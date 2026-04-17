@@ -2489,11 +2489,26 @@ function CalendarSidebar({
     ownAccounts: false,
     sharedAccounts: false,
   });
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef(null);
   const miniMonthCells = buildMiniMonthCells(focusDate);
   const activeWeekStart = getWeekStart(focusDate);
   const ownAccounts = accounts.filter((account) => account.ownership === 'self');
   const sharedAccounts = accounts.filter((account) => account.ownership === 'shared');
   const toggleSection = (key) => setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  useEffect(() => {
+    if (!createMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (createMenuRef.current && !createMenuRef.current.contains(event.target)) {
+        setCreateMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, [createMenuOpen]);
 
       if (collapsed) {
         return (
@@ -2509,13 +2524,37 @@ function CalendarSidebar({
           >
             <ChevronRight size={18} />
           </button>
-          <button
-            onClick={onNewEvent}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-            title="发起会议"
-          >
-            <Plus size={18} />
-          </button>
+          <div className="relative" ref={createMenuRef}>
+            <button
+              onClick={() => setCreateMenuOpen((prev) => !prev)}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-blue-600 hover:bg-slate-200"
+              title="新建"
+            >
+              <Plus size={18} />
+            </button>
+            {createMenuOpen && (
+              <div className="absolute left-[calc(100%+8px)] top-0 z-30 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
+                <button
+                  onClick={() => {
+                    onNewEvent();
+                    setCreateMenuOpen(false);
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  发起会议
+                </button>
+                <button
+                  onClick={() => {
+                    onNewEvent();
+                    setCreateMenuOpen(false);
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  新建日程
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex-1 min-h-0"></div>
         <div className="border-t border-slate-200 bg-[#f1f3f5] p-3">
@@ -2541,13 +2580,38 @@ function CalendarSidebar({
             <ChevronLeft size={18} />
           </button>
         </div>
-        <button
-          onClick={onNewEvent}
-          className="mt-4 flex w-full min-w-0 items-center justify-center rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-colors hover:bg-blue-700"
-        >
-          <Plus size={20} className="mr-2" />
-          发起会议
-        </button>
+        <div className="relative mt-4" ref={createMenuRef}>
+          <button
+            onClick={() => setCreateMenuOpen((prev) => !prev)}
+            className="flex w-full min-w-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 font-bold text-blue-600 transition-colors hover:bg-slate-200"
+          >
+            <Plus size={18} className="mr-2" />
+            新建
+            <ChevronDown size={16} className="ml-2" />
+          </button>
+          {createMenuOpen && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
+              <button
+                onClick={() => {
+                  onNewEvent();
+                  setCreateMenuOpen(false);
+                }}
+                className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+              >
+                发起会议
+              </button>
+              <button
+                onClick={() => {
+                  onNewEvent();
+                  setCreateMenuOpen(false);
+                }}
+                className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+              >
+                新建日程
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-slate-200 bg-[#f1f3f5] px-5 pb-5">
@@ -4062,100 +4126,6 @@ function CalendarEventSidebar({
           >
             删除日程
           </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function CalendarContextSidebar({
-  calendarLayout,
-  focusDate,
-  activeAccounts,
-  accountDisplayMode,
-  splitAccountIds,
-  onToggleSplitView,
-  onToggleSplitAccount,
-}) {
-  const splitEnabled = activeAccounts.length > 1;
-
-  return (
-    <aside
-      className="relative z-10 hidden shrink-0 border-l border-slate-200 bg-[#fcfcfb] lg:flex lg:flex-col"
-      style={{ width: 'clamp(288px, 24vw, 352px)', zIndex: 20 }}
-    >
-      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5">
-        <div>
-          <div className="text-sm font-black text-slate-900">C 栏</div>
-          <div className="mt-1 text-xs text-slate-500">视图设置与当前上下文</div>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8f8f7] p-4">
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">当前视图</div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-              <div className="text-sm font-semibold text-slate-900">{VIEW_OPTIONS.find((option) => option.id === calendarLayout)?.label || '日历'}视图</div>
-              <div className="mt-1 text-xs text-slate-500">{formatRangeTitle(calendarLayout, focusDate)}</div>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">显示方式</div>
-            <button
-              onClick={onToggleSplitView}
-              disabled={!splitEnabled}
-              className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                splitEnabled
-                  ? accountDisplayMode === 'split'
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
-              }`}
-            >
-              <span>拆分视图</span>
-              <span className="text-xs font-bold">{accountDisplayMode === 'split' ? '已开启' : '已关闭'}</span>
-            </button>
-            <div className="mt-2 text-xs leading-5 text-slate-500">
-              {splitEnabled ? '开启后会按账户拆分对比查看。' : '至少选择两个可见日历后，才可以开启拆分视图。'}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">当前可见日历</div>
-            <div className="space-y-2">
-              {activeAccounts.map((account) => {
-                const selectedInSplit = splitAccountIds.includes(account.id);
-                return (
-                  <button
-                    key={account.id}
-                    onClick={() => onToggleSplitAccount(account.id)}
-                    disabled={accountDisplayMode !== 'split' || activeAccounts.length <= 1}
-                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
-                      accountDisplayMode === 'split'
-                        ? selectedInSplit
-                          ? 'border-blue-200 bg-blue-50'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${account.color}`}></span>
-                      <span className="truncate text-sm font-medium text-slate-800">{account.email || account.name}</span>
-                    </div>
-                    {accountDisplayMode === 'split' && (
-                      <span className="text-[11px] font-bold text-slate-500">{selectedInSplit ? '显示' : '隐藏'}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm leading-6 text-slate-500">
-            单击日程会在这里显示摘要，双击再进入详情。
-          </div>
         </div>
       </div>
     </aside>
@@ -8602,28 +8572,16 @@ function MainApp() {
                   />
                 )}
 
-                {showRightSidebar && currentScreen === 'calendar' && (
-                  selectedEvent ? (
-                    <CalendarEventSidebar
-                      event={selectedEvent}
-                      calendar={selectedEventCalInfo}
-                      account={selectedEventAccountInfo}
-                      onBackToAgenda={() => setSelectedEventId(null)}
-                      onOpenDetails={() => openEventDetails(selectedEvent.id)}
-                      onDeleteEvent={handleDeleteEvent}
-                      onRespond={handleRespondToEvent}
-                    />
-                  ) : (
-                    <CalendarContextSidebar
-                      calendarLayout={calendarLayout}
-                      focusDate={focusDate}
-                      activeAccounts={activeAccounts}
-                      accountDisplayMode={effectiveAccountDisplayMode}
-                      splitAccountIds={splitAccountIds}
-                      onToggleSplitView={() => setAccountDisplayMode((prev) => (prev === 'split' ? 'overlay' : 'split'))}
-                      onToggleSplitAccount={toggleSplitAccount}
-                    />
-                  )
+                {showRightSidebar && currentScreen === 'calendar' && selectedEvent && (
+                  <CalendarEventSidebar
+                    event={selectedEvent}
+                    calendar={selectedEventCalInfo}
+                    account={selectedEventAccountInfo}
+                    onBackToAgenda={() => setSelectedEventId(null)}
+                    onOpenDetails={() => openEventDetails(selectedEvent.id)}
+                    onDeleteEvent={handleDeleteEvent}
+                    onRespond={handleRespondToEvent}
+                  />
                 )}
 
                 {currentScreen === 'details' && selectedEvent && (
