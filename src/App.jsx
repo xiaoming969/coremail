@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   Copy,
   Edit,
@@ -2477,6 +2479,8 @@ function CalendarSidebar({
   onToggleAccount,
   onSetAccountGroupChecked,
   onOpenMailboxPermissions,
+  onOpenSharingSettings,
+  onAddSharedCalendar,
   onToggleCollapsed,
   activeProduct,
   onSelectProduct,
@@ -2508,7 +2512,7 @@ function CalendarSidebar({
           <button
             onClick={onNewEvent}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-            title="新建日程"
+            title="发起会议"
           >
             <Plus size={18} />
           </button>
@@ -2542,22 +2546,30 @@ function CalendarSidebar({
           className="mt-4 flex w-full min-w-0 items-center justify-center rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-colors hover:bg-blue-700"
         >
           <Plus size={20} className="mr-2" />
-          新建日程
+          发起会议
         </button>
       </div>
 
       <div className="border-b border-slate-200 bg-[#f1f3f5] px-5 pb-5">
         <div className="px-1 pt-1">
-          <div className="flex justify-between items-center mb-4">
-            <span className="font-bold text-gray-800 text-sm">
-              {focusDate.getFullYear()}年 {focusDate.getMonth() + 1}月
-            </span>
-            <div className="flex space-x-1">
-              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(-1)}>
+          <div className="mb-4 flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1">
+              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(-12)} title="上一年">
+                <ChevronsLeft size={14} />
+              </button>
+              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(-1)} title="上一月">
                 <ChevronLeft size={16} />
               </button>
-              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(1)}>
+            </div>
+            <span className="min-w-0 text-center text-sm font-bold text-gray-800">
+              {focusDate.getFullYear()}年 {focusDate.getMonth() + 1}月
+            </span>
+            <div className="flex items-center gap-1">
+              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(1)} title="下一月">
                 <ChevronRight size={16} />
+              </button>
+              <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(12)} title="下一年">
+                <ChevronsRight size={14} />
               </button>
             </div>
           </div>
@@ -2572,7 +2584,8 @@ function CalendarSidebar({
             {miniMonthCells.map((cell) => {
               const inActiveWeek = getWeekStart(cell.date).getTime() === activeWeekStart.getTime();
               const dayMeta = miniMonthEventMap.get(formatDateLabel(cell.date));
-              const markerColors = dayMeta?.colors?.slice(0, 3) || [];
+              const markerColors = dayMeta?.colors?.slice(0, 4) || [];
+              const overflowMarkerCount = Math.max((dayMeta?.accountCount || markerColors.length) - markerColors.length, 0);
               const isSelectedDate = sameDay(cell.date, focusDate);
               const showWeekRange = calendarLayout === 'week' && inActiveWeek;
 
@@ -2596,13 +2609,16 @@ function CalendarSidebar({
                     {cell.date.getDate()}
                   </button>
                   {markerColors.length > 0 && (
-                    <div className="pointer-events-none absolute bottom-0 left-1/2 z-[1] flex -translate-x-1/2 items-center gap-1">
+                    <div className="pointer-events-none absolute bottom-0 left-1/2 z-[1] flex -translate-x-1/2 items-center gap-1 rounded-full px-1">
                       {markerColors.map((color, index) => (
                         <span
                           key={`${cell.key}-marker-${index}`}
                           className={`h-1.5 w-1.5 rounded-full ${color}`}
                         ></span>
                       ))}
+                      {overflowMarkerCount > 0 && (
+                        <span className="text-[9px] font-bold leading-none text-gray-400">+{overflowMarkerCount}</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2616,23 +2632,44 @@ function CalendarSidebar({
         <div>
           <div className="space-y-4">
             {[
-              { key: 'ownAccounts', title: '我的账户', ownership: 'self', items: ownAccounts },
-              { key: 'sharedAccounts', title: '其他账户', ownership: 'shared', items: sharedAccounts },
+              { key: 'ownAccounts', title: '我的日历', ownership: 'self', items: ownAccounts },
+              { key: 'sharedAccounts', title: '共享日历', ownership: 'shared', items: sharedAccounts },
             ].map((group) => (
-              <div key={group.title}>
-                <div className="flex items-center justify-between gap-2 mb-3">
+              <div key={group.title} className="group">
+                <div className="mb-3 flex items-center justify-between gap-2">
                   <button onClick={() => toggleSection(group.key)} className="flex items-center min-w-0 text-left">
                     <ChevronDown size={14} className={`mr-2 text-gray-400 transition-transform ${collapsedSections[group.key] ? '-rotate-90' : ''}`} />
                     <div className="text-[11px] font-black text-gray-400 uppercase">{group.title}</div>
                   </button>
-                  {group.items.length > 0 && !group.items.every((item) => item.checked) && (
-                    <button
-                      onClick={() => onSetAccountGroupChecked(group.ownership)}
-                      className="px-2.5 py-1 rounded-lg text-[11px] font-black text-gray-500 bg-gray-100 hover:bg-gray-200 whitespace-nowrap"
-                    >
-                      全选
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    {group.items.length > 0 && !group.items.every((item) => item.checked) && (
+                      <button
+                        onClick={() => onSetAccountGroupChecked(group.ownership)}
+                        className="rounded-lg px-2 py-1 text-[11px] font-black text-gray-500 transition hover:bg-slate-200/70 whitespace-nowrap"
+                      >
+                        全选
+                      </button>
+                    )}
+                    {group.ownership === 'self' ? (
+                      <button
+                        onClick={onOpenSharingSettings}
+                        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-slate-200/70 hover:text-gray-600"
+                        title="设置共享日历"
+                        aria-label="设置共享日历"
+                      >
+                        <Settings size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={onAddSharedCalendar}
+                        className="rounded-lg p-1.5 text-gray-400 transition hover:bg-slate-200/70 hover:text-gray-600"
+                        title="添加共享日历"
+                        aria-label="添加共享日历"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 		                {!collapsedSections[group.key] && <div>
 		                  {group.items.map((account) => (
@@ -3930,7 +3967,7 @@ function CalendarEventSidebar({
           className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
           <ChevronLeft size={15} className="mr-2" />
-          返回安排
+          返回设置
         </button>
         <button
           onClick={onOpenDetails}
@@ -4025,6 +4062,100 @@ function CalendarEventSidebar({
           >
             删除日程
           </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function CalendarContextSidebar({
+  calendarLayout,
+  focusDate,
+  activeAccounts,
+  accountDisplayMode,
+  splitAccountIds,
+  onToggleSplitView,
+  onToggleSplitAccount,
+}) {
+  const splitEnabled = activeAccounts.length > 1;
+
+  return (
+    <aside
+      className="relative z-10 hidden shrink-0 border-l border-slate-200 bg-[#fcfcfb] lg:flex lg:flex-col"
+      style={{ width: 'clamp(288px, 24vw, 352px)', zIndex: 20 }}
+    >
+      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5">
+        <div>
+          <div className="text-sm font-black text-slate-900">C 栏</div>
+          <div className="mt-1 text-xs text-slate-500">视图设置与当前上下文</div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8f8f7] p-4">
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">当前视图</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="text-sm font-semibold text-slate-900">{VIEW_OPTIONS.find((option) => option.id === calendarLayout)?.label || '日历'}视图</div>
+              <div className="mt-1 text-xs text-slate-500">{formatRangeTitle(calendarLayout, focusDate)}</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">显示方式</div>
+            <button
+              onClick={onToggleSplitView}
+              disabled={!splitEnabled}
+              className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                splitEnabled
+                  ? accountDisplayMode === 'split'
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
+              }`}
+            >
+              <span>拆分视图</span>
+              <span className="text-xs font-bold">{accountDisplayMode === 'split' ? '已开启' : '已关闭'}</span>
+            </button>
+            <div className="mt-2 text-xs leading-5 text-slate-500">
+              {splitEnabled ? '开启后会按账户拆分对比查看。' : '至少选择两个可见日历后，才可以开启拆分视图。'}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">当前可见日历</div>
+            <div className="space-y-2">
+              {activeAccounts.map((account) => {
+                const selectedInSplit = splitAccountIds.includes(account.id);
+                return (
+                  <button
+                    key={account.id}
+                    onClick={() => onToggleSplitAccount(account.id)}
+                    disabled={accountDisplayMode !== 'split' || activeAccounts.length <= 1}
+                    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
+                      accountDisplayMode === 'split'
+                        ? selectedInSplit
+                          ? 'border-blue-200 bg-blue-50'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                        : 'border-slate-200 bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${account.color}`}></span>
+                      <span className="truncate text-sm font-medium text-slate-800">{account.email || account.name}</span>
+                    </div>
+                    {accountDisplayMode === 'split' && (
+                      <span className="text-[11px] font-bold text-slate-500">{selectedInSplit ? '显示' : '隐藏'}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm leading-6 text-slate-500">
+            单击日程会在这里显示摘要，双击再进入详情。
+          </div>
         </div>
       </div>
     </aside>
@@ -4763,7 +4894,7 @@ function AddSharedCalendarModal({ open, draft, onClose, onChange, onApplyTemplat
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
           <div>
             <div className="text-lg font-black text-gray-900">添加共享日历</div>
-            <div className="text-sm text-gray-500 mt-1">通过添加他人的账号，将共享账户与主日历一并接入当前视图。</div>
+            <div className="text-sm text-gray-500 mt-1">通过添加他人的账号，将共享日历与主日历一并接入当前视图。</div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
@@ -4840,7 +4971,7 @@ function AddSharedCalendarModal({ open, draft, onClose, onChange, onApplyTemplat
           </div>
 
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-            添加后会自动生成一个共享账户和对应主日历，并出现在左侧的“其他账户”分组中。
+            添加后会自动生成一个共享日历来源，并出现在左侧的“共享日历”分组中。
           </div>
         </div>
 
@@ -5475,30 +5606,27 @@ function MainApp() {
     activeEvents.forEach((event) => {
       const calendar = calendarMap[event.calId];
       const color = calendar?.color || 'bg-gray-400';
+      const accountId = calendar?.accountId || 'unknown';
       const span = event.isAllDay ? Math.max(1, event.allDaySpan || 1) : 1;
       const startDate = stripTime(eventToDate(event));
 
       for (let offset = 0; offset < span; offset += 1) {
         const dateKey = formatDateLabel(addDays(startDate, offset));
-        const current = nextMap.get(dateKey) || { count: 0, colors: [] };
+        const current = nextMap.get(dateKey) || { count: 0, colors: [], accountIds: [] };
 
         current.count += 1;
         if (!current.colors.includes(color)) current.colors.push(color);
+        if (!current.accountIds.includes(accountId)) current.accountIds.push(accountId);
         nextMap.set(dateKey, current);
       }
     });
 
+    nextMap.forEach((meta) => {
+      meta.accountCount = meta.accountIds.length;
+    });
+
     return nextMap;
   }, [activeEvents, calendarMap]);
-
-  const agendaGroups = useMemo(() => {
-    return activeAccountIds
-      .map((accountId) => ({
-        accountId,
-        items: interactiveRangeEvents.filter((event) => !event.isAllDay && calendarMap[event.calId]?.accountId === accountId),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [activeAccountIds, interactiveRangeEvents, calendarMap]);
   const reminderEvents = useMemo(() => {
     const now = TODAY_DATE.getTime();
     const visible = events
@@ -5902,11 +6030,11 @@ function MainApp() {
     }
 
     if (accounts.some((account) => account.email.toLowerCase() === email)) {
-      triggerFeedback('L3', {
-        msg: '该共享账号已存在',
-        icon: <AlertCircle size={16} />,
-        color: 'bg-red-600',
-      });
+    triggerFeedback('L3', {
+      msg: '该共享日历已存在',
+      icon: <AlertCircle size={16} />,
+      color: 'bg-red-600',
+    });
       return;
     }
 
@@ -5918,14 +6046,14 @@ function MainApp() {
 
     setAccounts((prev) => [
       ...prev,
-      {
-        id: nextAccountId,
-        name,
-        email,
-        role: '其他账户',
-        ownership: 'shared',
-        color: draft.color,
-        checked: true,
+        {
+          id: nextAccountId,
+          name,
+          email,
+          role: '共享日历',
+          ownership: 'shared',
+          color: draft.color,
+          checked: true,
         mailboxMembers: [
           {
             id: `mb-${stamp}-self`,
@@ -5989,7 +6117,7 @@ function MainApp() {
     ]);
     setSharedCalendarDialog((prev) => ({ ...prev, open: false }));
     triggerFeedback('L3', {
-      msg: `已添加共享账号：${name}`,
+      msg: `已添加共享日历：${name}`,
       icon: <Calendar size={16} />,
       color: 'bg-blue-600',
     });
@@ -6667,7 +6795,7 @@ function MainApp() {
       prev.map((account) => (account.ownership === ownership ? { ...account, checked: true } : account)),
     );
     triggerFeedback('L3', {
-      msg: `${ownership === 'self' ? '我的账户' : '其他账户'}已全部选中`,
+      msg: `${ownership === 'self' ? '我的日历' : '共享日历'}已全部选中`,
       icon: <Check size={16} />,
       color: 'bg-slate-900',
     });
@@ -8156,8 +8284,6 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handleCreateShortcuts);
   }, [currentScreen, saveDraft]);
 
-  const agendaTitle =
-    calendarLayout === 'month' ? '本月重点' : calendarLayout === 'day' ? '当日安排' : '本周安排';
   const showAccountLabel = calendarLayout === 'day' ? activeAccounts.length > 1 : false;
 
   return (
@@ -8175,6 +8301,8 @@ function MainApp() {
           onToggleAccount={toggleAccount}
           onSetAccountGroupChecked={setAccountGroupChecked}
           onOpenMailboxPermissions={openMailboxPermissions}
+          onOpenSharingSettings={handleOpenSharingSettings}
+          onAddSharedCalendar={handleAddSharedCalendar}
           onToggleCollapsed={() => setCalendarSidebarCollapsed((prev) => !prev)}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
@@ -8201,32 +8329,11 @@ function MainApp() {
             {activeProduct === 'calendar' ? (
               <div className="flex items-center gap-2 overflow-x-auto min-w-0 pr-1">
                 <button
-                  onClick={() => navTo('create')}
-                  className="shrink-0 inline-flex items-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
-                >
-                  <Plus size={14} className="mr-1.5" />
-                  发起会议
-                </button>
-                <button
                   onClick={handleCalendarSync}
                   className="shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-slate-50"
                 >
                   <RefreshCw size={14} className="mr-1.5" />
                   同步日历
-                </button>
-                <button
-                  onClick={handleOpenSharingSettings}
-                  className="shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-slate-50"
-                >
-                  <Settings size={14} className="mr-1.5" />
-                  设置共享日历
-                </button>
-                <button
-                  onClick={handleAddSharedCalendar}
-                  className="shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-slate-50"
-                >
-                  <Calendar size={14} className="mr-1.5" />
-                  添加共享日历
                 </button>
                 <button
                   onClick={handleOpenReminders}
@@ -8507,13 +8614,14 @@ function MainApp() {
                       onRespond={handleRespondToEvent}
                     />
                   ) : (
-                    <AgendaSidebar
-                      title={agendaTitle}
-                      groupedEvents={agendaGroups}
-                      accountMap={accountMap}
-                      calendarMap={calendarMap}
-                      onOpenEvent={openEventDetails}
-                      onRespond={handleRespondToEvent}
+                    <CalendarContextSidebar
+                      calendarLayout={calendarLayout}
+                      focusDate={focusDate}
+                      activeAccounts={activeAccounts}
+                      accountDisplayMode={effectiveAccountDisplayMode}
+                      splitAccountIds={splitAccountIds}
+                      onToggleSplitView={() => setAccountDisplayMode((prev) => (prev === 'split' ? 'overlay' : 'split'))}
+                      onToggleSplitAccount={toggleSplitAccount}
                     />
                   )
                 )}
