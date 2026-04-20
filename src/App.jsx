@@ -8293,7 +8293,32 @@ function MainApp() {
               </div>
             )}
           </div>
-
+          <div className="ml-auto flex items-center gap-1 self-end lg:self-auto">
+            <button
+              type="button"
+              aria-label="最小化窗口"
+              title="最小化"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            >
+              <Minus size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label="全屏窗口"
+              title="全屏"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            >
+              <Square size={14} />
+            </button>
+            <button
+              type="button"
+              aria-label="关闭窗口"
+              title="关闭"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </header>
 
         <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden bg-[#f8f8f7]">
