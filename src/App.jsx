@@ -436,7 +436,7 @@ const getTimedEventCardDensity = ({ isSplit = false, columnCount = 1, durationH 
 
 const overlapsWindow = (leftStart, leftEnd, rightStart, rightEnd) => leftStart < rightEnd && rightStart < leftEnd;
 const isWorkHour = (hour) => hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
-const getTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT + TIMELINE_HEADER_HEIGHT;
+const getTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT;
 const getTimeHeight = (durationH) => durationH * CELL_HEIGHT;
 const getWorkdayScrollTop = () => Math.max(0, (WORK_START_HOUR - DAY_START_HOUR) * CELL_HEIGHT);
 const scrollElementToTop = (element, top) => {
@@ -2862,8 +2862,7 @@ function WeekView({
   const paneHeaderHeight = 0;
   const splitWeekPaneHeaderHeight = isSplit ? SPLIT_WEEK_PANE_HEADER_HEIGHT : 0;
   const weekTimelineHeaderHeight = TIMELINE_HEADER_HEIGHT;
-  const weekTimelineTopOffset = splitWeekPaneHeaderHeight + weekTimelineHeaderHeight;
-  const getWeekTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT + weekTimelineTopOffset;
+  const getWeekTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT;
   const paneGap = 0;
   const paneMinWidth = isSplit ? (weekAccounts.length >= 3 ? 400 : 440) : 0;
   const paneData = useMemo(() => {
@@ -2895,7 +2894,7 @@ function WeekView({
     const target = scrollRef?.current;
     if (!target) return;
 
-    const scrollTop = getWorkdayScrollTop(weekTimelineTopOffset);
+    const scrollTop = getWorkdayScrollTop();
     const timeoutIds = [0, 80, 180, 320].map((delay) =>
       window.setTimeout(() => {
         if (target.isConnected) scrollElementToTop(target, scrollTop);
@@ -2917,87 +2916,137 @@ function WeekView({
       timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
       frameIds.forEach((frameId) => window.cancelAnimationFrame(frameId));
     };
-  }, [scrollRef, scrollToWorkStartToken, weekTimelineTopOffset]);
+  }, [scrollRef, scrollToWorkStartToken]);
 
   return (
     <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
       <div className="flex-1 min-h-0 overflow-x-auto">
         <div className="flex min-h-full min-w-full flex-col" style={isSplit ? { minWidth: `${minContentWidth}px` } : undefined}>
-          <div className="sticky top-0 z-30 flex border-b border-gray-200 bg-white shrink-0 relative" style={{ zIndex: 30 }}>
-            <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px' }}>
-              {paneHeaderHeight > 0 && <div className="border-b border-gray-200 bg-gray-50" style={{ height: `${paneHeaderHeight}px` }}></div>}
-              <div className="flex items-center justify-center" style={{ height: `${allDayHeight}px` }}>
-                <span className="text-xs font-bold text-gray-400">全天</span>
-              </div>
-            </div>
-            <div
-              className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex'}
-              style={isSplit ? { gridTemplateColumns: `repeat(${paneData.length}, minmax(${paneMinWidth}px, 1fr))` } : undefined}
-            >
-              {paneData.map((pane, paneIndex) => (
-                <div
-                  key={pane.account.id}
-                  className={`bg-white shrink-0 ${isSplit ? `overflow-hidden ${paneIndex < paneData.length - 1 ? 'border-r border-gray-200' : ''}` : 'border-r border-gray-200'}`}
-                  style={isSplit ? { minWidth: `${paneMinWidth}px` } : { flex: 1, minWidth: 0 }}
-                >
-                  <div className="relative" style={{ height: `${allDayHeight}px` }}>
-                    <div className="flex h-full">
+          <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
+            <div className="flex border-b border-gray-200 bg-white">
+              <div
+                className="border-r border-gray-200 shrink-0 bg-white"
+                style={{ width: '64px', height: `${splitWeekPaneHeaderHeight + weekTimelineHeaderHeight}px` }}
+              ></div>
+              <div
+                className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white'}
+                style={isSplit ? { gridTemplateColumns: `repeat(${paneData.length}, minmax(${paneMinWidth}px, 1fr))` } : undefined}
+              >
+                {paneData.map((pane, paneIndex) => (
+                  <div
+                    key={`${pane.account.id}-date-header`}
+                    className={`bg-white shrink-0 ${isSplit ? `overflow-hidden ${paneIndex < paneData.length - 1 ? 'border-r border-gray-200' : ''}` : 'border-r border-gray-200'}`}
+                    style={isSplit ? { minWidth: `${paneMinWidth}px` } : { flex: 1, minWidth: 0 }}
+                  >
+                    {isSplit && (
+                      <div
+                        className="flex items-center gap-2 border-b border-gray-200 bg-[#fcfcfb] px-3"
+                        style={{ height: `${splitWeekPaneHeaderHeight}px` }}
+                      >
+                        <div className={`h-2.5 w-2.5 rounded-full ${pane.account.color}`}></div>
+                        <div className="min-w-0 flex-1 truncate text-[12px] font-bold text-gray-700">{pane.account.email || pane.account.name}</div>
+                        <button
+                          type="button"
+                          onClick={() => onHideAccount?.(pane.account.id)}
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
+                          title={`隐藏 ${pane.account.email || pane.account.name}`}
+                          aria-label={`隐藏 ${pane.account.email || pane.account.name}`}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex bg-white">
                       {days.map((day) => (
-                        <div key={`${pane.account.id}-${day.date.toISOString()}-all-day`} className="flex-1 border-r border-gray-100 bg-white"></div>
+                        <div
+                          key={`${pane.account.id}-${day.date.toISOString()}-date-header`}
+                          className={`flex-1 border-r border-gray-200 px-2 ${
+                            day.isToday ? 'bg-blue-50/80' : 'bg-[#fcfcfb]'
+                          }`}
+                          style={{ height: `${weekTimelineHeaderHeight}px` }}
+                        >
+                          <div className="flex h-full flex-col items-center justify-center">
+                            <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
+                            <span className={`text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>{day.dayNumber}</span>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                    <div className="pointer-events-none absolute inset-0">
-                      {pane.allDayEvents.map((event) => {
-                        const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
-                        const account = accountMap[calendar.accountId];
-                        const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
-                        const startDay = event.day || 0;
-                        const endDay = Math.min(days.length - 1, startDay + Math.max(1, event.allDaySpan || 1) - 1);
-                        const spanDays = endDay - startDay + 1;
-                        const row = pane.allDayLayout.positions[event.id]?.row || 0;
-                        const top = `${8 + row * 28}px`;
-                        const left = `calc(${(startDay * 100) / days.length}% + 4px)`;
-                        const width = `calc(${(spanDays * 100) / days.length}% - 8px)`;
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex bg-white">
+              <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px', height: `${allDayHeight}px` }}>
+                <div className="flex h-full items-center justify-center">
+                  <span className="text-xs font-bold text-gray-400">全天</span>
+                </div>
+              </div>
+              <div
+                className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex'}
+                style={isSplit ? { gridTemplateColumns: `repeat(${paneData.length}, minmax(${paneMinWidth}px, 1fr))` } : undefined}
+              >
+                {paneData.map((pane, paneIndex) => (
+                  <div
+                    key={pane.account.id}
+                    className={`bg-white shrink-0 ${isSplit ? `overflow-hidden ${paneIndex < paneData.length - 1 ? 'border-r border-gray-200' : ''}` : 'border-r border-gray-200'}`}
+                    style={isSplit ? { minWidth: `${paneMinWidth}px` } : { flex: 1, minWidth: 0 }}
+                  >
+                    <div className="relative" style={{ height: `${allDayHeight}px` }}>
+                      <div className="flex h-full">
+                        {days.map((day) => (
+                          <div key={`${pane.account.id}-${day.date.toISOString()}-all-day`} className="flex-1 border-r border-gray-100 bg-white"></div>
+                        ))}
+                      </div>
+                      <div className="pointer-events-none absolute inset-0">
+                        {pane.allDayEvents.map((event) => {
+                          const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
+                          const account = accountMap[calendar.accountId];
+                          const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+                          const startDay = event.day || 0;
+                          const endDay = Math.min(days.length - 1, startDay + Math.max(1, event.allDaySpan || 1) - 1);
+                          const spanDays = endDay - startDay + 1;
+                          const row = pane.allDayLayout.positions[event.id]?.row || 0;
+                          const top = `${8 + row * 28}px`;
+                          const left = `calc(${(startDay * 100) / days.length}% + 4px)`;
+                          const width = `calc(${(spanDays * 100) / days.length}% - 8px)`;
 
-                        return (
-                          <button
-                            key={`${pane.account.id}-${event.id}-span`}
-                            onClick={(entry) => {
-                              entry.stopPropagation();
-                              onSelectEvent(event.id);
-                            }}
-                            onDoubleClick={(entry) => {
-                              entry.stopPropagation();
-                              onOpenEvent(event.id);
-                            }}
-                            onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
-                            onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
-                            onMouseLeave={() => onHidePreview(event.id)}
-                            title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
-                            className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container}`}
-                            style={{ left, width, top }}
-                          >
-                            <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${tones.stripe}`}></div>
-                            <div className="pl-2 truncate">
-                              {event.title}
-                              {spanDays > 1 && <span className="ml-1 text-[10px] text-gray-400">跨{spanDays}天</span>}
-                            </div>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={`${pane.account.id}-${event.id}-span`}
+                              onClick={(entry) => {
+                                entry.stopPropagation();
+                                onSelectEvent(event.id);
+                              }}
+                              onDoubleClick={(entry) => {
+                                entry.stopPropagation();
+                                onOpenEvent(event.id);
+                              }}
+                              onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                              onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                              onMouseLeave={() => onHidePreview(event.id)}
+                              title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
+                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container}`}
+                              style={{ left, width, top }}
+                            >
+                              <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${tones.stripe}`}></div>
+                              <div className="pl-2 truncate">
+                                {event.title}
+                                {spanDays > 1 && <span className="ml-1 text-[10px] text-gray-400">跨{spanDays}天</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           <div ref={scrollRef} data-timeline-scroll="week" className="flex-1 min-h-0 overflow-y-auto bg-white flex relative">
             <div className="border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
-	              <div className="sticky top-0 z-20 bg-white">
-                {isSplit && <div className="border-b border-gray-200 bg-gray-50/95" style={{ height: `${splitWeekPaneHeaderHeight}px` }}></div>}
-	                <div className="border-b border-gray-200 bg-white" style={{ height: `${weekTimelineHeaderHeight}px` }}></div>
-              </div>
               {HOURS.map((hour) => (
                 <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                   <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
@@ -3015,24 +3064,6 @@ function WeekView({
                   className={`shrink-0 bg-white ${isSplit ? `overflow-hidden ${paneIndex < paneData.length - 1 ? 'border-r border-gray-200' : ''}` : 'border-r border-gray-200'}`}
                   style={isSplit ? { minWidth: `${paneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                 >
-                  {isSplit && (
-                    <div
-                      className="sticky top-0 z-30 flex items-center gap-2 border-b border-gray-200 bg-[#fcfcfb] px-3"
-                      style={{ height: `${splitWeekPaneHeaderHeight}px` }}
-                    >
-                      <div className={`h-2.5 w-2.5 rounded-full ${pane.account.color}`}></div>
-                      <div className="min-w-0 flex-1 truncate text-[12px] font-bold text-gray-700">{pane.account.email || pane.account.name}</div>
-                      <button
-                        type="button"
-                        onClick={() => onHideAccount?.(pane.account.id)}
-                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
-                        title={`隐藏 ${pane.account.email || pane.account.name}`}
-                        aria-label={`隐藏 ${pane.account.email || pane.account.name}`}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )}
                   <div className="flex bg-white">
                     {days.map((day, dayIndex) => {
                       const laneId = isSplit ? pane.account.id : null;
@@ -3043,18 +3074,6 @@ function WeekView({
                           key={`${pane.account.id}-${day.date.toISOString()}`}
                           className={`flex-1 border-r border-gray-200 relative ${day.isToday ? 'bg-blue-50/30' : ''}`}
                         >
-                          <div
-                            className={`sticky border-b px-2 ${
-                              day.isToday ? 'bg-blue-50/80' : 'bg-[#fcfcfb]'
-                            }`}
-                            style={{ top: `${splitWeekPaneHeaderHeight}px`, zIndex: 20, height: `${weekTimelineHeaderHeight}px` }}
-                          >
-                            <div className="flex h-full flex-col items-center justify-center">
-                              <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
-                              <span className={`text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>{day.dayNumber}</span>
-                            </div>
-                          </div>
-
                           {HOURS.map((hour) => (
                             <div
                               key={`${pane.account.id}-${day.date.toISOString()}-${hour}`}
@@ -3337,86 +3356,99 @@ function DayView({
     <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
       <div className="flex-1 min-h-0 overflow-x-auto">
         <div className="flex min-h-full min-w-full flex-col" style={isSplit ? { minWidth: `${64 + lanes.length * dayPaneMinWidth}px` } : undefined}>
-          <div className="sticky top-0 z-30 flex border-b border-gray-200 bg-gray-50 shrink-0">
-            <div className="border-r border-gray-200 flex flex-col justify-center items-center py-2 bg-white shrink-0" style={{ width: '64px' }}>
-              <span className="text-xs font-bold text-gray-400">全天</span>
-            </div>
-            <div className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'} style={splitGridStyle}>
-              {lanes.map((lane) => (
-                <div
-                  key={lane.id}
-                  className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-h-[64px] relative`}
-                  style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
-                >
-                  <div className="px-4 py-3 border-b border-gray-100 bg-white">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center">
-                        <div className={`w-2.5 h-2.5 rounded-full ${lane.color}`}></div>
-                        <div className="ml-2 min-w-0">
-                          <div className="text-sm font-bold text-gray-900 truncate">{lane.email || lane.name}</div>
-                          <div className="text-xs text-gray-400 truncate">{isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : lane.email}</div>
+          <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
+            <div className="flex border-b border-gray-200 bg-white">
+              <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px', height: `${TIMELINE_HEADER_HEIGHT}px` }}></div>
+              <div className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'} style={splitGridStyle}>
+                {lanes.map((lane) => (
+                  <div
+                    key={`${lane.id}-date-header`}
+                    className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
+                    style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
+                  >
+                    <div className="flex h-14 items-center px-4 bg-white">
+                      <div className="flex min-w-0 items-center justify-between gap-3 w-full">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
+                          <div className="text-lg font-black text-gray-900">
+                            {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                          </div>
                         </div>
+                        {isSplit && (
+                          <button
+                            type="button"
+                            onClick={() => onHideAccount?.(lane.id)}
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
+                            title={`隐藏 ${lane.email || lane.name}`}
+                            aria-label={`隐藏 ${lane.email || lane.name}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
-                      {isSplit && (
-                        <button
-                          type="button"
-                          onClick={() => onHideAccount?.(lane.id)}
-                          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
-                          title={`隐藏 ${lane.email || lane.name}`}
-                          aria-label={`隐藏 ${lane.email || lane.name}`}
-                        >
-                          <X size={14} />
-                        </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex bg-white">
+              <div className="border-r border-gray-200 flex items-center justify-center bg-white shrink-0" style={{ width: '64px' }}>
+                <span className="text-xs font-bold text-gray-400">全天</span>
+              </div>
+              <div className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'} style={splitGridStyle}>
+                {lanes.map((lane) => (
+                  <div
+                    key={lane.id}
+                    className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-h-[64px] relative`}
+                    style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
+                  >
+                    <div className="p-2 space-y-2">
+                      {allDayEvents
+                        .filter((event) => lane.id === 'overlay' || calendarMap[event.calId]?.accountId === lane.id)
+                        .map((event) => {
+                          const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
+                          const account = accountMap[calendar.accountId];
+                          return (
+                            <button
+                              key={event.id}
+                              onClick={(entry) => {
+                                entry.stopPropagation();
+                                onSelectEvent(event.id);
+                              }}
+                              onDoubleClick={(entry) => {
+                                entry.stopPropagation();
+                                onOpenEvent(event.id);
+                              }}
+                              onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                              onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                              onMouseLeave={() => onHidePreview(event.id)}
+                              title={`${event.title}${account ? ` · ${account.name}` : ''}`}
+                              className="w-full text-left rounded-xl border px-3 py-2 bg-gray-50 hover:bg-white"
+                            >
+                              <div className="flex items-start">
+                                <div className={`w-2 h-2 rounded-full mr-2 ${calendar.color}`}></div>
+                                <div className="min-w-0">
+                                  {showOverlayAccountLabel && account && (
+                                    <div className="mb-0.5 text-[10px] font-black text-gray-400 truncate">{account.name}</div>
+                                  )}
+                                  <span className="block text-xs font-bold text-gray-800 truncate">{event.title}</span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      {allDayEvents.filter((event) => lane.id === 'overlay' || calendarMap[event.calId]?.accountId === lane.id).length === 0 && (
+                        <div className="text-xs text-gray-400 px-2 py-1">无全天事件</div>
                       )}
                     </div>
                   </div>
-                  <div className="p-2 space-y-2">
-                    {allDayEvents
-                      .filter((event) => lane.id === 'overlay' || calendarMap[event.calId]?.accountId === lane.id)
-                      .map((event) => {
-                        const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
-                        const account = accountMap[calendar.accountId];
-                        return (
-                          <button
-                            key={event.id}
-                            onClick={(entry) => {
-                              entry.stopPropagation();
-                              onSelectEvent(event.id);
-                            }}
-                            onDoubleClick={(entry) => {
-                              entry.stopPropagation();
-                              onOpenEvent(event.id);
-                            }}
-                            onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
-                            onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
-                            onMouseLeave={() => onHidePreview(event.id)}
-                            title={`${event.title}${account ? ` · ${account.name}` : ''}`}
-                            className="w-full text-left rounded-xl border px-3 py-2 bg-gray-50 hover:bg-white"
-                          >
-                            <div className="flex items-start">
-                              <div className={`w-2 h-2 rounded-full mr-2 ${calendar.color}`}></div>
-                              <div className="min-w-0">
-                                {showOverlayAccountLabel && account && (
-                                  <div className="mb-0.5 text-[10px] font-black text-gray-400 truncate">{account.name}</div>
-                                )}
-                                <span className="block text-xs font-bold text-gray-800 truncate">{event.title}</span>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    {allDayEvents.filter((event) => lane.id === 'overlay' || calendarMap[event.calId]?.accountId === lane.id).length === 0 && (
-                      <div className="text-xs text-gray-400 px-2 py-1">无全天事件</div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
 		          <div ref={scrollRef} data-timeline-scroll="day" className="flex-1 min-h-0 overflow-y-auto bg-white flex relative">
             <div className="border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
-              <div className="h-14 border-b border-gray-200"></div>
               {HOURS.map((hour) => (
                 <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                   <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
@@ -3425,20 +3457,12 @@ function DayView({
             </div>
             <div className="flex-1 min-w-0">
               <div className={isSplit ? 'grid bg-white min-w-full' : 'flex bg-white min-w-full'} style={splitGridStyle}>
-	                {lanes.map((lane) => (
+                {lanes.map((lane) => (
 	                  <div
                       key={lane.id}
                       className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 relative min-w-0`}
                       style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                     >
-		                    <div className="sticky top-0 z-20 flex h-14 items-center border-b bg-white px-4 shadow-[0_1px_0_rgba(229,231,235,1)]">
-	                      <div className="min-w-0">
-	                        <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
-	                        <div className="text-lg font-black text-gray-900">
-                            {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
-                          </div>
-	                      </div>
-	                    </div>
                     {HOURS.map((hour) => (
                       (() => {
                         const preferredAccountId = lane.id !== 'overlay' ? lane.id : null;
