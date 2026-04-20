@@ -111,7 +111,6 @@ const WORK_END_HOUR = 18;
 const CELL_HEIGHT = 96;
 const TIMELINE_HEADER_HEIGHT = 56;
 const SPLIT_WEEK_PANE_HEADER_HEIGHT = 36;
-const MONTH_PANEL_HEADER_HEIGHT = 56;
 const HALF_HOUR_STEP = 0.5;
 const MIN_EVENT_DURATION = 0.5;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, index) => index + DAY_START_HOUR);
@@ -3658,7 +3657,7 @@ function MonthView({
   onHideAccount,
 }) {
   const monthCells = buildMiniMonthCells(focusDate);
-  const monthWeekdayStickyTop = accountDisplayMode === 'split' && splitAccounts.length > 0 ? MONTH_PANEL_HEADER_HEIGHT : 0;
+  const monthWeekdayStickyTop = 0;
   const monthAccounts =
     accountDisplayMode === 'split' && splitAccounts.length > 0
       ? splitAccounts
@@ -3666,106 +3665,128 @@ function MonthView({
   const isSplit = accountDisplayMode === 'split' && monthAccounts.length > 0;
   const monthPaneMinWidth = monthAccounts.length >= 4 ? 320 : monthAccounts.length === 3 ? 360 : 420;
   const monthSplitMinWidth = monthAccounts.length > 0 ? monthAccounts.length * monthPaneMinWidth + Math.max(monthAccounts.length - 1, 0) * 16 : 0;
-  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-200" style={{ minWidth: '100%' }}>
-      <div
-        className="sticky z-20 grid grid-cols-7 gap-px border-b border-gray-200 bg-gray-200"
-        style={{ top: `${stickyTop}px` }}
-      >
-        {MONTH_WEEKDAY_NAMES.map((day) => (
-          <div
-            key={`${paneKey}-${day}`}
-            className="bg-gray-50 px-3 py-3 text-xs font-black text-gray-500 shadow-[0_1px_0_rgba(229,231,235,1)]"
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-px bg-gray-200">
-        {monthCells.map((cell) => {
-          const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
+  const renderMonthWeekdayHeader = (paneKey = 'overlay', stickyTop = 0) => (
+    <div
+      className="sticky z-20 grid grid-cols-7 gap-px border-b border-slate-200 bg-slate-200"
+      style={{ top: `${stickyTop}px` }}
+    >
+      {MONTH_WEEKDAY_NAMES.map((day) => (
+        <div
+          key={`${paneKey}-${day}`}
+          className="flex h-12 items-center justify-center bg-[#fcfcfb] text-xs font-black text-slate-500"
+        >
+          {day}
+        </div>
+      ))}
+    </div>
+  );
+  const renderMonthCells = (panelEvents, preferredAccountId = null, paneKey = 'overlay') => (
+    <div className="grid grid-cols-7 gap-px bg-slate-200">
+      {monthCells.map((cell) => {
+        const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
+        const isSelectedDate = sameDay(cell.date, focusDate);
+        const showQuickCreate = cell.isCurrentMonth && isSelectedDate;
 
-          return (
-            <div
-              key={`${paneKey}-${cell.key}`}
-              onClick={() => onSelectDate(cell.date)}
-              onContextMenu={(event) => onSlotContextMenu(event, { date: cell.date, hour: 10, preferredAccountId })}
-              className={`bg-white p-3 flex flex-col cursor-pointer transition-colors min-h-[164px] ${
-                cell.isCurrentMonth ? 'hover:bg-blue-50' : 'bg-gray-50 text-gray-300'
-              } ${cell.isToday ? 'ring-2 ring-inset ring-blue-500' : ''}`}
-            >
-              <div className="mb-3 flex items-center justify-between">
+        return (
+          <div
+            key={`${paneKey}-${cell.key}`}
+            onClick={() => onSelectDate(cell.date)}
+            onContextMenu={(event) => onSlotContextMenu(event, { date: cell.date, hour: 10, preferredAccountId })}
+            className={`group relative flex min-h-[164px] cursor-pointer flex-col p-3 transition-colors ${
+              cell.isCurrentMonth ? 'bg-white hover:bg-blue-50/40' : 'bg-slate-50 text-slate-300'
+            }`}
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectDate(cell.date);
+                }}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black transition ${
+                  cell.isToday
+                    ? 'bg-blue-600 text-white'
+                    : isSelectedDate
+                      ? 'border border-blue-500 bg-blue-50 text-blue-700'
+                      : cell.isCurrentMonth
+                        ? 'text-slate-800 hover:bg-slate-100'
+                        : 'text-slate-300'
+                }`}
+              >
+                {cell.date.getDate()}
+              </button>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickCreate({ date: cell.date, h: 10, preferredAccountId });
+                }}
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-slate-400 transition ${
+                  cell.isCurrentMonth
+                    ? showQuickCreate
+                      ? 'border-blue-200 bg-blue-50 text-blue-600 opacity-100'
+                      : 'border-slate-200 bg-white opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600 group-focus-within:opacity-100 group-focus-within:pointer-events-auto'
+                    : 'pointer-events-none opacity-0'
+                }`}
+                title="新建日程"
+                aria-label={`在 ${formatDateLabel(cell.date)} 新建日程`}
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {dayEvents.slice(0, 3).map((event) => {
+                const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
+                const account = accountMap[calendar.accountId];
+                const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+
+                return (
+                  <button
+                    key={event.id}
+                    onClick={(entry) => {
+                      entry.stopPropagation();
+                      onSelectEvent(event.id);
+                    }}
+                    onDoubleClick={(entry) => {
+                      entry.stopPropagation();
+                      onOpenEvent(event.id);
+                    }}
+                    onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                    onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                    onMouseLeave={() => onHidePreview(event.id)}
+                    title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
+                    className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs font-bold ${tones.container}`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${tones.stripe}`}></div>
+                      <span className="shrink-0 text-[10px] font-black text-gray-500">
+                        {event.isAllDay ? '全天' : formatHour(event.startH || 8)}
+                      </span>
+                      <span className="truncate flex-1">{event.title}</span>
+                    </div>
+                  </button>
+                );
+              })}
+              {dayEvents.length > 3 && (
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectDate(cell.date);
                   }}
-                  className={`w-8 h-8 rounded-full text-sm font-black ${
-                    cell.isToday ? 'bg-blue-600 text-white' : cell.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-300'
-                  }`}
+                  className="text-xs font-bold text-blue-600"
                 >
-                  {cell.date.getDate()}
+                  +{dayEvents.length - 3} 更多
                 </button>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onQuickCreate({ date: cell.date, h: 10, preferredAccountId });
-                  }}
-                  className="w-7 h-7 rounded-full border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-
-              <div className="space-y-1.5">
-                {dayEvents.slice(0, 3).map((event) => {
-                  const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
-                  const account = accountMap[calendar.accountId];
-                  const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
-
-                  return (
-                    <button
-                      key={event.id}
-                      onClick={(entry) => {
-                        entry.stopPropagation();
-                        onSelectEvent(event.id);
-                      }}
-                      onDoubleClick={(entry) => {
-                        entry.stopPropagation();
-                        onOpenEvent(event.id);
-                      }}
-                      onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
-                      onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
-                      onMouseLeave={() => onHidePreview(event.id)}
-                      title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
-                      className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs font-bold ${tones.container}`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${tones.stripe}`}></div>
-                        <span className="shrink-0 text-[10px] font-black text-gray-500">
-                          {event.isAllDay ? '全天' : formatHour(event.startH || 8)}
-                        </span>
-                        <span className="truncate flex-1">{event.title}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-                {dayEvents.length > 3 && (
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelectDate(cell.date);
-                    }}
-                    className="text-xs font-bold text-blue-600"
-                  >
-                    +{dayEvents.length - 3} 更多
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white" style={{ minWidth: '100%' }}>
+      {renderMonthWeekdayHeader(paneKey, stickyTop)}
+      {renderMonthCells(panelEvents, preferredAccountId, paneKey)}
     </div>
   );
 
@@ -3785,7 +3806,7 @@ function MonthView({
             return (
               <section
                 key={monthAccount.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
               >
                 <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
                   <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
