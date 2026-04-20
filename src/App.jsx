@@ -8403,17 +8403,30 @@ function MainApp() {
                         </div>
 
                         {activeAccounts.length > 1 && (
-                          <button
-                            onClick={() => setAccountDisplayMode((prev) => (prev === 'split' ? 'overlay' : 'split'))}
-                            className={`hidden md:inline-flex items-center rounded-xl border px-3 py-2 text-sm font-bold transition ${
-                              effectiveAccountDisplayMode === 'split'
-                                ? 'border-blue-200 bg-blue-50 text-blue-700'
-                                : 'border-slate-200 bg-white text-gray-700 hover:bg-slate-50'
-                            }`}
-                            aria-pressed={effectiveAccountDisplayMode === 'split'}
-                          >
-                            拆分视图
-                          </button>
+                          <div className="hidden md:inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
+                            <button
+                              onClick={() => setAccountDisplayMode('overlay')}
+                              className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                                effectiveAccountDisplayMode === 'overlay'
+                                  ? 'bg-slate-900 text-white'
+                                  : 'text-gray-700 hover:bg-slate-50'
+                              }`}
+                              aria-pressed={effectiveAccountDisplayMode === 'overlay'}
+                            >
+                              叠加视图
+                            </button>
+                            <button
+                              onClick={() => setAccountDisplayMode('split')}
+                              className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                                effectiveAccountDisplayMode === 'split'
+                                  ? 'bg-slate-900 text-white'
+                                  : 'text-gray-700 hover:bg-slate-50'
+                              }`}
+                              aria-pressed={effectiveAccountDisplayMode === 'split'}
+                            >
+                              拆分视图
+                            </button>
+                          </div>
                         )}
 
                         {activeAccounts.length > MAX_SPLIT_ACCOUNTS && effectiveAccountDisplayMode === 'split' && (
