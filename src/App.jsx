@@ -3643,102 +3643,105 @@ function MonthView({
   const monthPaneMinWidth = monthAccounts.length >= 4 ? 320 : monthAccounts.length === 3 ? 360 : 420;
   const monthSplitMinWidth = monthAccounts.length > 0 ? monthAccounts.length * monthPaneMinWidth + Math.max(monthAccounts.length - 1, 0) * 16 : 0;
   const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
-    <div
-      className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-gray-200 bg-gray-200"
-      style={{ minWidth: '100%' }}
-    >
-      {MONTH_WEEKDAY_NAMES.map((day) => (
-        <div
-          key={`${paneKey}-${day}`}
-          className="sticky z-20 border-b border-gray-200 bg-gray-50 px-3 py-3 text-xs font-black text-gray-500 shadow-[0_1px_0_rgba(229,231,235,1)]"
-          style={{ top: `${stickyTop}px` }}
-        >
-          {day}
-        </div>
-      ))}
-      {monthCells.map((cell) => {
-        const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
-
-        return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-200" style={{ minWidth: '100%' }}>
+      <div
+        className="sticky z-20 grid grid-cols-7 gap-px border-b border-gray-200 bg-gray-200"
+        style={{ top: `${stickyTop}px` }}
+      >
+        {MONTH_WEEKDAY_NAMES.map((day) => (
           <div
-            key={`${paneKey}-${cell.key}`}
-            onClick={() => onSelectDate(cell.date)}
-            onContextMenu={(event) => onSlotContextMenu(event, { date: cell.date, hour: 10, preferredAccountId })}
-            className={`bg-white p-3 flex flex-col cursor-pointer transition-colors min-h-[164px] ${
-              cell.isCurrentMonth ? 'hover:bg-blue-50' : 'bg-gray-50 text-gray-300'
-            } ${cell.isToday ? 'ring-2 ring-inset ring-blue-500' : ''}`}
+            key={`${paneKey}-${day}`}
+            className="bg-gray-50 px-3 py-3 text-xs font-black text-gray-500 shadow-[0_1px_0_rgba(229,231,235,1)]"
           >
-            <div className="mb-3 flex items-center justify-between">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelectDate(cell.date);
-                }}
-                className={`w-8 h-8 rounded-full text-sm font-black ${
-                  cell.isToday ? 'bg-blue-600 text-white' : cell.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-300'
-                }`}
-              >
-                {cell.date.getDate()}
-              </button>
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onQuickCreate({ date: cell.date, h: 10, preferredAccountId });
-                }}
-                className="w-7 h-7 rounded-full border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
+            {day}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-gray-200">
+        {monthCells.map((cell) => {
+          const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
 
-            <div className="space-y-1.5">
-              {dayEvents.slice(0, 3).map((event) => {
-                const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
-                const account = accountMap[calendar.accountId];
-                const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
-
-                return (
-                  <button
-                    key={event.id}
-                    onClick={(entry) => {
-                      entry.stopPropagation();
-                      onSelectEvent(event.id);
-                    }}
-                    onDoubleClick={(entry) => {
-                      entry.stopPropagation();
-                      onOpenEvent(event.id);
-                    }}
-                    onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
-                    onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
-                    onMouseLeave={() => onHidePreview(event.id)}
-                    title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
-                    className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs font-bold ${tones.container}`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${tones.stripe}`}></div>
-                      <span className="shrink-0 text-[10px] font-black text-gray-500">
-                        {event.isAllDay ? '全天' : formatHour(event.startH || 8)}
-                      </span>
-                      <span className="truncate flex-1">{event.title}</span>
-                    </div>
-                  </button>
-                );
-              })}
-              {dayEvents.length > 3 && (
+          return (
+            <div
+              key={`${paneKey}-${cell.key}`}
+              onClick={() => onSelectDate(cell.date)}
+              onContextMenu={(event) => onSlotContextMenu(event, { date: cell.date, hour: 10, preferredAccountId })}
+              className={`bg-white p-3 flex flex-col cursor-pointer transition-colors min-h-[164px] ${
+                cell.isCurrentMonth ? 'hover:bg-blue-50' : 'bg-gray-50 text-gray-300'
+              } ${cell.isToday ? 'ring-2 ring-inset ring-blue-500' : ''}`}
+            >
+              <div className="mb-3 flex items-center justify-between">
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelectDate(cell.date);
                   }}
-                  className="text-xs font-bold text-blue-600"
+                  className={`w-8 h-8 rounded-full text-sm font-black ${
+                    cell.isToday ? 'bg-blue-600 text-white' : cell.isCurrentMonth ? 'text-gray-800 hover:bg-gray-100' : 'text-gray-300'
+                  }`}
                 >
-                  +{dayEvents.length - 3} 更多
+                  {cell.date.getDate()}
                 </button>
-              )}
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onQuickCreate({ date: cell.date, h: 10, preferredAccountId });
+                  }}
+                  className="w-7 h-7 rounded-full border border-gray-200 text-gray-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 flex items-center justify-center"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                {dayEvents.slice(0, 3).map((event) => {
+                  const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
+                  const account = accountMap[calendar.accountId];
+                  const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+
+                  return (
+                    <button
+                      key={event.id}
+                      onClick={(entry) => {
+                        entry.stopPropagation();
+                        onSelectEvent(event.id);
+                      }}
+                      onDoubleClick={(entry) => {
+                        entry.stopPropagation();
+                        onOpenEvent(event.id);
+                      }}
+                      onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                      onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                      onMouseLeave={() => onHidePreview(event.id)}
+                      title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
+                      className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs font-bold ${tones.container}`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${tones.stripe}`}></div>
+                        <span className="shrink-0 text-[10px] font-black text-gray-500">
+                          {event.isAllDay ? '全天' : formatHour(event.startH || 8)}
+                        </span>
+                        <span className="truncate flex-1">{event.title}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+                {dayEvents.length > 3 && (
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelectDate(cell.date);
+                    }}
+                    className="text-xs font-bold text-blue-600"
+                  >
+                    +{dayEvents.length - 3} 更多
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 
