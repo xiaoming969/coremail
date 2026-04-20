@@ -111,6 +111,7 @@ const WORK_END_HOUR = 18;
 const CELL_HEIGHT = 96;
 const TIMELINE_HEADER_HEIGHT = 56;
 const SPLIT_WEEK_PANE_HEADER_HEIGHT = 36;
+const MONTH_PANEL_HEADER_HEIGHT = 56;
 const HALF_HOUR_STEP = 0.5;
 const MIN_EVENT_DURATION = 0.5;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, index) => index + DAY_START_HOUR);
@@ -437,8 +438,7 @@ const overlapsWindow = (leftStart, leftEnd, rightStart, rightEnd) => leftStart <
 const isWorkHour = (hour) => hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
 const getTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT + TIMELINE_HEADER_HEIGHT;
 const getTimeHeight = (durationH) => durationH * CELL_HEIGHT;
-const getWorkdayScrollTop = (headerHeight = TIMELINE_HEADER_HEIGHT) =>
-  Math.max(0, headerHeight + (WORK_START_HOUR - DAY_START_HOUR) * CELL_HEIGHT);
+const getWorkdayScrollTop = () => Math.max(0, (WORK_START_HOUR - DAY_START_HOUR) * CELL_HEIGHT);
 const scrollElementToTop = (element, top) => {
   if (!element) return;
   element.scrollTop = top;
@@ -2923,7 +2923,7 @@ function WeekView({
     <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
       <div className="flex-1 min-h-0 overflow-x-auto">
         <div className="flex min-h-full min-w-full flex-col" style={isSplit ? { minWidth: `${minContentWidth}px` } : undefined}>
-          <div className="flex border-b border-gray-200 bg-white shrink-0 relative" style={{ zIndex: 5 }}>
+          <div className="sticky top-0 z-30 flex border-b border-gray-200 bg-white shrink-0 relative" style={{ zIndex: 30 }}>
             <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px' }}>
               {paneHeaderHeight > 0 && <div className="border-b border-gray-200 bg-gray-50" style={{ height: `${paneHeaderHeight}px` }}></div>}
               <div className="flex items-center justify-center" style={{ height: `${allDayHeight}px` }}>
@@ -3337,7 +3337,7 @@ function DayView({
     <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
       <div className="flex-1 min-h-0 overflow-x-auto">
         <div className="flex min-h-full min-w-full flex-col" style={isSplit ? { minWidth: `${64 + lanes.length * dayPaneMinWidth}px` } : undefined}>
-          <div className="flex border-b border-gray-200 bg-gray-50 shrink-0">
+          <div className="sticky top-0 z-30 flex border-b border-gray-200 bg-gray-50 shrink-0">
             <div className="border-r border-gray-200 flex flex-col justify-center items-center py-2 bg-white shrink-0" style={{ width: '64px' }}>
               <span className="text-xs font-bold text-gray-400">全天</span>
             </div>
@@ -3634,18 +3634,23 @@ function MonthView({
   onHideAccount,
 }) {
   const monthCells = buildMiniMonthCells(focusDate);
+  const monthWeekdayStickyTop = accountDisplayMode === 'split' && splitAccounts.length > 0 ? MONTH_PANEL_HEADER_HEIGHT : 0;
   const monthAccounts =
     accountDisplayMode === 'split' && splitAccounts.length > 0
       ? splitAccounts
       : [];
   const isSplit = accountDisplayMode === 'split' && monthAccounts.length > 0;
-  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay') => (
+  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
     <div
       className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-gray-200 bg-gray-200"
       style={{ minWidth: '100%' }}
     >
       {MONTH_WEEKDAY_NAMES.map((day) => (
-        <div key={`${paneKey}-${day}`} className="bg-gray-50 px-3 py-3 text-xs font-black text-gray-500">
+        <div
+          key={`${paneKey}-${day}`}
+          className="sticky z-20 border-b border-gray-200 bg-gray-50 px-3 py-3 text-xs font-black text-gray-500 shadow-[0_1px_0_rgba(229,231,235,1)]"
+          style={{ top: `${stickyTop}px` }}
+        >
           {day}
         </div>
       ))}
@@ -3747,7 +3752,7 @@ function MonthView({
                 key={monthAccount.id}
                 className="w-[540px] shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
               >
-                <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
                   <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-black text-gray-900">{monthAccount.email || monthAccount.name}</div>
@@ -3763,7 +3768,7 @@ function MonthView({
                     <X size={14} />
                   </button>
                 </div>
-                <div className="p-3">{renderMonthGrid(panelEvents, monthAccount.id, monthAccount.id)}</div>
+                <div className="p-3">{renderMonthGrid(panelEvents, monthAccount.id, monthAccount.id, monthWeekdayStickyTop)}</div>
               </section>
             );
           })}
@@ -3772,7 +3777,7 @@ function MonthView({
     );
   }
 
-  return <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">{renderMonthGrid(events, null, 'overlay')}</div>;
+  return <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">{renderMonthGrid(events, null, 'overlay', 0)}</div>;
 }
 
 function EventPreviewCard({ event, calendar, account, x, y, mode = 'hover', label = '快速预览' }) {
