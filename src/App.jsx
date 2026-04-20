@@ -3640,6 +3640,8 @@ function MonthView({
       ? splitAccounts
       : [];
   const isSplit = accountDisplayMode === 'split' && monthAccounts.length > 0;
+  const monthPaneMinWidth = monthAccounts.length >= 4 ? 320 : monthAccounts.length === 3 ? 360 : 420;
+  const monthSplitMinWidth = monthAccounts.length > 0 ? monthAccounts.length * monthPaneMinWidth + Math.max(monthAccounts.length - 1, 0) * 16 : 0;
   const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
     <div
       className="grid grid-cols-7 gap-px rounded-xl overflow-hidden border border-gray-200 bg-gray-200"
@@ -3743,14 +3745,20 @@ function MonthView({
   if (isSplit) {
     return (
       <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">
-        <div className="flex min-w-max gap-4">
+        <div
+          className="grid min-w-full gap-4"
+          style={{
+            gridTemplateColumns: `repeat(${monthAccounts.length}, minmax(${monthPaneMinWidth}px, 1fr))`,
+            minWidth: `${monthSplitMinWidth}px`,
+          }}
+        >
           {monthAccounts.map((monthAccount) => {
             const panelEvents = events.filter((event) => calendarMap[event.calId]?.accountId === monthAccount.id);
 
             return (
               <section
                 key={monthAccount.id}
-                className="w-[540px] shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                className="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
               >
                 <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
                   <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
