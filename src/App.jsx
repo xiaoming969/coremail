@@ -36,7 +36,6 @@ import {
   Search,
   Send,
   Settings,
-  Sidebar,
   Square,
   SquarePen,
   Star,
@@ -8412,14 +8411,6 @@ function MainApp() {
                           </div>
                         )}
 
-                        <button
-                          onClick={() => setShowRightSidebar((prev) => !prev)}
-	                          className={`rounded-xl border p-2 transition ${
-	                            showRightSidebar ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-gray-500'
-	                          }`}
-                        >
-                          <Sidebar size={20} />
-                        </button>
                       </div>
                     </header>
 
