@@ -434,15 +434,6 @@ const getTimedEventCardDensity = ({ isSplit = false, columnCount = 1, durationH 
   return 'regular';
 };
 
-const getCompactStatusLabel = (status, density) => {
-  if (density === 'micro') {
-    if (status === '待响应') return '待';
-    if (status === '已拒绝') return '拒';
-  }
-
-  return status;
-};
-
 const overlapsWindow = (leftStart, leftEnd, rightStart, rightEnd) => leftStart < rightEnd && rightStart < leftEnd;
 const isWorkHour = (hour) => hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
 const getTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT + TIMELINE_HEADER_HEIGHT;
@@ -553,6 +544,40 @@ const getEventStatusBadgeMeta = (status) => {
   }
 
   return null;
+};
+const getTimedEventStatusSurface = (status) => {
+  if (status === '待响应') {
+    return {
+      cardClass: 'border-amber-200/90 ring-1 ring-amber-200/70',
+      topRuleClass: 'bg-amber-400/90',
+    };
+  }
+
+  if (status === '已拒绝') {
+    return {
+      cardClass: 'border-dashed border-slate-300/90 opacity-85',
+      topRuleClass: 'bg-slate-400/80',
+    };
+  }
+
+  if (status === '已取消') {
+    return {
+      cardClass: 'border-dashed border-slate-300/90 opacity-60',
+      topRuleClass: 'bg-slate-300/90',
+    };
+  }
+
+  if (status === '草稿') {
+    return {
+      cardClass: 'border-dashed border-slate-300/90 bg-slate-50/90',
+      topRuleClass: 'bg-slate-400/80',
+    };
+  }
+
+  return {
+    cardClass: '',
+    topRuleClass: '',
+  };
 };
 const getEventSearchFields = (event, calendar, account) => {
   const date = eventToDate(event);
@@ -2569,7 +2594,7 @@ function CalendarSidebar({
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
       style={{ width: '252px', zIndex: 20 }}
     >
-      <div className="border-b border-slate-200 bg-[#f1f3f5] px-5 pt-5 pb-4">
+      <div className="bg-[#f1f3f5] px-5 pt-5 pb-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-lg font-black text-gray-900">日历</div>
           <button
@@ -2614,7 +2639,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="border-b border-slate-200 bg-[#f1f3f5] px-5 pb-5">
+      <div className="bg-[#f1f3f5] px-5 pb-5">
         <div className="px-1 pt-1">
           <div className="mb-4 flex items-center justify-between gap-1">
             <div className="flex items-center gap-1">
@@ -2694,7 +2719,7 @@ function CalendarSidebar({
 
       <div className="flex-1 min-h-0 overflow-y-auto bg-[#f1f3f5] p-4">
         <div>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {[
               { key: 'ownAccounts', title: '我的日历', ownership: 'self', items: ownAccounts },
               { key: 'sharedAccounts', title: '共享日历', ownership: 'shared', items: sharedAccounts },
@@ -2735,11 +2760,11 @@ function CalendarSidebar({
                     )}
                   </div>
                 </div>
-		                {!collapsedSections[group.key] && <div>
+		                {!collapsedSections[group.key] && <div className="space-y-2">
 		                  {group.items.map((account) => (
 					                    <div
 					                      key={account.id}
-					                      className="group w-full bg-transparent px-1 py-2 transition-all duration-200"
+					                      className="group w-full border-none bg-transparent px-1 py-2 transition-all duration-200 shadow-none"
 					                    >
 			                      <div className="flex items-center gap-3">
 			                        <div className={`h-2.5 w-2.5 rounded-full ${account.color}`}></div>
@@ -3104,8 +3129,8 @@ function WeekView({
                                 durationH: safeDuration,
                               });
                               const useCompactCard = cardDensity !== 'regular';
-                              const compactStatusLabel = getCompactStatusLabel(event.status, cardDensity);
                               const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
+                              const statusSurface = getTimedEventStatusSurface(event.status);
 
                               return (
                                 <div
@@ -3127,12 +3152,13 @@ function WeekView({
                                   onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                   onMouseLeave={() => onHidePreview(event.id)}
                                   title={`${event.title || '无标题'} · ${formatTimeRange(safeStartH, safeDuration)}${account ? ` · ${account.email || account.name}` : ''}`}
-                                  className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${
+                                  className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                                     editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                                   } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'}`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width, padding: useCompactCard ? '6px' : '8px' }}
                                 >
                                   {event.type !== 'busy_only' && <div className={`absolute left-0 top-0 bottom-0 w-1 ${tones.stripe}`}></div>}
+                                  {statusSurface.topRuleClass && <div className={`pointer-events-none absolute left-1.5 right-1.5 top-1 h-0.5 rounded-full ${statusSurface.topRuleClass}`}></div>}
                                   {statusBadgeMeta && (
                                     <span
                                       className={`pointer-events-none absolute right-1.5 top-1.5 z-[1] inline-flex items-center rounded-full border font-bold ${
@@ -3184,32 +3210,6 @@ function WeekView({
                                           <Clock size={10} className="mr-1" />
                                           {formatTimeRange(safeStartH, safeDuration)}
                                         </div>
-                                      )}
-                                      {event.status === '待响应' && (
-                                        <span
-                                          className={`mt-auto inline-flex items-center self-start rounded-md font-bold ${
-                                            useCompactCard
-                                              ? cardDensity === 'micro'
-                                                ? 'max-w-full px-1 py-0.5 text-[10px] leading-none text-orange-700 bg-orange-100'
-                                                : 'max-w-full px-1.5 py-1 text-[10px] leading-none text-orange-700 bg-orange-100'
-                                              : 'px-1.5 py-1 text-xs text-orange-600 bg-orange-100'
-                                          }`}
-                                        >
-                                          {compactStatusLabel}
-                                        </span>
-                                      )}
-                                      {event.status === '已拒绝' && (
-                                        <span
-                                          className={`mt-auto inline-flex items-center self-start rounded-md font-bold ${
-                                            useCompactCard
-                                              ? cardDensity === 'micro'
-                                                ? 'max-w-full px-1 py-0.5 text-[10px] leading-none text-slate-700 bg-slate-100'
-                                                : 'max-w-full px-1.5 py-1 text-[10px] leading-none text-slate-700 bg-slate-100'
-                                              : 'px-1.5 py-1 text-xs text-slate-600 bg-slate-100'
-                                          }`}
-                                        >
-                                          {compactStatusLabel}
-                                        </span>
                                       )}
                                     </div>
                                   )}
@@ -3506,8 +3506,8 @@ function DayView({
                           durationH: safeDuration,
                         });
                         const useCompactCard = cardDensity !== 'regular';
-                        const compactStatusLabel = getCompactStatusLabel(event.status, cardDensity);
                         const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
+                        const statusSurface = getTimedEventStatusSurface(event.status);
                               return (
                           <div
                             key={event.id}
@@ -3528,12 +3528,13 @@ function DayView({
                             onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                             onMouseLeave={() => onHidePreview(event.id)}
                             title={`${event.title || '无标题'} · ${formatTimeRange(safeStartH, safeDuration)}${event.location ? ` · ${event.location}` : ''}`}
-                            className={`group absolute border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${
+                            className={`group absolute border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                               editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                             } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'}`}
                             style={{ top: `${top}px`, height: `${height}px`, left, width }}
                           >
                             {event.type !== 'busy_only' && <div className={`absolute left-0 top-0 bottom-0 w-1 ${useCompactCard ? '' : 'rounded-l-xl'} ${tones.stripe}`}></div>}
+                            {statusSurface.topRuleClass && <div className={`pointer-events-none absolute left-2 right-2 top-1 h-0.5 rounded-full ${statusSurface.topRuleClass}`}></div>}
                             {statusBadgeMeta && (
                               <span
                                 className={`pointer-events-none absolute right-1.5 top-1.5 z-[1] inline-flex items-center rounded-full border font-bold ${
@@ -3585,32 +3586,6 @@ function DayView({
                                     <Clock size={10} className="mr-1" />
                                     {formatTimeRange(safeStartH, safeDuration)}
                                   </div>
-                                )}
-                                {event.status === '待响应' && (
-                                  <span
-                                    className={`mt-auto inline-flex items-center self-start rounded-md font-bold ${
-                                      useCompactCard
-                                        ? cardDensity === 'micro'
-                                          ? 'max-w-full px-1 py-0.5 text-[10px] leading-none text-orange-700 bg-orange-100'
-                                          : 'max-w-full px-1.5 py-1 text-[10px] leading-none text-orange-700 bg-orange-100'
-                                        : 'px-1.5 py-1 text-xs text-orange-600 bg-orange-100'
-                                    }`}
-                                  >
-                                    {compactStatusLabel}
-                                  </span>
-                                )}
-                                {event.status === '已拒绝' && (
-                                  <span
-                                    className={`mt-auto inline-flex items-center self-start rounded-md font-bold ${
-                                      useCompactCard
-                                        ? cardDensity === 'micro'
-                                          ? 'max-w-full px-1 py-0.5 text-[10px] leading-none text-slate-700 bg-slate-100'
-                                          : 'max-w-full px-1.5 py-1 text-[10px] leading-none text-slate-700 bg-slate-100'
-                                        : 'px-1.5 py-1 text-xs text-slate-600 bg-slate-100'
-                                    }`}
-                                  >
-                                    {compactStatusLabel}
-                                  </span>
                                 )}
                                 {event.location && !useCompactCard && <div className="text-xs opacity-70 truncate">{event.location}</div>}
                               </div>
@@ -8328,7 +8303,7 @@ function MainApp() {
                 {currentScreen === 'calendar' && (
                   <div className="relative flex flex-1 min-w-0 min-h-0 flex-col bg-[#f8f8f7]">
                     <header className="relative flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-[#fcfcfb] px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:px-8" style={{ zIndex: 10 }}>
-                      <div className="flex items-center gap-3 min-w-0 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
                           className="hidden sm:block rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
@@ -8346,39 +8321,38 @@ function MainApp() {
                         <div className="min-w-0">
                           <h2 className="text-lg sm:text-xl font-black text-gray-800 truncate">{formatRangeTitle(calendarLayout, focusDate)}</h2>
                         </div>
-                      </div>
-
-                      <div className="flex w-full min-w-0 sm:max-w-[360px]">
-                        <div className="flex w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 py-2">
-                          <button
-                            onClick={() => executeCalendarSearch()}
-                            className="shrink-0 text-gray-400 transition hover:text-gray-600"
-                            title="搜索日程"
-                            aria-label="搜索日程"
-                          >
-                            <Search size={16} />
-                          </button>
-                          <input
-                            value={calendarSearchQuery}
-                            onChange={(event) => setCalendarSearchQuery(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                executeCalendarSearch(event.currentTarget.value);
-                              }
-                            }}
-                            placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
-                            className="ml-2 flex-1 border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
-                          />
-                          {calendarSearchQuery && (
+                        <div className="flex w-full min-w-0 sm:ml-2 sm:max-w-[340px]">
+                          <div className="flex w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 py-2">
                             <button
-                              onClick={clearCalendarSearch}
-                              className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
-                              title="清空搜索"
+                              onClick={() => executeCalendarSearch()}
+                              className="shrink-0 text-gray-400 transition hover:text-gray-600"
+                              title="搜索日程"
+                              aria-label="搜索日程"
                             >
-                              <X size={14} />
+                              <Search size={16} />
                             </button>
-                          )}
+                            <input
+                              value={calendarSearchQuery}
+                              onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  executeCalendarSearch(event.currentTarget.value);
+                                }
+                              }}
+                              placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
+                              className="ml-2 flex-1 border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
+                            />
+                            {calendarSearchQuery && (
+                              <button
+                                onClick={clearCalendarSearch}
+                                className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
+                                title="清空搜索"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
