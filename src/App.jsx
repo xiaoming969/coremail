@@ -110,7 +110,8 @@ const WORK_START_HOUR = 8;
 const WORK_END_HOUR = 18;
 const CELL_HEIGHT = 96;
 const TIMELINE_HEADER_HEIGHT = 56;
-const SPLIT_WEEK_PANE_HEADER_HEIGHT = 36;
+const SPLIT_WEEK_PANE_HEADER_HEIGHT = 40;
+const SPLIT_DAY_PANE_HEADER_HEIGHT = 40;
 const HALF_HOUR_STEP = 0.5;
 const MIN_EVENT_DURATION = 0.5;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, index) => index + DAY_START_HOUR);
@@ -2810,6 +2811,29 @@ function CalendarSidebar({
   );
 }
 
+function SplitPaneHeader({ colorClass, title, subtitle, onHide, hideLabel, height = 40 }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-gray-200 bg-[#fcfcfb] px-3" style={{ height: `${height}px` }}>
+      <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${colorClass}`}></div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-black text-gray-900">{title}</div>
+        {subtitle ? <div className="truncate text-[11px] font-bold text-gray-400">{subtitle}</div> : null}
+      </div>
+      {onHide ? (
+        <button
+          type="button"
+          onClick={onHide}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-gray-700"
+          title={hideLabel}
+          aria-label={hideLabel}
+        >
+          <X size={14} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function WeekView({
   days,
   events,
@@ -2930,22 +2954,13 @@ function WeekView({
                     style={isSplit ? { minWidth: `${paneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                   >
                     {isSplit && (
-                      <div
-                        className="flex items-center gap-2 border-b border-gray-200 bg-[#fcfcfb] px-3"
-                        style={{ height: `${splitWeekPaneHeaderHeight}px` }}
-                      >
-                        <div className={`h-2.5 w-2.5 rounded-full ${pane.account.color}`}></div>
-                        <div className="min-w-0 flex-1 truncate text-[12px] font-bold text-gray-700">{pane.account.email || pane.account.name}</div>
-                        <button
-                          type="button"
-                          onClick={() => onHideAccount?.(pane.account.id)}
-                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
-                          title={`隐藏 ${pane.account.email || pane.account.name}`}
-                          aria-label={`隐藏 ${pane.account.email || pane.account.name}`}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
+                      <SplitPaneHeader
+                        colorClass={pane.account.color}
+                        title={pane.account.email || pane.account.name}
+                        onHide={() => onHideAccount?.(pane.account.id)}
+                        hideLabel={`隐藏 ${pane.account.email || pane.account.name}`}
+                        height={splitWeekPaneHeaderHeight}
+                      />
                     )}
                     <div className="flex bg-white">
                       {days.map((day) => (
@@ -3302,6 +3317,7 @@ function DayView({
   const allDayEvents = sortEvents(events.filter((event) => event.isAllDay));
   const timedEvents = sortEvents(events.filter((event) => !event.isAllDay));
   const dayPaneMinWidth = isSplit ? (lanes.length >= 3 ? 280 : 320) : 0;
+  const splitDayPaneHeaderHeight = isSplit ? SPLIT_DAY_PANE_HEADER_HEIGHT : 0;
   const splitGridStyle = isSplit ? { gridTemplateColumns: `repeat(${lanes.length}, minmax(${dayPaneMinWidth}px, 1fr))` } : undefined;
   const timedEventLayouts = useMemo(
     () =>
@@ -3349,7 +3365,7 @@ function DayView({
         <div className="flex min-h-full min-w-full flex-col" style={isSplit ? { minWidth: `${64 + lanes.length * dayPaneMinWidth}px` } : undefined}>
           <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
             <div className="flex border-b border-gray-200 bg-white">
-              <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px', height: `${TIMELINE_HEADER_HEIGHT}px` }}></div>
+              <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px', height: `${splitDayPaneHeaderHeight + TIMELINE_HEADER_HEIGHT}px` }}></div>
               <div className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'} style={splitGridStyle}>
                 {lanes.map((lane) => (
                   <div
@@ -3357,25 +3373,25 @@ function DayView({
                     className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
                     style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                   >
+                    {isSplit && (
+                      <SplitPaneHeader
+                        colorClass={lane.color}
+                        title={lane.email || lane.name}
+                        onHide={() => onHideAccount?.(lane.id)}
+                        hideLabel={`隐藏 ${lane.email || lane.name}`}
+                        height={splitDayPaneHeaderHeight}
+                      />
+                    )}
                     <div className="flex h-14 items-center px-4 bg-white">
                       <div className="flex min-w-0 items-center justify-between gap-3 w-full">
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
-                          <div className="text-lg font-black text-gray-900">
-                            {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                          <div className="text-xs font-bold text-gray-500">
+                            {sameDay(focusDate, TODAY_DATE)
+                              ? `今日 · ${WEEKDAY_NAMES[focusDate.getDay() === 0 ? 6 : focusDate.getDay() - 1]}`
+                              : WEEKDAY_NAMES[focusDate.getDay() === 0 ? 6 : focusDate.getDay() - 1]}
                           </div>
+                          <div className="text-lg font-black text-gray-900">{`${focusDate.getMonth() + 1}月${focusDate.getDate()}日`}</div>
                         </div>
-                        {isSplit && (
-                          <button
-                            type="button"
-                            onClick={() => onHideAccount?.(lane.id)}
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
-                            title={`隐藏 ${lane.email || lane.name}`}
-                            aria-label={`隐藏 ${lane.email || lane.name}`}
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -3649,14 +3665,14 @@ function MonthView({
   onHideAccount,
 }) {
   const monthCells = buildMiniMonthCells(focusDate);
-  const monthWeekdayStickyTop = 0;
   const monthAccounts =
     accountDisplayMode === 'split' && splitAccounts.length > 0
       ? splitAccounts
       : [];
   const isSplit = accountDisplayMode === 'split' && monthAccounts.length > 0;
+  const monthWeekdayStickyTop = isSplit ? SPLIT_DAY_PANE_HEADER_HEIGHT : 0;
   const monthPaneMinWidth = monthAccounts.length >= 4 ? 320 : monthAccounts.length === 3 ? 360 : 420;
-  const monthSplitMinWidth = monthAccounts.length > 0 ? monthAccounts.length * monthPaneMinWidth + Math.max(monthAccounts.length - 1, 0) * 16 : 0;
+  const monthSplitMinWidth = monthAccounts.length > 0 ? monthAccounts.length * monthPaneMinWidth : 0;
   const renderMonthWeekdayHeader = (paneKey = 'overlay', stickyTop = 0) => (
     <div
       className="sticky z-20 grid grid-cols-7 gap-px border-b border-slate-200 bg-slate-200"
@@ -3779,8 +3795,8 @@ function MonthView({
       })}
     </div>
   );
-  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white" style={{ minWidth: '100%' }}>
+  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0, framed = true) => (
+    <div className={framed ? 'overflow-hidden rounded-xl border border-slate-200 bg-white' : 'bg-white'} style={{ minWidth: '100%' }}>
       {renderMonthWeekdayHeader(paneKey, stickyTop)}
       {renderMonthCells(panelEvents, preferredAccountId, paneKey)}
     </div>
@@ -3788,39 +3804,32 @@ function MonthView({
 
   if (isSplit) {
     return (
-      <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">
+      <div className="flex-1 min-h-0 overflow-auto bg-white">
         <div
-          className="grid min-w-full gap-4"
+          className="grid min-w-full bg-white"
           style={{
             gridTemplateColumns: `repeat(${monthAccounts.length}, minmax(${monthPaneMinWidth}px, 1fr))`,
             minWidth: `${monthSplitMinWidth}px`,
           }}
         >
-          {monthAccounts.map((monthAccount) => {
+          {monthAccounts.map((monthAccount, monthIndex) => {
             const panelEvents = events.filter((event) => calendarMap[event.calId]?.accountId === monthAccount.id);
 
             return (
               <section
                 key={monthAccount.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                className={`min-w-0 overflow-hidden bg-white ${monthIndex < monthAccounts.length - 1 ? 'border-r border-gray-200' : ''}`}
               >
-                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
-                  <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black text-gray-900">{monthAccount.email || monthAccount.name}</div>
-                    <div className="truncate text-[11px] font-bold text-gray-400">{focusDate.getFullYear()}年 {focusDate.getMonth() + 1}月</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onHideAccount?.(monthAccount.id)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-gray-700"
-                    title={`隐藏 ${monthAccount.email || monthAccount.name}`}
-                    aria-label={`隐藏 ${monthAccount.email || monthAccount.name}`}
-                  >
-                    <X size={14} />
-                  </button>
+                <div className="sticky top-0 z-30">
+                  <SplitPaneHeader
+                    colorClass={monthAccount.color}
+                    title={monthAccount.email || monthAccount.name}
+                    onHide={() => onHideAccount?.(monthAccount.id)}
+                    hideLabel={`隐藏 ${monthAccount.email || monthAccount.name}`}
+                    height={SPLIT_DAY_PANE_HEADER_HEIGHT}
+                  />
                 </div>
-                <div className="p-3">{renderMonthGrid(panelEvents, monthAccount.id, monthAccount.id, monthWeekdayStickyTop)}</div>
+                {renderMonthGrid(panelEvents, monthAccount.id, monthAccount.id, monthWeekdayStickyTop, false)}
               </section>
             );
           })}
