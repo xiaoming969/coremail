@@ -416,6 +416,14 @@ const getAgendaStatusTone = (status) => {
   return 'bg-emerald-50 text-emerald-700 border-emerald-200';
 };
 
+const getAccountCheckboxTone = (color) => {
+  if (color?.includes('orange')) return 'border-orange-500 bg-orange-500 text-white hover:border-orange-400';
+  if (color?.includes('emerald')) return 'border-emerald-500 bg-emerald-500 text-white hover:border-emerald-400';
+  if (color?.includes('violet')) return 'border-violet-500 bg-violet-500 text-white hover:border-violet-400';
+  if (color?.includes('slate')) return 'border-slate-500 bg-slate-500 text-white hover:border-slate-400';
+  return 'border-blue-600 bg-blue-600 text-white hover:border-blue-400';
+};
+
 const getPreviewPosition = (clientX, clientY) => {
   if (typeof window === 'undefined') return { x: clientX + 16, y: clientY + 16 };
 
@@ -2575,7 +2583,7 @@ function CalendarSidebar({
         className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
         style={{ width: '88px', zIndex: 20 }}
       >
-        <div className="flex flex-col items-center gap-3 border-b border-slate-200 bg-[#f1f3f5] px-3 py-4">
+        <div className="flex flex-col items-center border-b border-slate-200 bg-[#f1f3f5] px-3 py-4">
           <button
             onClick={onToggleCollapsed}
             className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 hover:bg-white"
@@ -2583,14 +2591,29 @@ function CalendarSidebar({
           >
             <ChevronRight size={18} />
           </button>
+        </div>
+        <div className="border-b border-slate-200 bg-[#f1f3f5] px-3 py-4">
           <div className="relative" ref={createMenuRef}>
-            <button
-              onClick={() => setCreateMenuOpen((prev) => !prev)}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-blue-600 hover:bg-slate-200"
-              title="新建"
-            >
-              <Plus size={18} />
-            </button>
+            <div className="flex h-11 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-blue-600">
+              <button
+                onClick={() => {
+                  onNewEvent();
+                  setCreateMenuOpen(false);
+                }}
+                className="flex flex-1 items-center justify-center transition hover:bg-slate-200"
+                title="新建日程"
+              >
+                <Plus size={18} />
+              </button>
+              <div className="w-px bg-slate-200" />
+              <button
+                onClick={() => setCreateMenuOpen((prev) => !prev)}
+                className="flex w-10 items-center justify-center transition hover:bg-slate-200"
+                title="展开新建菜单"
+              >
+                <ChevronDown size={16} />
+              </button>
+            </div>
             {createMenuOpen && (
               <div className="absolute left-[calc(100%+8px)] top-0 z-30 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
                 <button
@@ -2598,8 +2621,9 @@ function CalendarSidebar({
                     onNewEvent();
                     setCreateMenuOpen(false);
                   }}
-                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
                 >
+                  <Users size={15} className="text-slate-400" />
                   发起会议
                 </button>
                 <button
@@ -2607,8 +2631,9 @@ function CalendarSidebar({
                     onNewEvent();
                     setCreateMenuOpen(false);
                   }}
-                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
                 >
+                  <SquarePen size={15} className="text-slate-400" />
                   新建日程
                 </button>
               </div>
@@ -2628,9 +2653,9 @@ function CalendarSidebar({
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
       style={{ width: '252px', zIndex: 20 }}
     >
-      <div className="bg-[#f1f3f5] px-5 pt-5 pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-lg font-black text-gray-900">日历</div>
+        <div className="bg-[#f1f3f5] px-5 pt-5 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-lg font-black text-gray-900">日历</div>
           <button
             onClick={onToggleCollapsed}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 hover:bg-white"
@@ -2640,14 +2665,28 @@ function CalendarSidebar({
           </button>
         </div>
         <div className="relative mt-4" ref={createMenuRef}>
-          <button
-            onClick={() => setCreateMenuOpen((prev) => !prev)}
-            className="flex w-full min-w-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 font-bold text-blue-600 transition-colors hover:bg-slate-200"
-          >
-            <Plus size={18} className="mr-2" />
-            新建
-            <ChevronDown size={16} className="ml-2" />
-          </button>
+          <div className="flex w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-blue-600">
+            <button
+              onClick={() => {
+                onNewEvent();
+                setCreateMenuOpen(false);
+              }}
+              className="flex min-w-0 flex-1 items-center justify-center px-4 py-3 font-bold transition-colors hover:bg-slate-200"
+            >
+              <Plus size={18} className="mr-2 shrink-0" />
+              <span className="truncate">新建日程</span>
+            </button>
+            <div className="w-px bg-slate-200" />
+            <button
+              onClick={() => setCreateMenuOpen((prev) => !prev)}
+              className="flex w-12 items-center justify-center transition-colors hover:bg-slate-200"
+              title="展开新建菜单"
+              aria-label="展开新建菜单"
+              aria-expanded={createMenuOpen}
+            >
+              <ChevronDown size={16} />
+            </button>
+          </div>
           {createMenuOpen && (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
               <button
@@ -2655,8 +2694,9 @@ function CalendarSidebar({
                   onNewEvent();
                   setCreateMenuOpen(false);
                 }}
-                className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
+                <Users size={15} className="text-slate-400" />
                 发起会议
               </button>
               <button
@@ -2664,8 +2704,9 @@ function CalendarSidebar({
                   onNewEvent();
                   setCreateMenuOpen(false);
                 }}
-                className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
+                <SquarePen size={15} className="text-slate-400" />
                 新建日程
               </button>
             </div>
@@ -2708,15 +2749,22 @@ function CalendarSidebar({
               const inActiveWeek = getWeekStart(cell.date).getTime() === activeWeekStart.getTime();
               const dayMeta = miniMonthEventMap.get(formatDateLabel(cell.date));
               const markerColors = dayMeta?.colors?.slice(0, 4) || [];
-              const overflowMarkerCount = Math.max((dayMeta?.accountCount || markerColors.length) - markerColors.length, 0);
               const isSelectedDate = sameDay(cell.date, focusDate);
               const showWeekRange = calendarLayout === 'week' && inActiveWeek;
 
               return (
-                <div key={cell.key} className="flex justify-center items-center h-9 relative cursor-pointer">
+                <div
+                  key={cell.key}
+                  className="relative flex h-9 cursor-pointer items-center justify-center"
+                  onClick={() => onSelectDate(cell.date)}
+                >
                   {showWeekRange && <div className="absolute inset-0 rounded-lg bg-slate-100"></div>}
                   <button
-                    onClick={() => onSelectDate(cell.date)}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onSelectDate(cell.date);
+                    }}
                     className={`relative z-[1] w-7 h-7 flex items-center justify-center rounded-full font-medium ${
                       cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-100' : 'text-gray-300'
                     } ${
@@ -2731,7 +2779,7 @@ function CalendarSidebar({
                   >
                     {cell.date.getDate()}
                   </button>
-                  {markerColors.length > 0 && (
+                  {markerColors.length > 0 && !isSelectedDate && (
                     <div className="pointer-events-none absolute left-1/2 z-[1] flex -translate-x-1/2 items-center justify-center" style={{ bottom: '1px' }}>
                       <span className="h-[2px] w-[6px] rounded-full bg-blue-500"></span>
                     </div>
@@ -2793,7 +2841,6 @@ function CalendarSidebar({
 					                      className="group w-full border-none bg-transparent px-1 py-2 transition-all duration-200 shadow-none"
 					                    >
 			                      <div className="flex items-center gap-3">
-			                        <div className={`h-2.5 w-2.5 rounded-full ${account.color}`}></div>
 			                        <div className="min-w-0 flex-1">
 			                          <div className="flex items-center justify-between gap-3">
 			                            <div title={account.email || account.name} className="min-w-0 text-sm font-bold text-gray-900 truncate">
@@ -2812,7 +2859,7 @@ function CalendarSidebar({
 			                                onClick={() => onToggleAccount(account.id)}
 		                                className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
 		                                  account.checked
-		                                    ? 'border-blue-600 bg-blue-600 text-white'
+		                                    ? getAccountCheckboxTone(account.color)
 		                                    : 'border-gray-300 bg-white text-transparent hover:border-blue-300'
 		                                }`}
 	                                title={account.checked ? '取消选中' : '选中'}
@@ -4079,7 +4126,6 @@ function CalendarEventSidebar({
   calendar,
   account,
   onBackToAgenda,
-  onOpenDetails,
   onDeleteEvent,
   onRespond,
 }) {
@@ -4092,19 +4138,14 @@ function CalendarEventSidebar({
       className="relative z-10 hidden shrink-0 border-l border-slate-200 bg-[#fcfcfb] lg:flex lg:flex-col"
       style={{ width: 'clamp(288px, 24vw, 352px)', zIndex: 20 }}
     >
-      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5">
+      <div className="flex h-16 items-center justify-end border-b border-slate-200 bg-[#fcfcfb] px-5">
         <button
           onClick={onBackToAgenda}
-          className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          title="关闭侧栏"
+          aria-label="关闭侧栏"
         >
-          <ChevronLeft size={15} className="mr-2" />
-          返回设置
-        </button>
-        <button
-          onClick={onOpenDetails}
-          className="inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-        >
-          打开详情
+          <X size={16} />
         </button>
       </div>
 
@@ -8492,16 +8533,47 @@ function MainApp() {
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
               <div className="flex items-center gap-2 overflow-x-auto min-w-0 pr-1">
+                <div className="flex h-10 min-w-[260px] items-center rounded-xl border border-slate-200 bg-white px-3 sm:min-w-[320px]">
+                  <button
+                    onClick={() => executeCalendarSearch()}
+                    className="shrink-0 text-gray-400 transition hover:text-gray-600"
+                    title="搜索日程"
+                    aria-label="搜索日程"
+                  >
+                    <Search size={16} />
+                  </button>
+                  <input
+                    value={calendarSearchQuery}
+                    onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        executeCalendarSearch(event.currentTarget.value);
+                      }
+                    }}
+                    placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
+                    className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
+                  />
+                  {calendarSearchQuery && (
+                    <button
+                      onClick={clearCalendarSearch}
+                      className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
+                      title="清空搜索"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={handleCalendarSync}
-                  className="shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
                 >
                   <RefreshCw size={14} className="mr-1.5" />
                   同步日历
                 </button>
                 <button
                   onClick={handleOpenReminders}
-                  className="shrink-0 inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
                 >
                   <Bell size={14} className="mr-1.5" />
                   提醒
@@ -8514,6 +8586,15 @@ function MainApp() {
             )}
           </div>
           <div className="ml-auto flex items-center gap-1 self-end lg:self-auto">
+            <div className="mx-1 h-6 w-px bg-slate-200" />
+            <button
+              type="button"
+              aria-label="联系客服"
+              title="联系客服"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            >
+              <HelpCircle size={16} />
+            </button>
             <button
               type="button"
               aria-label="最小化窗口"
@@ -8550,7 +8631,7 @@ function MainApp() {
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
-                          className="hidden sm:block rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
+                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
                         >
                           今天
                         </button>
@@ -8568,7 +8649,8 @@ function MainApp() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="relative">
+                        <div className="relative h-10 rounded-xl border border-slate-200 bg-white pl-3 pr-9">
+                          <div className="pointer-events-none flex h-full items-center text-sm font-bold text-gray-700">视图</div>
                           <select
                             value={calendarLayout}
                             onChange={(event) => {
@@ -8578,7 +8660,8 @@ function MainApp() {
                                 queueTimelineScrollToWorkStart(nextLayout);
                               }
                             }}
-                            className="appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm font-bold text-gray-700 focus:outline-none"
+                            className="absolute inset-0 z-[1] cursor-pointer appearance-none opacity-0"
+                            aria-label="切换视图"
                           >
                             {VIEW_OPTIONS.map((option) => (
                               <option key={option.id} value={option.id}>
@@ -8636,37 +8719,6 @@ function MainApp() {
                           </div>
                         )}
 
-                        <div className="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2">
-                          <button
-                            onClick={() => executeCalendarSearch()}
-                            className="shrink-0 text-gray-400 transition hover:text-gray-600"
-                            title="搜索日程"
-                            aria-label="搜索日程"
-                          >
-                            <Search size={16} />
-                          </button>
-                          <input
-                            value={calendarSearchQuery}
-                            onChange={(event) => setCalendarSearchQuery(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                executeCalendarSearch(event.currentTarget.value);
-                              }
-                            }}
-                            placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
-                            className="ml-2 w-[220px] border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
-                          />
-                          {calendarSearchQuery && (
-                            <button
-                              onClick={clearCalendarSearch}
-                              className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
-                              title="清空搜索"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
                       </div>
                     </header>
 
