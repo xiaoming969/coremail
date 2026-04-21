@@ -2696,16 +2696,8 @@ function CalendarSidebar({
                     {cell.date.getDate()}
                   </button>
                   {markerColors.length > 0 && (
-                    <div className="pointer-events-none absolute bottom-0 left-1/2 z-[1] flex -translate-x-1/2 items-center gap-1 rounded-full px-1">
-                      {markerColors.map((color, index) => (
-                        <span
-                          key={`${cell.key}-marker-${index}`}
-                          className={`h-1.5 w-1.5 rounded-full ${color}`}
-                        ></span>
-                      ))}
-                      {overflowMarkerCount > 0 && (
-                        <span className="text-[9px] font-bold leading-none text-gray-400">+{overflowMarkerCount}</span>
-                      )}
+                    <div className="pointer-events-none absolute left-1/2 z-[1] flex -translate-x-1/2 items-center justify-center" style={{ bottom: '1px' }}>
+                      <span className="h-[2px] w-[6px] rounded-full bg-blue-500"></span>
                     </div>
                   )}
                 </div>
@@ -3733,7 +3725,7 @@ function MonthView({
               </button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-0.5">
               {dayEvents.slice(0, 3).map((event) => {
                 const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                 const account = accountMap[calendar.accountId];
@@ -3754,14 +3746,18 @@ function MonthView({
                     onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseLeave={() => onHidePreview(event.id)}
                     title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
-                    className={`w-full rounded-lg border px-2 py-1.5 text-left text-xs font-bold ${tones.container}`}
+                    className={`w-full rounded border px-1.5 py-1 text-left text-[11px] leading-tight ${tones.container}`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${tones.stripe}`}></div>
-                      <span className="shrink-0 text-[10px] font-black text-gray-500">
-                        {event.isAllDay ? '全天' : formatHour(event.startH || 8)}
-                      </span>
-                      <span className="truncate flex-1">{event.title}</span>
+                    <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                      <div className={`shrink-0 rounded-sm ${tones.stripe}`} style={{ width: '3px', height: '3px' }}></div>
+                      {event.isAllDay ? (
+                        <span className="truncate font-medium">{event.title}</span>
+                      ) : (
+                        <>
+                          <span className="shrink-0 font-semibold text-gray-500" style={{ fontSize: '10px' }}>{formatHour(event.startH || 8)}</span>
+                          <span className="truncate font-medium min-w-0">{event.title}</span>
+                        </>
+                      )}
                     </div>
                   </button>
                 );
@@ -3772,7 +3768,7 @@ function MonthView({
                     event.stopPropagation();
                     onSelectDate(cell.date);
                   }}
-                  className="text-xs font-bold text-blue-600"
+                  className="text-[11px] font-bold text-blue-600 pl-1"
                 >
                   +{dayEvents.length - 3} 更多
                 </button>
@@ -8483,39 +8479,6 @@ function MainApp() {
                         <div className="min-w-0">
                           <h2 className="text-lg sm:text-xl font-black text-gray-800 truncate">{formatRangeTitle(calendarLayout, focusDate)}</h2>
                         </div>
-                        <div className="flex w-full min-w-0 sm:ml-2 sm:max-w-[340px]">
-                          <div className="flex w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white px-3 py-2">
-                            <button
-                              onClick={() => executeCalendarSearch()}
-                              className="shrink-0 text-gray-400 transition hover:text-gray-600"
-                              title="搜索日程"
-                              aria-label="搜索日程"
-                            >
-                              <Search size={16} />
-                            </button>
-                            <input
-                              value={calendarSearchQuery}
-                              onChange={(event) => setCalendarSearchQuery(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                  executeCalendarSearch(event.currentTarget.value);
-                                }
-                              }}
-                              placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
-                              className="ml-2 flex-1 border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
-                            />
-                            {calendarSearchQuery && (
-                              <button
-                                onClick={clearCalendarSearch}
-                                className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
-                                title="清空搜索"
-                              >
-                                <X size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
@@ -8587,31 +8550,39 @@ function MainApp() {
                           </div>
                         )}
 
-                      </div>
-                    </header>
-
-                    {calendarSyncReport && (
-                      <div className="border-b border-slate-200 bg-[#fcfcfb] px-4 py-3 sm:px-8">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                            已同步 {calendarSyncReport.calendarCount} 个日历
-                          </span>
-                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                            刷新 {calendarSyncReport.updatedCount} 场会议
-                          </span>
-                          {calendarSyncReport.hiddenAccountCount > 0 && (
-                            <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                              {calendarSyncReport.hiddenAccountCount} 个账户未勾选，可能看不到全部会议
-                            </span>
-                          )}
-                          {calendarSyncReport.busyOnlyCount > 0 && (
-                            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                              {calendarSyncReport.busyOnlyCount} 个共享日历仅同步忙闲
-                            </span>
+                        <div className="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2">
+                          <button
+                            onClick={() => executeCalendarSearch()}
+                            className="shrink-0 text-gray-400 transition hover:text-gray-600"
+                            title="搜索日程"
+                            aria-label="搜索日程"
+                          >
+                            <Search size={16} />
+                          </button>
+                          <input
+                            value={calendarSearchQuery}
+                            onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                executeCalendarSearch(event.currentTarget.value);
+                              }
+                            }}
+                            placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
+                            className="ml-2 w-[220px] border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
+                          />
+                          {calendarSearchQuery && (
+                            <button
+                              onClick={clearCalendarSearch}
+                              className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
+                              title="清空搜索"
+                            >
+                              <X size={14} />
+                            </button>
                           )}
                         </div>
                       </div>
-                    )}
+                    </header>
 
 	                    {activeCalIds.length === 0 ? (
 	                      <div className="flex-1 flex items-center justify-center bg-white">
