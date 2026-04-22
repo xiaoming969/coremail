@@ -2692,10 +2692,10 @@ function CalendarSidebar({
       if (collapsed) {
         return (
       <aside
-        className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
+        className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-white/90 backdrop-blur-[80px] md:flex md:flex-col"
         style={{ width: '88px', zIndex: 20 }}
       >
-        <div className="flex flex-col items-center border-b border-slate-200 bg-[#f1f3f5] px-3 py-4">
+        <div className="flex flex-col items-center border-b border-slate-200 px-3 py-4">
           <button
             onClick={onToggleCollapsed}
             className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 hover:bg-white"
@@ -2704,7 +2704,7 @@ function CalendarSidebar({
             <ChevronRight size={18} />
           </button>
         </div>
-        <div className="border-b border-slate-200 bg-[#f1f3f5] px-3 py-4">
+        <div className="border-b border-slate-200 px-3 py-4">
           <div className="relative" ref={createMenuRef}>
             <div className="flex h-11 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-blue-600">
               <button
@@ -2753,7 +2753,7 @@ function CalendarSidebar({
           </div>
         </div>
         <div className="flex-1 min-h-0"></div>
-        <div className="border-t border-slate-200 bg-[#f1f3f5] p-3">
+        <div className="border-t border-slate-200 p-3">
           <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} compact vertical />
         </div>
       </aside>
@@ -2762,10 +2762,10 @@ function CalendarSidebar({
 
   return (
     <aside
-      className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
+      className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-white/90 backdrop-blur-[80px] md:flex md:flex-col"
       style={{ width: '252px', zIndex: 20 }}
     >
-        <div className="bg-[#f1f3f5] px-5 pt-5 pb-4">
+        <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="text-lg font-black text-gray-900">日历</div>
           <button
@@ -2825,7 +2825,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="bg-[#f1f3f5] px-5 pb-5">
+      <div className="px-5 pb-5">
         <div className="px-1 pt-1">
           <div className="mb-4 flex items-center justify-between gap-1">
             <div className="flex items-center gap-1">
@@ -2902,7 +2902,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto bg-[#f1f3f5] p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         <div>
           <div className="space-y-5">
             {[
@@ -2999,7 +2999,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 bg-[#f1f3f5] p-4">
+      <div className="border-t border-slate-200 p-4">
         <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
       </div>
     </aside>
