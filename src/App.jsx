@@ -9361,15 +9361,15 @@ function MainApp() {
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
-                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
+                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-[9px] text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
                         >
                           今天
                         </button>
-                        <div className="flex items-center rounded-full border border-slate-200 bg-white p-1">
-                          <button className="rounded-full p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(-1)}>
+                        <div className="flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
+                          <button className="rounded-full p-[7px] text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(-1)}>
                             <ChevronLeft size={18} />
                           </button>
-                          <button className="rounded-full p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(1)}>
+                          <button className="rounded-full p-[7px] text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(1)}>
                             <ChevronRight size={18} />
                           </button>
                         </div>
@@ -9379,7 +9379,7 @@ function MainApp() {
                       </div>
 
                         <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-0.5">
+                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
                             {VIEW_OPTIONS.map((option) => (
                               <button
                                 key={option.id}
@@ -9389,7 +9389,7 @@ function MainApp() {
                                     queueTimelineScrollToWorkStart(option.id);
                                   }
                                 }}
-                                className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
+                                className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                   calendarLayout === option.id
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'text-gray-600 hover:bg-slate-50'
@@ -9401,10 +9401,10 @@ function MainApp() {
                           </div>
 
                         {activeAccounts.length > 1 && (
-                          <div className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white p-0.5">
+                          <div className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
                             <button
                               onClick={() => setAccountDisplayMode('overlay')}
-                              className={`rounded-full px-3 py-2 text-sm font-bold transition ${
+                              className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'overlay'
                                   ? 'bg-blue-600 text-white shadow-sm'
                                   : 'text-gray-600 hover:bg-slate-50'
@@ -9415,7 +9415,7 @@ function MainApp() {
                             </button>
                             <button
                               onClick={() => setAccountDisplayMode('split')}
-                              className={`rounded-full px-3 py-2 text-sm font-bold transition ${
+                              className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'split'
                                   ? 'bg-blue-600 text-white shadow-sm'
                                   : 'text-gray-600 hover:bg-slate-50'
