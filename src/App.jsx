@@ -2788,7 +2788,6 @@ function CalendarSidebar({
               <Plus size={18} className="mr-2 shrink-0" />
               <span className="truncate">新建日程</span>
             </button>
-            <div className="w-px bg-slate-200" />
             <button
               onClick={() => setCreateMenuOpen((prev) => !prev)}
               className="flex w-12 items-center justify-center transition-colors hover:bg-slate-200"
