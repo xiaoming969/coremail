@@ -9385,7 +9385,6 @@ function MainApp() {
             )}
           </div>
           <div className="ml-auto flex items-center gap-1 self-end lg:self-auto">
-            <div className="mx-1 h-6 w-px bg-slate-200" />
             <button
               type="button"
               aria-label="联系客服"
@@ -9394,6 +9393,7 @@ function MainApp() {
             >
               <HelpCircle size={16} />
             </button>
+            <div className="mx-1 h-6 w-px bg-slate-200" />
             <button
               type="button"
               aria-label="最小化窗口"
