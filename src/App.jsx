@@ -2663,6 +2663,7 @@ function CalendarSidebar({
   onOpenSharingSettings,
   onAddSharedCalendar,
   onToggleCollapsed,
+  onAccountContextMenu,
   activeProduct,
   onSelectProduct,
 }) {
@@ -2932,35 +2933,34 @@ function CalendarSidebar({
                 </div>
 		                {!collapsedSections[group.key] && <div className="space-y-px">
 		                  {group.items.map((account) => (
-			                    <div
-			                      key={account.id}
-			                      className="group/account relative flex cursor-default items-center gap-2 rounded-lg px-1.5 py-[3px] transition-colors duration-120 hover:bg-slate-200/50"
-			                      onContextMenu={(e) => {
-                          e.preventDefault();
+                    <div
+	                    key={account.id}
+	                    className="group/account relative flex cursor-default items-center gap-2 rounded-lg px-1.5 py-[3px] transition-colors duration-120 hover:bg-slate-200/50"
+	                    onContextMenu={(e) => onAccountContextMenu(e, account)}
+	                  >
+	                    {/* Checkbox - independent click zone */}
+	                    <button
+	                      onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
+	                      className={`flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-150 ${
+	                        account.checked
+	                          ? `scale-100 border-transparent ${getAccountCheckboxTone(account.color).split(' ').filter(s => s.includes('bg-') || s.includes('text-')).join(' ')}`
+	                          : 'border-gray-300 bg-white scale-100 hover:border-blue-400 hover:bg-blue-50/50'
+	                      }`}
+	                      title={account.checked ? '取消选中' : '选中'}
+	                    >
+	                      {account.checked && <Check size={10} strokeWidth={2.5} />}
+	                    </button>
+	                    {/* Content area - click to open details */}
+	                    <div
+                        title={account.name || ''}
+                        className="min-w-0 flex-1 truncate cursor-pointer py-0.5 rounded px-1 -mx-1 transition-colors hover:bg-white/40"
+                        onClick={() => {
                           if (account.ownership === 'shared') {
                             onOpenSharedCalendarAccess(account.id);
                           } else {
                             onOpenMailboxPermissions(account.id);
                           }
                         }}
-			                    >
-			                      {/* Checkbox - independent click zone */}
-			                      <button
-			                        onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
-			                        className={`flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-150 ${
-			                          account.checked
-			                            ? `scale-100 border-transparent ${getAccountCheckboxTone(account.color).split(' ').filter(s => s.includes('bg-') || s.includes('text-')).join(' ')}`
-			                            : 'border-gray-300 bg-white scale-100 hover:border-blue-400 hover:bg-blue-50/50'
-			                        }`}
-			                        title={account.checked ? '取消选中' : '选中'}
-			                      >
-			                        {account.checked && <Check size={10} strokeWidth={2.5} />}
-			                      </button>
-			                      {/* Content area - separate click zone */}
-			                      <div
-                        title={account.name || ''}
-                        className="min-w-0 flex-1 truncate cursor-pointer py-0.5 rounded px-1 -mx-1 transition-colors hover:bg-white/40"
-                        onClick={() => onToggleAccount(account.id)}
                       >
 			                        <span className="text-[13px] leading-tight font-medium text-gray-800">
 			                          {account.name || ''}
@@ -5289,7 +5289,7 @@ function AddSharedCalendarModal({
           <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
             {[
               ['inbox', `收到的共享${pendingInvitations.length > 0 ? ` (${pendingInvitations.length})` : ''}`],
-              ['manual', '添加 / 导入'],
+              ['manual', '手动添加'],
             ].map(([tabId, label]) => (
               <button
                 key={tabId}
@@ -5350,8 +5350,8 @@ function AddSharedCalendarModal({
                   <input
                     value={draft.name}
                     onChange={(event) => onChange({ name: event.target.value })}
-                    placeholder="输入后在左侧显示（可选）"
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white"
+                    placeholder="例如：领导助理"
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </label>
                 <label className="text-xs font-bold text-gray-500">
@@ -5359,8 +5359,8 @@ function AddSharedCalendarModal({
                   <input
                     value={draft.email}
                     onChange={(event) => onChange({ email: event.target.value })}
-                    placeholder="name@company.com"
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white"
+                    placeholder="例如：name@company.com"
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </label>
                 <label className="text-xs font-bold text-gray-500">
@@ -5368,7 +5368,7 @@ function AddSharedCalendarModal({
                   <select
                     value={draft.permissionId}
                     onChange={(event) => onChange({ permissionId: event.target.value })}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white"
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {CALENDAR_PERMISSION_OPTIONS.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -8913,6 +8913,15 @@ function MainApp() {
     setContextMenu({ x, y, event: entry });
   };
 
+  const handleAccountContextMenu = (event, account) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!account) return;
+    const x = Math.min(event.clientX, window.innerWidth - 180);
+    const y = Math.min(event.clientY, window.innerHeight - 140);
+    setContextMenu({ x, y, account });
+  };
+
   useEffect(() => {
     const handleMouseMove = (entry) => {
       const active = eventInteractionRef.current;
@@ -9235,6 +9244,7 @@ function MainApp() {
           onOpenSharingSettings={handleOpenSharingSettings}
           onAddSharedCalendar={handleAddSharedCalendar}
           onToggleCollapsed={() => setCalendarSidebarCollapsed((prev) => !prev)}
+          onAccountContextMenu={handleAccountContextMenu}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
         />
@@ -11090,6 +11100,47 @@ function MainApp() {
             <Trash size={14} className="mr-2" />
             移除
           </button>
+        </div>
+      )}
+
+      {contextMenu && contextMenu.account && (
+        <div
+          className="fixed z-50 w-48 rounded-[18px] border border-slate-200 bg-white py-1 shadow-md"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="mb-1 border-b border-slate-100 px-3 py-2">
+            <div className="text-xs font-bold text-gray-800 truncate">{contextMenu.account.name || contextMenu.account.email || '未知账号'}</div>
+            <div className="text-[11px] text-gray-400 mt-0.5 truncate">{contextMenu.account.email || ''}</div>
+          </div>
+          <button
+            onClick={() => {
+              if (contextMenu.account.ownership === 'shared') {
+                openSharedCalendarAccess(contextMenu.account.id);
+              } else {
+                openMailboxPermissions(contextMenu.account.id);
+              }
+              setContextMenu(null);
+            }}
+            className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+          >
+            <Eye size={14} className="mr-2" />
+            查看详情
+          </button>
+          {contextMenu.account.ownership === 'shared' && (
+            <button
+              onClick={() => {
+                const nextAccounts = accounts.filter((a) => a.id !== contextMenu.account.id);
+                setAccounts(nextAccounts);
+                setCalendars((prev) => prev.filter((c) => c.accountId !== contextMenu.account.id));
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
+            >
+              <Trash size={14} className="mr-2" />
+              移除账号
+            </button>
+          )}
         </div>
       )}
 
