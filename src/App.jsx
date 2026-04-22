@@ -2904,42 +2904,42 @@ function CalendarSidebar({
               { key: 'sharedAccounts', title: '共享账户', ownership: 'shared', items: sharedAccounts },
             ].map((group) => (
               <div key={group.title} className="group">
-                <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
                   <button onClick={() => toggleSection(group.key)} className="flex items-center min-w-0 text-left">
-                    <ChevronDown size={14} className={`mr-1.5 text-gray-400 transition-transform ${collapsedSections[group.key] ? '-rotate-90' : ''}`} />
+                    <ChevronDown size={14} className={`mr-1 text-gray-400 transition-transform ${collapsedSections[group.key] ? '-rotate-90' : ''}`} />
                     <div className="text-[11px] font-bold text-gray-400 tracking-wide">{group.title}</div>
                   </button>
-                  <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                    {group.items.length > 0 && !group.items.every((item) => item.checked) && (
-                      <button
-                        onClick={() => onSetAccountGroupChecked(group.ownership)}
-                        className="rounded-md px-2 py-0.5 text-[11px] font-medium text-gray-500 transition hover:bg-slate-200/70"
-                      >
-                        全选
-                      </button>
-                    )}
-                    {group.ownership === 'self' && (
-                      <button
-                        onClick={onOpenSharingSettings}
-                        className="rounded-md p-1 text-gray-400 transition hover:bg-slate-200/70 hover:text-gray-600"
-                        title="设置共享账户"
-                      >
-                        <Settings size={13} />
-                      </button>
-                    )}
-                  </div>
+                  {group.items.length > 0 && !group.items.every((item) => item.checked) && (
+                    <button
+                      onClick={() => onSetAccountGroupChecked(group.ownership)}
+                      className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-gray-400 transition hover:bg-slate-200/70"
+                    >
+                      全选
+                    </button>
+                  )}
+                  {group.ownership === 'self' && (
+                    <button
+                      onClick={onOpenSharingSettings}
+                      className="rounded-md p-0.5 text-gray-300 transition hover:bg-slate-200/70 hover:text-gray-500"
+                      title="设置共享账户"
+                    >
+                      <Settings size={12} />
+                    </button>
+                  )}
                 </div>
-		                {!collapsedSections[group.key] && <div className="space-y-px">
-		                  {group.items.map((account) => (
+		                {!collapsedSections[group.key] && <div className="space-y-[2px]">
+		                  {group.items.map((account) => {
+				const displayName = account.name || '';
+                    return (
                     <div
 	                    key={account.id}
-	                    className="group/account relative flex cursor-default items-center gap-2 rounded-lg px-1.5 py-[3px] transition-colors duration-120 hover:bg-slate-200/50"
+	                    className="group/account relative flex cursor-default items-center gap-1.5 rounded-lg px-1 py-[2px] transition-colors duration-120 hover:bg-slate-200/50"
 	                    onContextMenu={(e) => onAccountContextMenu(e, account)}
 	                  >
 	                    {/* Checkbox - independent click zone */}
 	                    <button
 	                      onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
-	                      className={`flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-150 ${
+	                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-150 ${
 	                        account.checked
 	                          ? `scale-100 border-transparent ${getAccountCheckboxTone(account.color).split(' ').filter(s => s.includes('bg-') || s.includes('text-')).join(' ')}`
 	                          : 'border-gray-300 bg-white scale-100 hover:border-blue-400 hover:bg-blue-50/50'
@@ -2950,7 +2950,7 @@ function CalendarSidebar({
 	                    </button>
 	                    {/* Content area - click to open details */}
 	                    <div
-                        title={account.name || ''}
+                        title={displayName}
                         className="min-w-0 flex-1 truncate cursor-pointer py-0.5 rounded px-1 -mx-1 transition-colors hover:bg-white/40"
                         onClick={() => {
                           if (account.ownership === 'shared') {
@@ -2960,29 +2960,30 @@ function CalendarSidebar({
                           }
                         }}
                       >
-			                        <span className="text-[13px] leading-tight font-medium text-gray-800">
-			                          {account.name || ''}
+			                        <span className="text-[13px] leading-snug font-medium text-gray-800">
+			                          {displayName}
 			                        </span>
 			                      </div>
-			                      {/* Pending notification dot for shared calendars */}
+			                      {/* Pending notification dot */}
                       {account.ownership === 'shared' && account.hasPendingInvite && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                       )}
 			                    </div>
-	                  ))}
+	                  );
+		              })}
                   {group.items.length === 0 && (
-                    <div className="px-1 py-3 text-xs font-medium text-gray-400">
-                      {`当前没有${group.title}`}
+                    <div className="px-1 py-2.5 text-xs font-medium text-gray-400">
+                      {`暂无${group.title.replace('日历', '')}`}
                     </div>
                   )}
                   {/* Persistent add button for shared calendars */}
                   {group.ownership === 'shared' && (
                     <button
                       onClick={onAddSharedCalendar}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600 mt-0.5"
+                      className="flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600 mt-0.5"
                     >
                       <Plus size={13} />
-                      添加共享账户
+                      添加共享
                     </button>
                   )}
                 </div>}
