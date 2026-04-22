@@ -2869,8 +2869,16 @@ function CalendarSidebar({
                     className={`relative z-[1] aspect-square w-7 flex items-center justify-center rounded-full font-medium transition-colors ${
                       cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-200' : 'text-gray-300'
                     } ${
-                      isSelectedDate || cell.isToday
+                      isSelectedDate && !cell.isToday
                         ? 'bg-blue-600 text-white font-bold'
+                        : ''
+                    } ${
+                      cell.isToday && !isSelectedDate
+                        ? 'ring-2 ring-blue-500 ring-offset-1 font-bold text-blue-600'
+                        : ''
+                    } ${
+                      cell.isToday && isSelectedDate
+                        ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-300 ring-offset-1'
                         : ''
                     }`}
                   >
