@@ -2949,32 +2949,31 @@ function CalendarSidebar({
 		                  {group.items.map((account) => (
 			                    <div
 			                      key={account.id}
-			                      className="group/account flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-slate-200/50"
-			                      onClick={() => onToggleAccount(account.id)}
+			                      className="group/account flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 transition-colors duration-150 hover:bg-slate-200/50"
 			                    >
-			                      {/* Color dot */}
-			                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: account.color || '#6366f1' }} />
-			                      {/* Name */}
-			                      <div title={account.email || account.name} className="min-w-0 flex-1 truncate">
-			                        <span className="text-[13px] font-semibold text-gray-800">
-			                          {account.name || (account.email ? account.email.split('@')[0] : '')}
-			                        </span>
-			                        {account.email && account.name && (
-			                          <span className="ml-1.5 text-[11px] text-gray-400">@{account.email.split('@')[1]}</span>
-			                        )}
-			                      </div>
-			                      {/* Checkbox */}
+			                      {/* Checkbox - front */}
 			                      <button
 			                        onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
-			                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+			                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition ${
 			                          account.checked
 			                            ? getAccountCheckboxTone(account.color)
 			                            : 'border-gray-300 bg-white text-transparent hover:border-blue-300'
 			                        }`}
 			                        title={account.checked ? '取消选中' : '选中'}
 			                      >
-			                        <Check size={12} />
+			                        <Check size={11} />
 			                      </button>
+			                      {/* Color dot */}
+			                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: account.color || '#6366f1' }} />
+			                      {/* Name */}
+			                      <div title={account.email || account.name} className="min-w-0 flex-1 truncate">
+			                        <span className="text-[13px] font-medium text-gray-800">
+			                          {account.name || (account.email ? account.email.split('@')[0] : '')}
+			                        </span>
+			                        {account.email && (
+			                          <span className="ml-1 text-[11px] text-gray-400">@{account.email.split('@')[1]}</span>
+			                        )}
+			                      </div>
 			                    </div>
 	                  ))}
                   {group.items.length === 0 && (
