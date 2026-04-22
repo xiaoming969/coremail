@@ -9320,16 +9320,16 @@ function MainApp() {
               type="button"
               aria-label="联系客服"
               title="联系客服"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
               <HelpCircle size={16} />
             </button>
-            <div className="mx-1 h-6 w-px bg-slate-200" />
+            <div className="mx-0.5 h-6 w-px bg-slate-200" />
             <button
               type="button"
               aria-label="最小化窗口"
               title="最小化"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
               <Minus size={16} />
             </button>
@@ -9337,7 +9337,7 @@ function MainApp() {
               type="button"
               aria-label="全屏窗口"
               title="全屏"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
               <Square size={14} />
             </button>
@@ -9345,7 +9345,7 @@ function MainApp() {
               type="button"
               aria-label="关闭窗口"
               title="关闭"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
               <X size={16} />
             </button>
