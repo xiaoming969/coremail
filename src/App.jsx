@@ -2923,7 +2923,7 @@ function CalendarSidebar({
                       <button
                         onClick={onOpenSharingSettings}
                         className="rounded-md p-1 text-gray-400 transition hover:bg-slate-200/70 hover:text-gray-600"
-                        title="设置共享日历"
+                        title="设置共享账户"
                       >
                         <Settings size={13} />
                       </button>
@@ -2984,7 +2984,7 @@ function CalendarSidebar({
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600 mt-0.5"
                     >
                       <Plus size={13} />
-                      添加共享日历
+                      添加共享账户
                     </button>
                   )}
                 </div>}
@@ -5279,7 +5279,7 @@ function AddSharedCalendarModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
-          <div className="text-lg font-black text-gray-900">共享日历</div>
+          <div className="text-lg font-black text-gray-900">共享账户</div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
@@ -5401,7 +5401,7 @@ function AddSharedCalendarModal({
           {draft.tab === 'manual' && (
             <button onClick={onSubmit} className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center">
               <Plus size={14} className="mr-2" />
-              添加共享日历
+              添加共享账户
             </button>
           )}
         </div>
@@ -5430,7 +5430,7 @@ function SharedCalendarAccessModal({ calendar, account, pendingRequest, onClose,
           <div>
             <div className="text-lg font-black text-gray-900">权限说明</div>
             <div className="text-sm text-gray-500 mt-1">
-              {calendar.name} · 已添加到左侧"共享日历"
+              {calendar.name} · 已添加到左侧"共享账户"
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
@@ -5489,7 +5489,7 @@ function SharedCalendarAccessModal({ calendar, account, pendingRequest, onClose,
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="text-sm font-black text-slate-900">权限不足时</div>
             <div className="mt-1 text-sm text-slate-500">
-              只有在你尝试编辑、删除或管理共享日历时，系统才会按需提示申请更高权限，避免高频打扰。
+              只有在你尝试编辑、删除或管理共享账户时，系统才会按需提示申请更高权限，避免高频打扰。
             </div>
             {pendingRequest?.status === 'pending' ? (
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -5513,7 +5513,7 @@ function SharedCalendarAccessModal({ calendar, account, pendingRequest, onClose,
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                当前已是该共享日历可申请的最高权限。
+                当前已是该共享账户可申请的最高权限。
               </div>
             )}
           </div>
@@ -6445,7 +6445,7 @@ function MainApp() {
                 ? `参与人：${participantPreview}`
                 : '未填写组织者和参与人';
         const sourceLabel = account
-          ? `${account.ownership === 'self' ? '我的日历' : '共享日历'}${calendar?.name ? ` · ${calendar.name}` : ''}`
+          ? `${account.ownership === 'self' ? '我的账户' : '共享账户'}${calendar?.name ? ` · ${calendar.name}` : ''}`
           : calendar?.name || '未知来源';
         const locationParts = [
           event.location,
@@ -6620,7 +6620,7 @@ function MainApp() {
           id: nextAccountId,
           name: invite.senderName,
           email: invite.senderEmail,
-          role: '共享日历',
+          role: '共享账户',
           ownership: 'shared',
           color: invite.color,
           checked: true,
@@ -6673,7 +6673,7 @@ function MainApp() {
       ),
     );
     triggerFeedback('L3', {
-      msg: `已添加到共享日历 · 当前权限：${permissionLabel}`,
+      msg: `已添加到共享账户 · 当前权限：${permissionLabel}`,
       icon: <Check size={16} />,
       color: 'bg-emerald-600',
     });
@@ -6715,7 +6715,7 @@ function MainApp() {
 
     if (accounts.some((account) => account.email.toLowerCase() === email)) {
     triggerFeedback('L3', {
-      msg: '该共享日历已存在',
+      msg: '该共享账户已存在',
       icon: <AlertCircle size={16} />,
       color: 'bg-red-600',
     });
@@ -6734,7 +6734,7 @@ function MainApp() {
           id: nextAccountId,
         name,
         email,
-        role: '共享日历',
+        role: '共享账户',
           ownership: 'shared',
           color: draft.color,
           checked: true,
@@ -6806,7 +6806,7 @@ function MainApp() {
     ]);
     setSharedCalendarDialog((prev) => ({ ...prev, open: false, tab: 'inbox' }));
     triggerFeedback('L3', {
-      msg: `已添加到共享日历 · 当前权限：${permissionLabel}`,
+      msg: `已添加到共享账户 · 当前权限：${permissionLabel}`,
       icon: <Check size={16} />,
       color: 'bg-emerald-600',
     });
@@ -11032,7 +11032,7 @@ function MainApp() {
             className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
           >
             <Calendar size={14} className="mr-2" />
-            添加共享日历
+            添加共享账户
           </button>
           <button
             onClick={() => {
