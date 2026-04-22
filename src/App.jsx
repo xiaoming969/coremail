@@ -2946,48 +2946,40 @@ function CalendarSidebar({
                     )}
                   </div>
                 </div>
-		                {!collapsedSections[group.key] && <div className="space-y-2">
+		                {!collapsedSections[group.key] && <div className="space-y-0.5">
 		                  {group.items.map((account) => (
-					                    <div
-					                      key={account.id}
-					                      className="group w-full border-none bg-transparent px-1 py-2 transition-all duration-200 shadow-none"
-					                    >
-			                      <div className="flex items-center gap-3">
-			                        <div className="min-w-0 flex-1">
-			                          <div className="flex items-center justify-between gap-3">
-			                            <div title={account.email || account.name} className="min-w-0 text-sm font-bold text-gray-900 truncate">
-			                              {account.email || account.name}
-			                            </div>
-			                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                onClick={() => (account.ownership === 'shared' ? onOpenSharedCalendarAccess(account.id) : onOpenMailboxPermissions(account.id))}
-                                className="rounded-xl p-1.5 text-gray-400 opacity-0 transition hover:bg-slate-200/80 hover:text-gray-600 group-hover:opacity-100 focus:opacity-100"
-                                title={account.ownership === 'shared' ? '查看权限说明' : '权限设置'}
-                                aria-label={`${account.ownership === 'shared' ? '查看' : '打开'} ${account.email || account.name} 的${account.ownership === 'shared' ? '权限说明' : '权限设置'}`}
-                              >
-                                <Settings size={14} />
-                              </button>
-			                              <button
-			                                onClick={() => onToggleAccount(account.id)}
-		                                className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
-		                                  account.checked
-		                                    ? getAccountCheckboxTone(account.color)
-		                                    : 'border-gray-300 bg-white text-transparent hover:border-blue-300'
-		                                }`}
-	                                title={account.checked ? '取消选中' : '选中'}
-		                                aria-label={`${account.checked ? '取消选中' : '选中'} ${account.email || account.name}`}
-		                                aria-pressed={account.checked}
-		                              >
-		                                <Check size={12} />
-		                              </button>
-		                            </div>
-		                          </div>
-		                        </div>
-		                      </div>
-		                    </div>
+			                    <div
+			                      key={account.id}
+			                      className="group/account flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-slate-200/50"
+			                      onClick={() => onToggleAccount(account.id)}
+			                    >
+			                      {/* Color dot */}
+			                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: account.color || '#6366f1' }} />
+			                      {/* Name */}
+			                      <div title={account.email || account.name} className="min-w-0 flex-1 truncate">
+			                        <span className="text-[13px] font-semibold text-gray-800">
+			                          {account.name || (account.email ? account.email.split('@')[0] : '')}
+			                        </span>
+			                        {account.email && account.name && (
+			                          <span className="ml-1.5 text-[11px] text-gray-400">@{account.email.split('@')[1]}</span>
+			                        )}
+			                      </div>
+			                      {/* Checkbox */}
+			                      <button
+			                        onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
+			                        className={`flex h-5 w-5 items-center justify-center rounded-md border transition ${
+			                          account.checked
+			                            ? getAccountCheckboxTone(account.color)
+			                            : 'border-gray-300 bg-white text-transparent hover:border-blue-300'
+			                        }`}
+			                        title={account.checked ? '取消选中' : '选中'}
+			                      >
+			                        <Check size={12} />
+			                      </button>
+			                    </div>
 	                  ))}
                   {group.items.length === 0 && (
-                    <div className="px-1 py-4 text-xs font-bold text-gray-400">
+                    <div className="px-2 py-4 text-xs font-bold text-gray-400">
                       {`当前没有${group.title}`}
                     </div>
                   )}
