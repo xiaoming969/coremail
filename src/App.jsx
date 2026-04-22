@@ -9373,15 +9373,15 @@ function MainApp() {
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
-                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-[9px] text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
+                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:h-10 sm:min-w-[72px]"
                         >
                           今天
                         </button>
-                        <div className="flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
-                          <button className="rounded-full p-[7px] text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(-1)}>
+                        <div className="flex h-10 items-center rounded-full border border-slate-200 bg-white p-[3px]">
+                          <button className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(-1)}>
                             <ChevronLeft size={18} />
                           </button>
-                          <button className="rounded-full p-[7px] text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(1)}>
+                          <button className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(1)}>
                             <ChevronRight size={18} />
                           </button>
                         </div>
