@@ -3120,7 +3120,7 @@ function WeekView({
                         <button
                           type="button"
                           onClick={() => onHideAccount?.(pane.account.id)}
-                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-gray-700"
                           title={`隐藏 ${pane.account.email || pane.account.name}`}
                           aria-label={`隐藏 ${pane.account.email || pane.account.name}`}
                         >
@@ -3538,19 +3538,22 @@ function DayView({
                     className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
                     style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                   >
-                    <div className="flex h-14 items-center px-4 bg-white">
+                    <div className="flex h-14 items-center px-4 bg-[#fcfcfb]">
                       <div className="flex min-w-0 items-center justify-between gap-3 w-full">
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
-                          <div className="text-lg font-black text-gray-900">
-                            {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                        <div className="min-w-0 flex items-center gap-2">
+                          {isSplit && <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${lane.color}`}></div>}
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
+                            <div className="text-lg font-black text-gray-900">
+                              {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                            </div>
                           </div>
                         </div>
                         {isSplit && (
                           <button
                             type="button"
                             onClick={() => onHideAccount?.(lane.id)}
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-slate-100 hover:text-gray-700"
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-gray-700"
                             title={`隐藏 ${lane.email || lane.name}`}
                             aria-label={`隐藏 ${lane.email || lane.name}`}
                           >
@@ -3961,7 +3964,7 @@ function MonthView({
     </div>
   );
   const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white" style={{ minWidth: '100%' }}>
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white" style={{ minWidth: '100%' }}>
       {renderMonthWeekdayHeader(paneKey, stickyTop)}
       {renderMonthCells(panelEvents, preferredAccountId, paneKey)}
     </div>
@@ -3983,9 +3986,9 @@ function MonthView({
             return (
               <section
                 key={monthAccount.id}
-                className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white"
               >
-                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-[#fcfcfb] px-4 py-3">
                   <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-black text-gray-900">{monthAccount.email || monthAccount.name}</div>
@@ -3994,7 +3997,7 @@ function MonthView({
                   <button
                     type="button"
                     onClick={() => onHideAccount?.(monthAccount.id)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-white hover:text-gray-700"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-gray-700"
                     title={`隐藏 ${monthAccount.email || monthAccount.name}`}
                     aria-label={`隐藏 ${monthAccount.email || monthAccount.name}`}
                   >
