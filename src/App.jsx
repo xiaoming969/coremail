@@ -9341,8 +9341,8 @@ function MainApp() {
         <header className="relative flex min-h-16 shrink-0 flex-col gap-3 border-b border-slate-200 bg-[#fcfcfb] px-4 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-6" style={{ zIndex: 40 }}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
-              <div className="flex items-center gap-2 overflow-x-auto min-w-0 pr-1">
-                <div className="flex h-10 min-w-[260px] items-center rounded-xl border border-slate-200 bg-white px-3 sm:min-w-[320px]">
+              <div className="flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap">
+                <div className="flex h-10 w-[324px] shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3">
                   <button
                     onClick={() => executeCalendarSearch()}
                     className="shrink-0 text-gray-400 transition hover:text-gray-600"
@@ -9360,7 +9360,7 @@ function MainApp() {
                         executeCalendarSearch(event.currentTarget.value);
                       }
                     }}
-                    placeholder="搜索主题、正文、参会人、组织者、时间、地点..."
+                    placeholder="搜索日程"
                     className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
                   />
                   {calendarSearchQuery && (
