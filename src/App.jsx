@@ -9456,29 +9456,27 @@ function MainApp() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="relative h-10 rounded-xl border border-slate-200 bg-white pl-3 pr-9">
-                          <div className="pointer-events-none flex h-full items-center text-sm font-bold text-gray-700">视图</div>
-                          <select
-                            value={calendarLayout}
-                            onChange={(event) => {
-                              const nextLayout = event.target.value;
-                              setCalendarLayout(nextLayout);
-                              if (nextLayout === 'day' || nextLayout === 'week') {
-                                queueTimelineScrollToWorkStart(nextLayout);
-                              }
-                            }}
-                            className="absolute inset-0 z-[1] cursor-pointer appearance-none opacity-0"
-                            aria-label="切换视图"
-                          >
+                        <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
+                        <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
                             {VIEW_OPTIONS.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}视图
-                              </option>
+                              <button
+                                key={option.id}
+                                onClick={() => {
+                                  setCalendarLayout(option.id);
+                                  if (option.id === 'day' || option.id === 'week') {
+                                    queueTimelineScrollToWorkStart(option.id);
+                                  }
+                                }}
+                                className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                                  calendarLayout === option.id
+                                    ? 'bg-slate-900 text-white'
+                                    : 'text-gray-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
                             ))}
-                          </select>
-                          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        </div>
+                          </div>
 
                         {activeAccounts.length > 1 && (
                           <div className="hidden md:inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
