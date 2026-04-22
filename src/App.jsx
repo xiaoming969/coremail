@@ -2714,7 +2714,7 @@ function CalendarSidebar({
                 onNewEvent();
                 setCreateMenuOpen(false);
               }}
-              className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
+              className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-white shadow-sm transition hover:bg-slate-700 active:scale-95"
               title="新建日程"
             >
               <Plus size={17} />
@@ -9391,7 +9391,7 @@ function MainApp() {
                                 }}
                                 className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                   calendarLayout === option.id
-                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    ? 'bg-slate-800 text-white shadow-sm'
                                     : 'text-gray-600 hover:bg-slate-50'
                                 }`}
                               >
@@ -9406,7 +9406,7 @@ function MainApp() {
                               onClick={() => setAccountDisplayMode('overlay')}
                               className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'overlay'
-                                  ? 'bg-blue-600 text-white shadow-sm'
+                                  ? 'bg-slate-800 text-white shadow-sm'
                                   : 'text-gray-600 hover:bg-slate-50'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'overlay'}
@@ -9417,7 +9417,7 @@ function MainApp() {
                               onClick={() => setAccountDisplayMode('split')}
                               className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'split'
-                                  ? 'bg-blue-600 text-white shadow-sm'
+                                  ? 'bg-slate-800 text-white shadow-sm'
                                   : 'text-gray-600 hover:bg-slate-50'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'split'}
@@ -9436,7 +9436,7 @@ function MainApp() {
                                   key={account.id}
                                   onClick={() => toggleSplitAccount(account.id)}
                                   className={`px-3 py-1.5 text-xs font-bold rounded-full whitespace-nowrap transition ${
-                                    selected ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-slate-50'
+                                    selected ? 'bg-slate-800 text-white shadow-sm' : 'text-gray-500 hover:bg-slate-50'
                                   }`}
                                   title={account.name}
                                 >
