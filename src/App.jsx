@@ -2886,9 +2886,9 @@ function CalendarSidebar({
                   >
                     {cell.date.getDate()}
                   </button>
-                  {markerColors.length > 0 && !isSelectedDate && (
+                  {markerColors.length > 0 && (
                     <div className="pointer-events-none absolute left-1/2 z-[1] flex -translate-x-1/2 items-center justify-center" style={{ bottom: '1px' }}>
-                      <span className="h-[2px] w-[6px] rounded-full bg-blue-500"></span>
+                      <span className={`h-[2px] w-[6px] rounded-full ${isSelectedDate ? 'bg-white' : 'bg-blue-500'}`}></span>
                     </div>
                   )}
                 </div>
