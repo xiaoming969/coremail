@@ -235,7 +235,7 @@ const MOCK_SHARE_INVITATIONS = [
     color: 'bg-cyan-500',
     status: 'pending',
     createdAt: new Date(2026, 0, 8, 14, 20).getTime(),
-    message: '共享了季度预算与报销排期，接收后会出现在左侧"共享日历"。',
+    message: '共享了季度预算与报销排期，接收后会出现在左侧"共享账户"。',
   },
   {
     id: 'share-invite-2',
@@ -1214,7 +1214,7 @@ const buildDraftForm = ({ event, slot, focusDate, calendars, activeAccountIds })
 const MOCK_ACCOUNTS = [
   {
     id: 'acc1',
-    name: '主工作邮箱',
+    name: '主工作',
     email: 'me@calendarpro.io',
     role: '我的账户',
     ownership: 'self',
@@ -1233,7 +1233,7 @@ const MOCK_ACCOUNTS = [
   },
   {
     id: 'acc2',
-    name: '领导助理邮箱',
+    name: '领导助理',
     email: 'ea@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -1252,7 +1252,7 @@ const MOCK_ACCOUNTS = [
   },
   {
     id: 'acc3',
-    name: '销售团队邮箱',
+    name: '销售团队',
     email: 'sales@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -2769,7 +2769,7 @@ function CalendarSidebar({
     >
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-lg font-black text-gray-900">日历</div>
+            <div className="text-lg font-black text-gray-900">账户</div>
           <button
             onClick={onToggleCollapsed}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 hover:bg-white"
@@ -2901,8 +2901,8 @@ function CalendarSidebar({
         <div>
           <div className="space-y-5">
             {[
-              { key: 'ownAccounts', title: '我的日历', ownership: 'self', items: ownAccounts },
-              { key: 'sharedAccounts', title: '共享日历', ownership: 'shared', items: sharedAccounts },
+              { key: 'ownAccounts', title: '我的账户', ownership: 'self', items: ownAccounts },
+              { key: 'sharedAccounts', title: '共享账户', ownership: 'shared', items: sharedAccounts },
             ].map((group) => (
               <div key={group.title} className="group">
                 <div className="mb-2 flex items-center justify-between gap-2">
