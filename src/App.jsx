@@ -115,7 +115,7 @@ const HALF_HOUR_STEP = 0.5;
 const MIN_EVENT_DURATION = 0.5;
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, index) => index + DAY_START_HOUR);
 const WEEKDAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const MONTH_WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+const MONTH_WEEKDAY_NAMES = ['一', '二', '三', '四', '五', '六', '日'];
 const VIEW_OPTIONS = [
   { id: 'month', label: '月' },
   { id: 'week', label: '周' },
@@ -1053,7 +1053,9 @@ const buildWeekDays = (focusDate) => {
 
 const buildMiniMonthCells = (focusDate) => {
   const monthStart = new Date(focusDate.getFullYear(), focusDate.getMonth(), 1);
-  const startOffset = monthStart.getDay();
+  // Monday-based: Sunday=0 -> 6, Mon=1->0, Tue=2->1, etc.
+  const dayOfWeek = monthStart.getDay();
+  const startOffset = (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
   const gridStart = addDays(monthStart, -startOffset);
 
   return Array.from({ length: 42 }, (_, index) => {
@@ -2869,23 +2871,16 @@ function CalendarSidebar({
                   className="relative flex h-9 cursor-pointer items-center justify-center"
                   onClick={() => onSelectDate(cell.date)}
                 >
-                  {showWeekRange && <div className="absolute inset-0 rounded-lg bg-slate-100"></div>}
+                  {showWeekRange && <div className="absolute inset-0 rounded-full bg-slate-100"></div>}
                   <button
                     type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSelectDate(cell.date);
-                    }}
-                    className={`relative z-[1] w-7 h-7 flex items-center justify-center rounded-full font-medium ${
-                      cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-100' : 'text-gray-300'
+                    onClick={() => onSelectDate(cell.date)}
+                    className={`relative z-[1] w-7 h-7 flex items-center justify-center rounded-full font-medium transition-colors ${
+                      cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-200' : 'text-gray-300'
                     } ${
-                      isSelectedDate
-                        ? cell.isToday
-                          ? 'bg-blue-600 text-white font-bold'
-                          : 'border border-blue-500 bg-white text-blue-600 font-bold'
-                        : cell.isToday
-                          ? 'bg-blue-600 text-white font-bold'
-                          : ''
+                      isSelectedDate || cell.isToday
+                        ? 'bg-blue-600 text-white font-bold'
+                        : ''
                     }`}
                   >
                     {cell.date.getDate()}
