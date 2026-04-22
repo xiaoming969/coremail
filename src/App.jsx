@@ -2709,28 +2709,18 @@ function CalendarSidebar({
         </div>
         <div className="border-b border-slate-200 px-3 py-4">
           <div className="relative" ref={createMenuRef}>
-            <div className="flex h-11 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-blue-600">
-              <button
-                onClick={() => {
-                  onNewEvent();
-                  setCreateMenuOpen(false);
-                }}
-                className="flex flex-1 items-center justify-center transition hover:bg-slate-200"
-                title="新建日程"
-              >
-                <Plus size={18} />
-              </button>
-              <div className="w-px bg-slate-200" />
-              <button
-                onClick={() => setCreateMenuOpen((prev) => !prev)}
-                className="flex w-10 items-center justify-center transition hover:bg-slate-200"
-                title="展开新建菜单"
-              >
-                <ChevronDown size={16} />
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                onNewEvent();
+                setCreateMenuOpen(false);
+              }}
+              className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
+              title="新建日程"
+            >
+              <Plus size={17} />
+            </button>
             {createMenuOpen && (
-              <div className="absolute left-[calc(100%+8px)] top-0 z-30 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
+              <div className="absolute left-[calc(50%+22px)] top-1/2 z-30 -translate-y-1/2 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-md">
                 <button
                   onClick={() => {
                     onNewEvent();
@@ -9371,16 +9361,16 @@ function MainApp() {
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
-                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
+                          className="hidden shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition hover:bg-slate-50 sm:inline-flex sm:min-w-[72px]"
                         >
                           今天
                         </button>
-                        <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1">
-                          <button className="rounded-xl p-1 text-gray-600 transition hover:bg-slate-50" onClick={() => changeRange(-1)}>
-                            <ChevronLeft size={20} />
+                        <div className="flex items-center rounded-full border border-slate-200 bg-white p-1">
+                          <button className="rounded-full p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(-1)}>
+                            <ChevronLeft size={18} />
                           </button>
-                          <button className="rounded-xl p-1 text-gray-600 transition hover:bg-slate-50" onClick={() => changeRange(1)}>
-                            <ChevronRight size={20} />
+                          <button className="rounded-full p-1.5 text-gray-500 transition hover:bg-blue-50 hover:text-blue-600" onClick={() => changeRange(1)}>
+                            <ChevronRight size={18} />
                           </button>
                         </div>
                         <div className="min-w-0">
@@ -9389,7 +9379,7 @@ function MainApp() {
                       </div>
 
                         <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
+                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-0.5">
                             {VIEW_OPTIONS.map((option) => (
                               <button
                                 key={option.id}
@@ -9399,10 +9389,10 @@ function MainApp() {
                                     queueTimelineScrollToWorkStart(option.id);
                                   }
                                 }}
-                                className={`rounded-lg px-3 py-1.5 text-sm font-bold transition ${
+                                className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
                                   calendarLayout === option.id
-                                    ? 'bg-slate-900 text-white'
-                                    : 'text-gray-700 hover:bg-slate-50'
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'text-gray-600 hover:bg-slate-50'
                                 }`}
                               >
                                 {option.label}
@@ -9411,13 +9401,13 @@ function MainApp() {
                           </div>
 
                         {activeAccounts.length > 1 && (
-                          <div className="hidden md:inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
+                          <div className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white p-0.5">
                             <button
                               onClick={() => setAccountDisplayMode('overlay')}
-                              className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                              className={`rounded-full px-3 py-2 text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'overlay'
-                                  ? 'bg-slate-900 text-white'
-                                  : 'text-gray-700 hover:bg-slate-50'
+                                  ? 'bg-blue-600 text-white shadow-sm'
+                                  : 'text-gray-600 hover:bg-slate-50'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'overlay'}
                             >
@@ -9425,10 +9415,10 @@ function MainApp() {
                             </button>
                             <button
                               onClick={() => setAccountDisplayMode('split')}
-                              className={`rounded-lg px-3 py-2 text-sm font-bold transition ${
+                              className={`rounded-full px-3 py-2 text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'split'
-                                  ? 'bg-slate-900 text-white'
-                                  : 'text-gray-700 hover:bg-slate-50'
+                                  ? 'bg-blue-600 text-white shadow-sm'
+                                  : 'text-gray-600 hover:bg-slate-50'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'split'}
                             >
@@ -9438,15 +9428,15 @@ function MainApp() {
                         )}
 
                         {activeAccounts.length > MAX_SPLIT_ACCOUNTS && effectiveAccountDisplayMode === 'split' && (
-                          <div className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 space-x-1">
+                          <div className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-full border border-slate-200 bg-white p-0.5 space-x-1">
                             {activeAccounts.map((account) => {
                               const selected = splitAccountIds.includes(account.id);
                               return (
                                 <button
                                   key={account.id}
                                   onClick={() => toggleSplitAccount(account.id)}
-                                  className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap ${
-                                    selected ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                                  className={`px-3 py-1.5 text-xs font-bold rounded-full whitespace-nowrap transition ${
+                                    selected ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:bg-slate-50'
                                   }`}
                                   title={account.name}
                                 >
