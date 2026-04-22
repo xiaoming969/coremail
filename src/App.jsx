@@ -2876,7 +2876,7 @@ function CalendarSidebar({
                   <button
                     type="button"
                     onClick={() => onSelectDate(cell.date)}
-                    className={`relative z-[1] w-7 h-7 flex items-center justify-center rounded-full font-medium transition-colors ${
+                    className={`relative z-[1] aspect-square w-7 flex items-center justify-center rounded-full font-medium transition-colors ${
                       cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-200' : 'text-gray-300'
                     } ${
                       isSelectedDate || cell.isToday
