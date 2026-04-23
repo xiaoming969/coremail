@@ -1215,7 +1215,7 @@ const buildDraftForm = ({ event, slot, focusDate, calendars, activeAccountIds })
 const MOCK_ACCOUNTS = [
   {
     id: 'acc1',
-    name: '主工作',
+    name: '我',
     email: 'me@calendarpro.io',
     role: '我的账户',
     ownership: 'self',
@@ -1234,7 +1234,7 @@ const MOCK_ACCOUNTS = [
   },
   {
     id: 'acc2',
-    name: '领导助理',
+    name: '李助理',
     email: 'ea@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -1253,7 +1253,7 @@ const MOCK_ACCOUNTS = [
   },
   {
     id: 'acc3',
-    name: '销售团队',
+    name: '王销售',
     email: 'sales@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -2988,10 +2988,10 @@ function CalendarSidebar({
                   {group.ownership === 'shared' && (
                     <button
                       onClick={onAddSharedCalendar}
-                      className="flex w-full items-center justify-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600 mt-0.5"
+                      className="flex w-full items-center justify-start gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600 mt-0.5"
                     >
                       <Plus size={13} />
-                      添加共享
+                      添加共享日历
                     </button>
                   )}
                 </div>}
