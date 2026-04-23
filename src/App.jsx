@@ -9279,7 +9279,7 @@ function MainApp() {
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
               <div className="flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap">
-                <div className="flex h-10 w-[324px] shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3">
+                <div className="flex h-10 w-[324px] shrink-0 items-center rounded-xl bg-black/5 px-3">
                   <button
                     onClick={() => executeCalendarSearch()}
                     className="shrink-0 text-gray-400 transition hover:text-gray-600"
@@ -9298,12 +9298,12 @@ function MainApp() {
                       }
                     }}
                     placeholder="搜索日程"
-                    className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
+                    className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none"
                   />
                   {calendarSearchQuery && (
                     <button
                       onClick={clearCalendarSearch}
-                      className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-slate-100 hover:text-gray-600"
+                      className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-black/10 hover:text-gray-600"
                       title="清空搜索"
                     >
                       <X size={14} />
@@ -9312,14 +9312,14 @@ function MainApp() {
                 </div>
                 <button
                   onClick={handleCalendarSync}
-                  className="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
                 >
                   <RefreshCw size={14} className="mr-1.5" />
                   同步日历
                 </button>
                 <button
                   onClick={handleOpenReminders}
-                  className="inline-flex h-10 shrink-0 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-gray-700 transition hover:bg-slate-50"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
                 >
                   <Bell size={14} className="mr-1.5" />
                   提醒
