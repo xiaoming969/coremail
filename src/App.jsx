@@ -2983,7 +2983,7 @@ function CalendarSidebar({
                   {group.ownership === 'shared' && (
                     <button
                       onClick={onAddSharedCalendar}
-                      className="mt-0.5 flex w-full items-center justify-start gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600"
+                      className="mt-0.5 flex w-full items-center justify-start gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600"
                     >
                       <Plus size={13} />
                       添加共享日历
