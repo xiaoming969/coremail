@@ -2863,7 +2863,7 @@ function CalendarSidebar({
               return (
                 <div
                   key={cell.key}
-                  className="relative flex h-9 cursor-pointer items-center justify-center"
+                  className="relative flex aspect-square w-9 cursor-pointer items-center justify-center"
                   onClick={() => onSelectDate(cell.date)}
                 >
                   {showWeekRange && <div className="absolute inset-0 rounded-full bg-slate-100"></div>}
