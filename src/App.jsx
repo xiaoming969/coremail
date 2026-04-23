@@ -1910,13 +1910,13 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
           key={id}
           onClick={() => onSelect(id)}
           title={label}
-          className={`rounded-xl border px-2 ${compact ? 'py-2.5' : 'py-3'} ${vertical ? 'w-full' : ''} flex items-center justify-center transition-all duration-200 ${
+          className={`rounded-xl px-2 ${compact ? 'py-2.5' : 'py-3'} ${vertical ? 'w-full' : ''} flex items-center justify-center transition-all duration-200 ${
             activeProduct === id
-              ? 'border-slate-900 bg-slate-900 text-white'
-              : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+              ? 'text-blue-600'
+              : 'text-slate-500 hover:text-slate-900'
           }`}
         >
-          <Icon size={compact ? 16 : 18} />
+          <Icon size={compact ? 16 : 18} fill={activeProduct === id ? 'currentColor' : 'none'} />
         </button>
       ))}
     </div>
@@ -2699,7 +2699,7 @@ function CalendarSidebar({
       if (collapsed) {
         return (
       <aside
-        className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-white/90 backdrop-blur-[80px] md:flex md:flex-col"
+        className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
         style={{ width: '88px', zIndex: 20 }}
       >
         <div className="flex flex-col items-center border-b border-slate-200 px-3 py-4">
@@ -2759,12 +2759,12 @@ function CalendarSidebar({
 
   return (
     <aside
-      className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-white/90 backdrop-blur-[80px] md:flex md:flex-col"
+      className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
       style={{ width: '252px', zIndex: 20 }}
     >
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-lg font-black text-gray-900">账户</div>
+            <div className="text-lg font-black text-gray-900">Coremail</div>
           <button
             onClick={onToggleCollapsed}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 hover:bg-white"
@@ -3001,7 +3001,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="p-4">
         <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
       </div>
     </aside>
