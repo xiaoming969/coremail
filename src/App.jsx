@@ -2862,12 +2862,8 @@ function CalendarSidebar({
               const showWeekRange = calendarLayout === 'week' && inActiveWeek;
 
               return (
-                <div
-                  key={cell.key}
-                  className="relative flex aspect-square w-9 cursor-pointer items-center justify-center"
-                  onClick={() => onSelectDate(cell.date)}
-                >
-                  {showWeekRange && <div className="absolute inset-0 rounded-full bg-slate-100"></div>}
+                <div key={cell.key} className="relative flex h-9 cursor-pointer items-center justify-center">
+                  {showWeekRange && <div className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-100"></div>}
                   <button
                     type="button"
                     onClick={() => onSelectDate(cell.date)}
