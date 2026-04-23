@@ -9395,7 +9395,7 @@ function MainApp() {
                       </div>
 
                         <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
+                        <div className="inline-flex items-center rounded-lg bg-gray-100 p-[3px]">
                             {VIEW_OPTIONS.map((option) => (
                               <button
                                 key={option.id}
@@ -9405,10 +9405,10 @@ function MainApp() {
                                     queueTimelineScrollToWorkStart(option.id);
                                   }
                                 }}
-                                className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
+                                className={`rounded-lg px-3 py-[9px] text-sm font-bold transition ${
                                   calendarLayout === option.id
-                                    ? 'bg-slate-800 text-white shadow-sm'
-                                    : 'text-gray-600 hover:bg-slate-50'
+                                    ? 'bg-white text-gray-800 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
                                 }`}
                               >
                                 {option.label}
@@ -9417,13 +9417,13 @@ function MainApp() {
                           </div>
 
                         {activeAccounts.length > 1 && (
-                          <div className="hidden md:inline-flex items-center rounded-full border border-slate-200 bg-white p-[3px]">
+                          <div className="hidden md:inline-flex items-center rounded-lg bg-gray-100 p-[3px]">
                             <button
                               onClick={() => setAccountDisplayMode('overlay')}
-                              className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
+                              className={`rounded-lg px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'overlay'
-                                  ? 'bg-slate-800 text-white shadow-sm'
-                                  : 'text-gray-600 hover:bg-slate-50'
+                                  ? 'bg-white text-gray-800 shadow-sm'
+                                  : 'text-gray-500 hover:text-gray-700'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'overlay'}
                             >
@@ -9431,10 +9431,10 @@ function MainApp() {
                             </button>
                             <button
                               onClick={() => setAccountDisplayMode('split')}
-                              className={`rounded-full px-3 py-[9px] text-sm font-bold transition ${
+                              className={`rounded-lg px-3 py-[9px] text-sm font-bold transition ${
                                 effectiveAccountDisplayMode === 'split'
-                                  ? 'bg-slate-800 text-white shadow-sm'
-                                  : 'text-gray-600 hover:bg-slate-50'
+                                  ? 'bg-white text-gray-800 shadow-sm'
+                                  : 'text-gray-500 hover:text-gray-700'
                               }`}
                               aria-pressed={effectiveAccountDisplayMode === 'split'}
                             >
@@ -9444,15 +9444,15 @@ function MainApp() {
                         )}
 
                         {activeAccounts.length > MAX_SPLIT_ACCOUNTS && effectiveAccountDisplayMode === 'split' && (
-                          <div className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-full border border-slate-200 bg-white p-0.5 space-x-1">
+                          <div className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-lg bg-gray-100 p-[3px] space-x-1">
                             {activeAccounts.map((account) => {
                               const selected = splitAccountIds.includes(account.id);
                               return (
                                 <button
                                   key={account.id}
                                   onClick={() => toggleSplitAccount(account.id)}
-                                  className={`px-3 py-1.5 text-xs font-bold rounded-full whitespace-nowrap transition ${
-                                    selected ? 'bg-slate-800 text-white shadow-sm' : 'text-gray-500 hover:bg-slate-50'
+                                  className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition ${
+                                    selected ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                   }`}
                                   title={account.name}
                                 >
