@@ -118,6 +118,7 @@ const WEEKDAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六
 const MONTH_WEEKDAY_NAMES = ['一', '二', '三', '四', '五', '六', '日'];
 const VIEW_OPTIONS = [
   { id: 'month', label: '月' },
+  { id: 'work_week', label: '工作周' },
   { id: 'week', label: '周' },
   { id: 'day', label: '日' },
 ];
@@ -1124,7 +1125,7 @@ const formatRangeTitle = (layout, focusDate) => {
 
   const weekDays = buildWeekDays(focusDate);
   const first = weekDays[0].date;
-  const last = weekDays[6].date;
+  const last = layout === 'work_week' ? weekDays[4].date : weekDays[6].date;
   const sameMonthRange = first.getMonth() === last.getMonth();
   return sameMonthRange
     ? `${first.getMonth() + 1}月 ${first.getDate()}日–${last.getDate()}日`
@@ -1138,7 +1139,7 @@ const eventMatchesLayout = (event, layout, focusDate) => {
   if (layout === 'month') return sameMonth(eventDate, focusDate);
 
   const weekStart = getWeekStart(focusDate);
-  const weekEnd = addDays(weekStart, 7);
+  const weekEnd = addDays(weekStart, layout === 'work_week' ? 5 : 7);
   return eventDate >= weekStart && eventDate < weekEnd;
 };
 
@@ -1149,8 +1150,31 @@ const sortEvents = (events) =>
 
     if (leftDate !== rightDate) return leftDate - rightDate;
     if ((left.isAllDay ? 1 : 0) !== (right.isAllDay ? 1 : 0)) return left.isAllDay ? -1 : 1;
-    return (left.startH || 0) - (right.startH || 0);
+    if ((left.startH || 0) !== (right.startH || 0)) return (left.startH || 0) - (right.startH || 0);
+    return (right.durationH || 1) - (left.durationH || 1);
   });
+
+const getCurrentTimeHour = () => TODAY_DATE.getHours() + TODAY_DATE.getMinutes() / 60;
+const isBusyOnlyEvent = (event, calendar) =>
+  event?.type === 'busy_only' || getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only';
+const isPrivateLimitedEvent = (event, calendar) =>
+  event?.visibility === 'private' && calendar?.type === 'shared' && calendar?.canViewPrivate === false;
+const getVisibleEventTitle = (event, calendar) => {
+  if (isBusyOnlyEvent(event, calendar)) return '忙碌';
+  if (isPrivateLimitedEvent(event, calendar)) return '私密日程';
+  return event?.title || '无标题';
+};
+const getCompactSourceLabel = (account, calendar) => {
+  const raw = account?.email || account?.name || calendar?.owner || calendar?.name || '';
+  if (!raw) return '';
+  return raw.includes('@') ? raw.split('@')[0] : raw.replace(/[()（）]/g, '').slice(0, 6);
+};
+const getEventSecondaryLine = (event, calendar) => {
+  if (isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar)) return '';
+  const place = event.location || (event.meetingProvider && event.meetingProvider !== 'none' ? MEETING_PROVIDER_LABELS[event.meetingProvider] : '');
+  const people = event.organizer || (event.attendees?.length ? `${event.attendees[0]}等 ${event.attendees.length} 人` : '');
+  return [place, people].filter(Boolean).join(' · ');
+};
 
 const getToneClasses = (event, colorClass) => {
   const isBusyOnly = event.type === 'busy_only';
@@ -2902,7 +2926,7 @@ function CalendarSidebar({
               const dayMeta = miniMonthEventMap.get(formatDateLabel(cell.date));
               const markerColors = dayMeta?.colors?.slice(0, 4) || [];
               const isSelectedDate = sameDay(cell.date, focusDate);
-              const showWeekRange = calendarLayout === 'week' && inActiveWeek;
+              const showWeekRange = (calendarLayout === 'week' || calendarLayout === 'work_week') && inActiveWeek;
 
               return (
                 <div key={cell.key} className="relative flex h-9 cursor-pointer items-center justify-center">
@@ -3125,6 +3149,39 @@ function WeekView({
   }, [allDayEvents, calendarMap, days, isSplit, timedEvents, weekAccounts]);
   const allDayHeight = Math.max(isSplit ? 44 : 52, ...paneData.map((pane) => 14 + pane.allDayLayout.rowCount * 30));
   const minContentWidth = isSplit ? 64 + paneData.length * paneMinWidth + Math.max(0, paneData.length - 1) * paneGap : 0;
+  const splitDayMinWidth = isSplit ? (weekAccounts.length >= 3 ? 420 : 340) : 0;
+  const splitWeekMinWidth = isSplit ? 64 + days.length * splitDayMinWidth : 0;
+  const splitWeekLayouts = useMemo(() => {
+    const layouts = {};
+
+    days.forEach((day, dayIndex) => {
+      weekAccounts.forEach((account) => {
+        const laneEvents = timedEvents.filter(
+          (event) => event.day === dayIndex && calendarMap[event.calId]?.accountId === account.id,
+        );
+        layouts[`${dayIndex}-${account.id}`] = buildTimedEventLayout(laneEvents);
+      });
+    });
+
+    return layouts;
+  }, [calendarMap, days, timedEvents, weekAccounts]);
+  const splitAllDayHeight = useMemo(() => {
+    if (!isSplit) return allDayHeight;
+
+    const maxCellCount = days.reduce((max, day, dayIndex) => {
+      const dayMax = weekAccounts.reduce((accountMax, account) => {
+        const count = allDayEvents.filter((event) => {
+          const startDay = event.day || 0;
+          const endDay = startDay + Math.max(1, event.allDaySpan || 1) - 1;
+          return calendarMap[event.calId]?.accountId === account.id && dayIndex >= startDay && dayIndex <= endDay;
+        }).length;
+        return Math.max(accountMax, count);
+      }, 0);
+      return Math.max(max, dayMax);
+    }, 0);
+
+    return Math.max(48, Math.min(132, 14 + Math.max(1, maxCellCount) * 28));
+  }, [allDayEvents, allDayHeight, calendarMap, days, isSplit, weekAccounts]);
 
   useLayoutEffect(() => {
     const target = scrollRef?.current;
@@ -3153,6 +3210,291 @@ function WeekView({
       frameIds.forEach((frameId) => window.cancelAnimationFrame(frameId));
     };
   }, [scrollRef, scrollToWorkStartToken]);
+
+  if (isSplit) {
+    return (
+      <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-x-auto">
+          <div className="flex min-h-full min-w-full flex-col" style={{ minWidth: `${splitWeekMinWidth}px` }}>
+            <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
+              <div className="flex border-b border-gray-200 bg-white">
+                <div className="shrink-0 border-r border-gray-200 bg-white" style={{ width: '64px', height: '82px' }}></div>
+                <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
+                  {days.map((day) => (
+                    <div key={day.date.toISOString()} className={`border-r border-gray-200 ${day.isToday ? 'bg-blue-50/70' : 'bg-[#fcfcfb]'}`}>
+                      <div className="flex h-12 flex-col items-center justify-center">
+                        <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
+                        <span className={`text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-900'}`}>{day.dayNumber}</span>
+                      </div>
+                      <div
+                        className="grid h-[34px] border-t border-gray-200 bg-white"
+                        style={{ gridTemplateColumns: `repeat(${weekAccounts.length}, minmax(0, 1fr))` }}
+                      >
+                        {weekAccounts.map((account, accountIndex) => (
+                          <div
+                            key={`${day.date.toISOString()}-${account.id}-label`}
+                            className={`flex min-w-0 items-center gap-1.5 px-2 ${accountIndex < weekAccounts.length - 1 ? 'border-r border-gray-100' : ''}`}
+                          >
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${account.color}`}></span>
+                            <span className="truncate text-[11px] font-bold text-gray-600">{account.email || account.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex bg-white">
+                <div className="flex shrink-0 items-center justify-center border-r border-gray-200 bg-white" style={{ width: '64px', height: `${splitAllDayHeight}px` }}>
+                  <span className="text-xs font-bold text-gray-400">全天</span>
+                </div>
+                <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
+                  {days.map((day, dayIndex) => (
+                    <div key={`${day.date.toISOString()}-split-all-day`} className="border-r border-gray-200">
+                      <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${weekAccounts.length}, minmax(0, 1fr))` }}>
+                        {weekAccounts.map((account, accountIndex) => {
+                          const cellEvents = allDayEvents.filter((event) => {
+                            const startDay = event.day || 0;
+                            const endDay = startDay + Math.max(1, event.allDaySpan || 1) - 1;
+                            return calendarMap[event.calId]?.accountId === account.id && dayIndex >= startDay && dayIndex <= endDay;
+                          });
+
+                          return (
+                            <div
+                              key={`${day.date.toISOString()}-${account.id}-all-day`}
+                              className={`min-w-0 px-1.5 py-1.5 ${accountIndex < weekAccounts.length - 1 ? 'border-r border-gray-100' : ''}`}
+                              style={{ height: `${splitAllDayHeight}px` }}
+                            >
+                              <div className="space-y-1">
+                                {cellEvents.slice(0, 3).map((event) => {
+                                  const calendar = calendarMap[event.calId] || { color: account.color, accountId: account.id };
+                                  const tones = getToneClasses(isBusyOnlyEvent(event, calendar) ? { ...event, type: 'busy_only' } : event, calendar.color || account.color);
+                                  const title = getVisibleEventTitle(event, calendar);
+                                  const spans = Math.max(1, event.allDaySpan || 1);
+
+                                  return (
+                                    <button
+                                      key={`${dayIndex}-${account.id}-${event.id}`}
+                                      onClick={(entry) => {
+                                        entry.stopPropagation();
+                                        onSelectEvent(event.id);
+                                      }}
+                                      onDoubleClick={(entry) => {
+                                        entry.stopPropagation();
+                                        onOpenEvent(event.id);
+                                      }}
+                                      onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                                      onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                                      onMouseLeave={() => onHidePreview(event.id)}
+                                      title={title}
+                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:bg-white ${tones.container}`}
+                                    >
+                                      <span className={event.status === '已取消' ? 'line-through' : ''}>{title}</span>
+                                      {spans > 1 && <span className="ml-1 text-[10px] text-gray-400">跨{spans}天</span>}
+                                    </button>
+                                  );
+                                })}
+                                {cellEvents.length > 3 && <div className="px-1 text-[10px] font-bold text-blue-600">+{cellEvents.length - 3} 更多</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div ref={scrollRef} data-timeline-scroll="week" className="flex-1 min-h-0 overflow-y-auto bg-white flex relative">
+              <div className="flex shrink-0 flex-col border-r border-gray-200 bg-white" style={{ width: '64px' }}>
+                {HOURS.map((hour) => (
+                  <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
+                    <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
+                {days.map((day, dayIndex) => (
+                  <div key={`${day.date.toISOString()}-split-timeline`} className={`relative border-r border-gray-200 ${day.isToday ? 'bg-blue-50/20' : 'bg-white'}`}>
+                    <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${weekAccounts.length}, minmax(0, 1fr))` }}>
+                      {weekAccounts.map((account, accountIndex) => {
+                        const laneId = account.id;
+                        const preferredAccountId = account.id;
+                        const laneEvents = timedEvents.filter(
+                          (event) => event.day === dayIndex && calendarMap[event.calId]?.accountId === account.id,
+                        );
+                        const laneLayout = splitWeekLayouts[`${dayIndex}-${account.id}`] || {};
+
+                        return (
+                          <div
+                            key={`${day.date.toISOString()}-${account.id}-timeline`}
+                            className={`relative min-w-0 ${accountIndex < weekAccounts.length - 1 ? 'border-r border-gray-100' : ''}`}
+                          >
+                            {HOURS.map((hour) => (
+                              <div
+                                key={`${day.date.toISOString()}-${account.id}-${hour}`}
+                                onMouseDown={(entry) => {
+                                  if (entry.button !== 0) return;
+                                  onStartSelection({ date: day.date, hour, laneId, preferredAccountId });
+                                }}
+                                onMouseEnter={() => onHoverSelection({ date: day.date, hour, laneId, preferredAccountId })}
+                                onContextMenu={(entry) => onSlotContextMenu(entry, { date: day.date, hour, laneId, preferredAccountId })}
+                                onDoubleClick={() => onCreateEvent({ date: day.date, startH: hour, durationH: 1, preferredAccountId })}
+                                data-calendar-slot="true"
+                                data-slot-date-ms={stripTime(day.date).getTime()}
+                                data-slot-hour={hour}
+                                className={`group relative h-24 cursor-pointer border-b transition-colors ${
+                                  isWorkHour(hour) ? 'border-gray-100 bg-transparent hover:bg-blue-50' : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100'
+                                }`}
+                              >
+                                {!selection && (
+                                  <div className="absolute inset-1 hidden items-center justify-center rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/60 group-hover:flex">
+                                    <Plus className="text-blue-500" size={16} />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+
+                            {selection && sameDay(selection.date, day.date) && (selection.laneId || null) === laneId && (
+                              <div
+                                className="pointer-events-none absolute rounded-lg border-2 border-blue-400 bg-blue-100/80 shadow-sm"
+                                style={{
+                                  top: `${getWeekTimeTop(selection.startH)}px`,
+                                  height: `${getTimeHeight(selection.durationH)}px`,
+                                  left: '4px',
+                                  width: 'calc(100% - 8px)',
+                                  zIndex: 4,
+                                }}
+                              >
+                                <div className="px-2 py-1.5 text-[11px] font-black text-blue-700">
+                                  新建 {formatTimeRange(selection.startH, selection.durationH)}
+                                </div>
+                              </div>
+                            )}
+
+                            {laneEvents.map((event) => {
+                              const calendar = calendarMap[event.calId] || { color: account.color, accountId: account.id };
+                              const displayEvent = isBusyOnlyEvent(event, calendar) ? { ...event, type: 'busy_only' } : event;
+                              const editable =
+                                !event.isAllDay && !isBusyOnlyEvent(event, calendar) && event.status !== '已取消' && canEditCalendarContent(calendar);
+                              const safeStartH = event.startH || WORK_START_HOUR;
+                              const safeDuration = event.durationH || 1;
+                              const layout = laneLayout[event.id] || { column: 0, columnCount: 1 };
+                              const top = getWeekTimeTop(safeStartH);
+                              const height = getTimeHeight(safeDuration);
+                              const width = `calc(${100 / layout.columnCount}% - 8px)`;
+                              const left = `calc(${(layout.column * 100) / layout.columnCount}% + 4px)`;
+                              const tones = getToneClasses(displayEvent, calendar.color || account.color);
+                              const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
+                              const statusSurface = getTimedEventStatusSurface(event.status);
+                              const title = getVisibleEventTitle(event, calendar);
+                              const isInteracting = interaction?.eventId === event.id;
+                              const density = getTimedEventCardDensity({ isSplit: true, columnCount: layout.columnCount, durationH: safeDuration });
+                              const showSecondary = density === 'regular' && safeDuration >= 1.25;
+
+                              return (
+                                <div
+                                  key={event.id}
+                                  onMouseDown={(entry) => {
+                                    if (!editable || entry.button !== 0) return;
+                                    onStartEventMove(entry, event);
+                                  }}
+                                  onClick={(entry) => {
+                                    entry.stopPropagation();
+                                    onSelectEvent(event.id);
+                                  }}
+                                  onDoubleClick={(entry) => {
+                                    entry.stopPropagation();
+                                    onOpenEvent(event.id);
+                                  }}
+                                  onContextMenu={(entry) => onContextMenu(entry, event)}
+                                  onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
+                                  onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
+                                  onMouseLeave={() => onHidePreview(event.id)}
+                                  title={`${title} · ${formatTimeRange(safeStartH, safeDuration)}`}
+                                  className={`group absolute overflow-hidden rounded-lg border px-2 py-1.5 shadow-none ${tones.container} ${statusSurface.cardClass} ${
+                                    editable ? 'cursor-grab select-none hover:ring-2 hover:ring-blue-200/80 active:cursor-grabbing' : 'cursor-pointer'
+                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none z-20 ring-2 ring-blue-300 shadow-lg' : 'hover:z-10'}`}
+                                  style={{ top: `${top}px`, height: `${height}px`, left, width }}
+                                >
+                                  {!isBusyOnlyEvent(event, calendar) && <div className={`absolute bottom-0 left-0 top-0 w-1 ${tones.stripe}`}></div>}
+                                  {statusSurface.topRuleClass && <div className={`pointer-events-none absolute left-1.5 right-1.5 top-1 h-0.5 rounded-full ${statusSurface.topRuleClass}`}></div>}
+                                  {statusBadgeMeta && (
+                                    <span className={`pointer-events-none absolute right-1.5 top-1.5 z-[1] rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none ${statusBadgeMeta.className}`}>
+                                      {statusBadgeMeta.compactLabel}
+                                    </span>
+                                  )}
+                                  {editable && (
+                                    <button
+                                      type="button"
+                                      onMouseDown={(entry) => onStartEventResize(entry, event, 'top')}
+                                      onClick={(entry) => entry.stopPropagation()}
+                                      className={`absolute left-1/2 top-0.5 z-[2] flex h-6 w-8 -translate-x-1/2 cursor-ns-resize items-start justify-center rounded-full transition-opacity ${
+                                        isInteracting ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                      }`}
+                                      aria-label="调整开始时间"
+                                    >
+                                      <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                    </button>
+                                  )}
+                                  {isBusyOnlyEvent(event, calendar) ? (
+                                    <div className="flex h-full items-center justify-center text-[12px] font-bold opacity-70">
+                                      <Lock size={13} className="mr-1" />
+                                      忙碌
+                                    </div>
+                                  ) : (
+                                    <div className={`flex h-full min-w-0 flex-col pl-1 ${statusBadgeMeta ? 'pr-7' : ''}`}>
+                                      <div className={`text-[11px] font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''}`} style={clampLinesStyle(2)}>
+                                        {title}
+                                      </div>
+                                      <div className="mt-0.5 text-[10px] font-semibold leading-tight opacity-80">
+                                        {formatHour(safeStartH)}
+                                        {safeDuration > 0.5 ? `–${formatHour(safeStartH + safeDuration)}` : ''}
+                                      </div>
+                                      {showSecondary && (
+                                        <div className="mt-0.5 truncate text-[10px] font-medium opacity-60">{getEventSecondaryLine(event, calendar)}</div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {editable && (
+                                    <button
+                                      type="button"
+                                      onMouseDown={(entry) => onStartEventResize(entry, event, 'bottom')}
+                                      onClick={(entry) => entry.stopPropagation()}
+                                      className={`absolute bottom-0.5 left-1/2 z-[2] flex h-6 w-8 -translate-x-1/2 cursor-ns-resize items-end justify-center rounded-full transition-opacity ${
+                                        isInteracting && interaction?.type === 'resize' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                      }`}
+                                      aria-label="调整时长"
+                                    >
+                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {day.isToday && (
+                      <div className="pointer-events-none absolute left-0 right-0" style={{ top: `${getWeekTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
+                        <div className="absolute -left-1 -mt-1 h-2 w-2 rounded-full bg-red-500"></div>
+                        <div className="w-full border-t-2 border-red-500"></div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col min-w-0 min-h-0 bg-white relative overflow-hidden">
@@ -3366,13 +3708,16 @@ function WeekView({
                               const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                               const account = accountMap[calendar.accountId];
                               const colorClass = calendar.color || 'bg-gray-500';
+                              const hiddenDetails = isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar);
+                              const displayEvent = hiddenDetails ? { ...event, type: 'busy_only' } : event;
+                              const visibleTitle = getVisibleEventTitle(event, calendar);
                               const editable =
-                                !event.isAllDay && event.type !== 'busy_only' && event.status !== '已取消' && canEditCalendarContent(calendar);
+                                !event.isAllDay && !hiddenDetails && event.status !== '已取消' && canEditCalendarContent(calendar);
                               const safeStartH = event.startH || WORK_START_HOUR;
                               const safeDuration = event.durationH || 1;
                               const top = getWeekTimeTop(safeStartH);
                               const height = getTimeHeight(safeDuration);
-                              const tones = getToneClasses(event, colorClass);
+                              const tones = getToneClasses(displayEvent, colorClass);
                               const layout = pane.timedLayout[event.id] || { column: 0, columnCount: 1 };
                               const width = `calc(${100 / layout.columnCount}% - 8px)`;
                               const left = `calc(${(layout.column * 100) / layout.columnCount}% + 4px)`;
@@ -3405,13 +3750,13 @@ function WeekView({
                                   onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                                   onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                   onMouseLeave={() => onHidePreview(event.id)}
-                                  title={`${event.title || '无标题'} · ${formatTimeRange(safeStartH, safeDuration)}${account ? ` · ${account.email || account.name}` : ''}`}
+                                  title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
                                   className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                                     editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                                   } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'}`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width, padding: useCompactCard ? '6px' : '8px' }}
                                 >
-                                  {event.type !== 'busy_only' && <div className={`absolute left-0 top-0 bottom-0 w-1 ${tones.stripe}`}></div>}
+                                  {!hiddenDetails && <div className={`absolute left-0 top-0 bottom-0 w-1 ${tones.stripe}`}></div>}
                                   {statusSurface.topRuleClass && <div className={`pointer-events-none absolute left-1.5 right-1.5 top-1 h-0.5 rounded-full ${statusSurface.topRuleClass}`}></div>}
                                   {statusBadgeMeta && (
                                     <span
@@ -3437,10 +3782,10 @@ function WeekView({
                                       <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
                                     </button>
                                   )}
-                                  {event.type === 'busy_only' ? (
+                                  {hiddenDetails ? (
                                     <div className="font-bold flex items-center h-full justify-center opacity-60">
                                       <Lock size={14} className="mr-1" />
-                                      忙碌
+                                      {visibleTitle}
                                     </div>
                                   ) : (
                                     <div className={`flex flex-col h-full min-w-0 ${statusBadgeMeta ? 'pr-9' : ''} pl-1`}>
@@ -3451,7 +3796,7 @@ function WeekView({
                                         }`}
                                         style={clampLinesStyle(cardDensity === 'micro' ? 2 : 2)}
                                       >
-                                        {event.title || '无标题'}
+                                        {visibleTitle}
                                       </div>
                                       {useCompactCard ? (
                                         <div className="mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-semibold leading-tight opacity-80">
@@ -3485,7 +3830,7 @@ function WeekView({
                             })}
 
                           {day.isToday && (
-                            <div className="absolute left-0 right-0 pointer-events-none" style={{ top: `${getWeekTimeTop(10.5)}px`, zIndex: 15 }}>
+                            <div className="absolute left-0 right-0 pointer-events-none" style={{ top: `${getWeekTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
                               <div className="absolute left-0 w-2 h-2 rounded-full bg-red-500 -mt-1 -ml-1"></div>
                               <div className="border-t-2 border-red-500 w-full relative"></div>
                             </div>
@@ -3752,13 +4097,16 @@ function DayView({
                       .map((event) => {
                         const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                         const account = accountMap[calendar.accountId];
+                        const hiddenDetails = isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar);
+                        const displayEvent = hiddenDetails ? { ...event, type: 'busy_only' } : event;
+                        const visibleTitle = getVisibleEventTitle(event, calendar);
                         const editable =
-                          !event.isAllDay && event.type !== 'busy_only' && event.status !== '已取消' && canEditCalendarContent(calendar);
+                          !event.isAllDay && !hiddenDetails && event.status !== '已取消' && canEditCalendarContent(calendar);
                         const safeStartH = event.startH || WORK_START_HOUR;
                         const safeDuration = event.durationH || 1;
                         const top = getTimeTop(safeStartH);
                         const height = getTimeHeight(safeDuration);
-                        const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+                        const tones = getToneClasses(displayEvent, calendar.color || 'bg-gray-500');
                         const layout = timedEventLayouts[lane.id]?.[event.id] || { column: 0, columnCount: 1 };
                         const width = `calc(${100 / layout.columnCount}% - 12px)`;
                         const left = `calc(${(layout.column / layout.columnCount) * 100}% + 8px)`;
@@ -3789,13 +4137,13 @@ function DayView({
                             onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                             onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                             onMouseLeave={() => onHidePreview(event.id)}
-                            title={`${event.title || '无标题'} · ${formatTimeRange(safeStartH, safeDuration)}${event.location ? ` · ${event.location}` : ''}`}
+                            title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${event.location && !hiddenDetails ? ` · ${event.location}` : ''}`}
                             className={`group absolute border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                               editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                             } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'}`}
                             style={{ top: `${top}px`, height: `${height}px`, left, width }}
                           >
-                            {event.type !== 'busy_only' && <div className={`absolute left-0 top-0 bottom-0 w-1 ${useCompactCard ? '' : 'rounded-l-xl'} ${tones.stripe}`}></div>}
+                            {!hiddenDetails && <div className={`absolute left-0 top-0 bottom-0 w-1 ${useCompactCard ? '' : 'rounded-l-xl'} ${tones.stripe}`}></div>}
                             {statusSurface.topRuleClass && <div className={`pointer-events-none absolute left-2 right-2 top-1 h-0.5 rounded-full ${statusSurface.topRuleClass}`}></div>}
                             {statusBadgeMeta && (
                               <span
@@ -3821,22 +4169,14 @@ function DayView({
                                 <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
                               </button>
                             )}
-                            {event.type === 'busy_only' ? (
+                            {hiddenDetails ? (
                               <div className="font-bold flex items-center h-full justify-center opacity-60">
                                 <Lock size={14} className="mr-1" />
-                                忙碌
+                                {visibleTitle}
                               </div>
                             ) : (
                               <div className={`flex flex-col h-full ${useCompactCard ? 'pl-1.5' : 'pl-2'} ${statusBadgeMeta ? 'pr-9' : ''}`}>
                                 {account && !useCompactCard && <div className="text-[10px] font-black opacity-60 truncate">{account.name}</div>}
-                                <div
-                                  className={`mb-1 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
-                                    useCompactCard ? 'text-[11px] break-words' : 'text-sm break-words'
-                                  }`}
-                                  style={clampLinesStyle(cardDensity === 'micro' ? 2 : 2)}
-                                >
-                                  {event.title}
-                                </div>
                                 {useCompactCard ? (
                                   <div className="mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-semibold leading-tight opacity-80">
                                     <span className="whitespace-nowrap">{formatHour(safeStartH)}</span>
@@ -3849,6 +4189,14 @@ function DayView({
                                     {formatTimeRange(safeStartH, safeDuration)}
                                   </div>
                                 )}
+                                <div
+                                  className={`mb-1 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
+                                    useCompactCard ? 'text-[11px] break-words' : 'text-sm break-words'
+                                  }`}
+                                  style={clampLinesStyle(cardDensity === 'micro' ? 2 : 2)}
+                                >
+                                  {visibleTitle}
+                                </div>
                                 {event.location && !useCompactCard && <div className="text-xs opacity-70 truncate">{event.location}</div>}
                               </div>
                             )}
@@ -3868,6 +4216,12 @@ function DayView({
                                 </div>
                               );
                       })}
+                    {sameDay(focusDate, TODAY_DATE) && (
+                      <div className="pointer-events-none absolute left-0 right-0" style={{ top: `${getTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
+                        <div className="absolute -left-1 -mt-1 h-2 w-2 rounded-full bg-red-500"></div>
+                        <div className="w-full border-t-2 border-red-500"></div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3920,12 +4274,13 @@ function MonthView({
       ))}
     </div>
   );
-  const renderMonthCells = (panelEvents, preferredAccountId = null, paneKey = 'overlay') => (
+  const renderMonthCells = (panelEvents, preferredAccountId = null, paneKey = 'overlay', options = {}) => (
     <div className="grid grid-cols-7 gap-px bg-slate-200">
       {monthCells.map((cell) => {
         const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
         const isSelectedDate = sameDay(cell.date, focusDate);
         const showQuickCreate = cell.isCurrentMonth && isSelectedDate;
+        const maxVisibleEvents = options.groupBySource ? 4 : 3;
 
         return (
           <div
@@ -3974,10 +4329,14 @@ function MonthView({
             </div>
 
             <div className="space-y-0.5">
-              {dayEvents.slice(0, 3).map((event) => {
+              {dayEvents.slice(0, maxVisibleEvents).map((event) => {
                 const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                 const account = accountMap[calendar.accountId];
-                const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+                const hiddenDetails = isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar);
+                const displayEvent = hiddenDetails ? { ...event, type: 'busy_only' } : event;
+                const tones = getToneClasses(displayEvent, calendar.color || 'bg-gray-500');
+                const visibleTitle = getVisibleEventTitle(event, calendar);
+                const sourceLabel = options.groupBySource ? getCompactSourceLabel(account, calendar) : '';
 
                 return (
                   <button
@@ -3993,24 +4352,29 @@ function MonthView({
                     onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseLeave={() => onHidePreview(event.id)}
-                    title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
+                    title={`${visibleTitle}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
                     className={`w-full rounded border px-1.5 py-1 text-left text-[11px] leading-tight ${tones.container}`}
                   >
                     <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                       <div className={`shrink-0 rounded-sm ${tones.stripe}`} style={{ width: '3px', height: '3px' }}></div>
+                      {sourceLabel && (
+                        <span className="shrink-0 rounded bg-white/70 px-1 text-[9px] font-bold text-gray-500">
+                          {sourceLabel}
+                        </span>
+                      )}
                       {event.isAllDay ? (
-                        <span className="truncate font-medium">{event.title}</span>
+                        <span className={`truncate font-medium ${event.status === '已取消' ? 'line-through' : ''}`}>{visibleTitle}</span>
                       ) : (
                         <>
                           <span className="shrink-0 font-semibold text-gray-500" style={{ fontSize: '10px' }}>{formatHour(event.startH || 8)}</span>
-                          <span className="truncate font-medium min-w-0">{event.title}</span>
+                          <span className={`truncate font-medium min-w-0 ${event.status === '已取消' ? 'line-through' : ''}`}>{visibleTitle}</span>
                         </>
                       )}
                     </div>
                   </button>
                 );
               })}
-              {dayEvents.length > 3 && (
+              {dayEvents.length > maxVisibleEvents && (
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
@@ -4018,7 +4382,7 @@ function MonthView({
                   }}
                   className="text-[11px] font-bold text-blue-600 pl-1"
                 >
-                  +{dayEvents.length - 3} 更多
+                  +{dayEvents.length - maxVisibleEvents} 更多
                 </button>
               )}
             </div>
@@ -4027,51 +4391,23 @@ function MonthView({
       })}
     </div>
   );
-  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0) => (
+  const renderMonthGrid = (panelEvents, preferredAccountId = null, paneKey = 'overlay', stickyTop = 0, options = {}) => (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white" style={{ minWidth: '100%' }}>
       {renderMonthWeekdayHeader(paneKey, stickyTop)}
-      {renderMonthCells(panelEvents, preferredAccountId, paneKey)}
+      {renderMonthCells(panelEvents, preferredAccountId, paneKey, options)}
     </div>
   );
 
   if (isSplit) {
     return (
       <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">
-        <div
-          className="grid min-w-full gap-4"
-          style={{
-            gridTemplateColumns: `repeat(${monthAccounts.length}, minmax(${monthPaneMinWidth}px, 1fr))`,
-            minWidth: `${monthSplitMinWidth}px`,
-          }}
-        >
-          {monthAccounts.map((monthAccount) => {
-            const panelEvents = events.filter((event) => calendarMap[event.calId]?.accountId === monthAccount.id);
-
-            return (
-              <section
-                key={monthAccount.id}
-                className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white"
-              >
-                <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-[#fcfcfb] px-4 py-3">
-                  <div className={`h-2.5 w-2.5 rounded-full ${monthAccount.color}`}></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black text-gray-900">{monthAccount.email || monthAccount.name}</div>
-                    <div className="truncate text-[11px] font-bold text-gray-400">{focusDate.getFullYear()}年 {focusDate.getMonth() + 1}月</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onHideAccount?.(monthAccount.id)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-gray-700"
-                    title={`隐藏 ${monthAccount.email || monthAccount.name}`}
-                    aria-label={`隐藏 ${monthAccount.email || monthAccount.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <div className="p-3">{renderMonthGrid(panelEvents, monthAccount.id, monthAccount.id, monthWeekdayStickyTop)}</div>
-              </section>
-            );
-          })}
+        <div className="space-y-3">
+          {monthAccounts.length > MAX_SPLIT_ACCOUNTS && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
+              当前显示日历较多，月视图按日期格内轻量标注来源；需要逐人对比时建议切换到日/周视图。
+            </div>
+          )}
+          {renderMonthGrid(events, null, 'month-source-grouped', monthWeekdayStickyTop, { groupBySource: true })}
         </div>
       </div>
     );
@@ -6134,6 +6470,10 @@ function MainApp() {
   }, [eventInteraction, rangeEvents]);
 
   const weekDays = useMemo(() => buildWeekDays(focusDate), [focusDate]);
+  const visibleWeekDays = useMemo(
+    () => (calendarLayout === 'work_week' ? weekDays.slice(0, 5) : weekDays),
+    [calendarLayout, weekDays],
+  );
   const selectedEvent = useMemo(() => events.find((event) => event.id === selectedEventId), [events, selectedEventId]);
   const selectedPermissionCalendar = useMemo(
     () => (permissionPanel.type === 'calendar' ? calendars.find((calendar) => calendar.id === permissionPanel.targetId) : null),
@@ -7431,7 +7771,7 @@ function MainApp() {
     setCurrentScreen('calendar');
     setCalendarReturnScreen('calendar');
 
-    if (calendarLayout === 'day' || calendarLayout === 'week') {
+    if (calendarLayout === 'day' || calendarLayout === 'week' || calendarLayout === 'work_week') {
       queueTimelineScrollToWorkStart(calendarLayout);
     }
   };
@@ -9738,7 +10078,7 @@ function MainApp() {
                                 key={option.id}
                                 onClick={() => {
                                   setCalendarLayout(option.id);
-                                  if (option.id === 'day' || option.id === 'week') {
+                                  if (option.id === 'day' || option.id === 'week' || option.id === 'work_week') {
                                     queueTimelineScrollToWorkStart(option.id);
                                   }
                                 }}
@@ -9859,7 +10199,7 @@ function MainApp() {
 		                    ) : (
 	                      <WeekView
 	                        key={`week-${focusDate.getTime()}-${timelineScrollToken}-${effectiveAccountDisplayMode}-${displayAccounts.map((account) => account.id).join('-')}`}
-	                        days={weekDays}
+	                        days={visibleWeekDays}
 	                        events={interactiveRangeEvents}
                         activeAccounts={activeAccounts}
                         accountDisplayMode={effectiveAccountDisplayMode}
