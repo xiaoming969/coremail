@@ -235,7 +235,7 @@ const MOCK_SHARE_INVITATIONS = [
     color: 'bg-cyan-500',
     status: 'pending',
     createdAt: new Date(2026, 0, 8, 14, 20).getTime(),
-    message: '共享了季度预算与报销排期，接收后会出现在左侧"共享账户"。',
+    message: '共享了季度预算与报销排期，接收后会出现在左侧“共享账户”。',
   },
   {
     id: 'share-invite-2',
@@ -519,10 +519,30 @@ const getAccountCheckboxTone = (color) => {
   if (color?.includes('orange')) return 'border-orange-500 bg-orange-500 text-white hover:border-orange-400';
   if (color?.includes('emerald')) return 'border-emerald-500 bg-emerald-500 text-white hover:border-emerald-400';
   if (color?.includes('violet')) return 'border-violet-500 bg-violet-500 text-white hover:border-violet-400';
+  if (color?.includes('cyan')) return 'border-cyan-500 bg-cyan-500 text-white hover:border-cyan-400';
+  if (color?.includes('teal')) return 'border-teal-500 bg-teal-500 text-white hover:border-teal-400';
+  if (color?.includes('fuchsia')) return 'border-fuchsia-500 bg-fuchsia-500 text-white hover:border-fuchsia-400';
+  if (color?.includes('amber')) return 'border-amber-500 bg-amber-500 text-white hover:border-amber-400';
+  if (color?.includes('rose')) return 'border-rose-500 bg-rose-500 text-white hover:border-rose-400';
+  if (color?.includes('indigo')) return 'border-indigo-500 bg-indigo-500 text-white hover:border-indigo-400';
   if (color?.includes('slate')) return 'border-slate-500 bg-slate-500 text-white hover:border-slate-400';
   return 'border-blue-600 bg-blue-600 text-white hover:border-blue-400';
 };
-const getAccountDisplayLabel = (account) => account?.email || account?.name || '';
+const ACCOUNT_COLOR_OPTIONS = [
+  'bg-blue-500',
+  'bg-orange-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-cyan-500',
+  'bg-teal-500',
+  'bg-fuchsia-500',
+  'bg-amber-500',
+  'bg-rose-500',
+  'bg-indigo-500',
+  'bg-slate-500',
+];
+const getAccountDisplayLabel = (account) => account?.displayName || account?.email || account?.name || '';
+const getAccountEditableName = (account) => account?.displayName || account?.name || account?.email || '';
 
 const getPreviewPosition = (clientX, clientY) => {
   if (typeof window === 'undefined') return { x: clientX + 16, y: clientY + 16 };
@@ -5154,7 +5174,12 @@ function CalendarPermissionModal({
 
 function MailboxPermissionModal({
   account,
+  accountCalendars = [],
   onClose,
+  onRenameAccount,
+  onUpdateAccountColor,
+  onExportAccountCalendar,
+  onDeleteAccountCalendars,
   onUpdateMember,
   onToggleMemberPermission,
   onAddMember,
@@ -5163,20 +5188,115 @@ function MailboxPermissionModal({
 }) {
   if (!account) return null;
 
+  const [draftName, setDraftName] = useState(getAccountEditableName(account));
+
+  useEffect(() => {
+    setDraftName(getAccountEditableName(account));
+  }, [account.id, account.displayName, account.name, account.email]);
+
+  const accountLabel = getAccountDisplayLabel(account);
+  const canSaveName = draftName.trim() && draftName.trim() !== getAccountEditableName(account);
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-[720px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="w-[760px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
-          <div>
-            <div className="text-lg font-black text-gray-900">账户详情</div>
-            <div className="text-sm text-gray-500 mt-1">{account.name} · {account.email}</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className={`h-4 w-4 shrink-0 rounded-full ${account.color || 'bg-blue-500'}`}></span>
+            <div className="min-w-0">
+              <div className="truncate text-lg font-black text-gray-900">账户详情</div>
+              <div className="mt-1 truncate text-sm text-gray-500">{accountLabel}</div>
+            </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X size={18} />
           </button>
         </div>
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
-          {/* 成员权限 */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+              <div>
+                <label className="text-xs font-bold text-slate-500">
+                  显示名称
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      value={draftName}
+                      onChange={(event) => setDraftName(event.target.value)}
+                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <button
+                      disabled={!canSaveName}
+                      onClick={() => onRenameAccount(account.id, draftName)}
+                      className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+                        canSaveName ? 'bg-slate-900 text-white hover:bg-slate-800' : 'cursor-not-allowed bg-slate-200 text-slate-400'
+                      }`}
+                    >
+                      保存
+                    </button>
+                  </div>
+                </label>
+                <div className="mt-3 text-xs font-medium text-slate-500">账户：{account.email || account.name}</div>
+              </div>
+
+              <div>
+                <div className="text-xs font-bold text-slate-500">账户颜色</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ACCOUNT_COLOR_OPTIONS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => onUpdateAccountColor(account.id, color)}
+                      className={`h-7 w-7 rounded-full ${color} transition ${
+                        account.color === color ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105'
+                      }`}
+                      title="修改颜色"
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-black text-gray-900">账户日历</div>
+                <div className="mt-0.5 text-xs text-slate-400">导出或删除会作用于该账户下的日历。</div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  onClick={() => onExportAccountCalendar(account.id)}
+                  className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <FileText size={13} className="mr-1.5" />
+                  导出日历
+                </button>
+                <button
+                  onClick={() => onDeleteAccountCalendars(account.id)}
+                  className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
+                >
+                  <Trash size={13} className="mr-1.5" />
+                  删除日历
+                </button>
+              </div>
+            </div>
+            {accountCalendars.length > 0 ? (
+              <div className="space-y-1.5">
+                {accountCalendars.map((calendar) => (
+                  <div key={calendar.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${calendar.color || account.color || 'bg-blue-500'}`}></span>
+                    <div className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{calendar.name}</div>
+                    <span className="shrink-0 text-xs font-medium text-slate-400">{calendar.isPrimary ? '默认' : '普通'}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
+                该账户下暂无日历。
+              </div>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-black text-gray-900">成员权限</div>
@@ -5281,7 +5401,10 @@ function AddSharedCalendarModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
-          <div className="text-lg font-black text-gray-900">共享账户</div>
+          <div>
+            <div className="text-lg font-black text-gray-900">添加共享日历</div>
+            <div className="mt-0.5 text-sm text-slate-500">接收共享邀请，或通过对方账号添加共享日历。</div>
+          </div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
@@ -5290,8 +5413,8 @@ function AddSharedCalendarModal({
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
           <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
             {[
-              ['inbox', `收到的共享${pendingInvitations.length > 0 ? ` (${pendingInvitations.length})` : ''}`],
-              ['manual', '手动添加'],
+              ['inbox', `共享邀请${pendingInvitations.length > 0 ? ` (${pendingInvitations.length})` : ''}`],
+              ['manual', '通过账号添加'],
             ].map(([tabId, label]) => (
               <button
                 key={tabId}
@@ -5321,7 +5444,7 @@ function AddSharedCalendarModal({
                         </div>
                         <div className="mt-0.5 text-xs text-slate-400 truncate">{invite.senderName} · {invite.senderEmail}</div>
                       </div>
-                      <div className="flex items-center shrink-0 gap-1.5 opacity-0 transition group-hover/invite:opacity-100">
+                      <div className="flex items-center shrink-0 gap-1.5">
                         <button
                           onClick={() => onIgnoreInvitation(invite.id)}
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
@@ -5348,25 +5471,25 @@ function AddSharedCalendarModal({
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="text-xs font-bold text-gray-500">
-                  显示名称
+                  显示名称（可选）
                   <input
                     value={draft.name}
                     onChange={(event) => onChange({ name: event.target.value })}
-                    placeholder="例如：领导助理"
+                    placeholder="不填则使用账号本身"
                     className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </label>
                 <label className="text-xs font-bold text-gray-500">
-                  账号 / 邮箱
+                  共享日历账号
                   <input
                     value={draft.email}
                     onChange={(event) => onChange({ email: event.target.value })}
-                    placeholder="例如：name@company.com"
+                    placeholder="user@company.com"
                     className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </label>
                 <label className="text-xs font-bold text-gray-500">
-                  默认权限
+                  当前权限
                   <select
                     value={draft.permissionId}
                     onChange={(event) => onChange({ permissionId: event.target.value })}
@@ -5382,15 +5505,19 @@ function AddSharedCalendarModal({
                 <label className="text-xs font-bold text-gray-500">
                   视图颜色
                   <div className="mt-1 flex items-center flex-wrap gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2.5">
-                    {['bg-orange-500', 'bg-cyan-500', 'bg-teal-500', 'bg-fuchsia-500', 'bg-amber-500', 'bg-emerald-500'].map((color) => (
+                    {ACCOUNT_COLOR_OPTIONS.filter((color) => color !== 'bg-blue-500').map((color) => (
                       <button
                         key={color}
+                        type="button"
                         onClick={() => onChange({ color })}
                         className={`w-7 h-7 rounded-full ${color} ${draft.color === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
                       />
                     ))}
                   </div>
                 </label>
+              </div>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium leading-5 text-blue-700">
+                添加后会出现在左侧“共享账户”分组中；当前 demo 只模拟已授权场景，权限说明可在账户行点击查看。
               </div>
             </>
           )}
@@ -5403,7 +5530,7 @@ function AddSharedCalendarModal({
           {draft.tab === 'manual' && (
             <button onClick={onSubmit} className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center">
               <Plus size={14} className="mr-2" />
-              添加共享账户
+              添加共享日历
             </button>
           )}
         </div>
@@ -5974,6 +6101,10 @@ function MainApp() {
   const selectedPermissionMailbox = useMemo(
     () => (permissionPanel.type === 'mailbox' ? accounts.find((account) => account.id === permissionPanel.targetId) : null),
     [accounts, permissionPanel],
+  );
+  const selectedPermissionMailboxCalendars = useMemo(
+    () => (selectedPermissionMailbox ? calendars.filter((calendar) => calendar.accountId === selectedPermissionMailbox.id) : []),
+    [calendars, selectedPermissionMailbox],
   );
   const selectedSharedAccessCalendar = useMemo(
     () =>
@@ -6582,6 +6713,181 @@ function MainApp() {
     });
   };
 
+  const renameAccount = (accountId, nextName) => {
+    const name = nextName.trim();
+    if (!name) {
+      triggerFeedback('L3', {
+        msg: '名称不能为空',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-red-600',
+      });
+      return;
+    }
+
+    setAccounts((prev) =>
+      prev.map((account) =>
+        account.id === accountId
+          ? {
+              ...account,
+              displayName: name,
+              name: account.email === account.name ? account.name : name,
+            }
+          : account,
+      ),
+    );
+    triggerFeedback('L3', {
+      msg: '账户名称已更新',
+      icon: <Check size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const updateAccountColor = (accountId, color) => {
+    const account = accounts.find((item) => item.id === accountId);
+    if (!account) return;
+
+    setAccounts((prev) => prev.map((item) => (item.id === accountId ? { ...item, color } : item)));
+    setCalendars((prev) =>
+      prev.map((calendar) =>
+        calendar.accountId === accountId && (calendar.isPrimary || calendar.color === account.color)
+          ? { ...calendar, color }
+          : calendar,
+      ),
+    );
+    triggerFeedback('L3', {
+      msg: '账户颜色已更新',
+      icon: <Check size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const exportAccountCalendar = (accountId) => {
+    const account = accounts.find((item) => item.id === accountId);
+    const accountCalendars = calendars.filter((calendar) => calendar.accountId === accountId);
+    const accountCalendarIds = new Set(accountCalendars.map((calendar) => calendar.id));
+    const accountEvents = events.filter((event) => accountCalendarIds.has(event.calId));
+
+    if (!account || accountCalendars.length === 0) {
+      triggerFeedback('L3', {
+        msg: '该账户暂无可导出的日历',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-red-600',
+      });
+      return;
+    }
+
+    const escapeIcsText = (value = '') =>
+      String(value).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+    const formatIcsDate = (date) =>
+      `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    const formatIcsDateTime = (date, hourValue = WORK_START_HOUR) => {
+      const next = new Date(date);
+      const hour = Math.floor(hourValue);
+      const minute = Math.round((hourValue - hour) * 60);
+      next.setHours(hour, minute, 0, 0);
+      return `${formatIcsDate(next)}T${String(next.getHours()).padStart(2, '0')}${String(next.getMinutes()).padStart(2, '0')}00`;
+    };
+    const calendarById = Object.fromEntries(accountCalendars.map((calendar) => [calendar.id, calendar]));
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Coremail Calendar Demo//CN',
+      `X-WR-CALNAME:${escapeIcsText(getAccountDisplayLabel(account))}`,
+    ];
+
+    accountEvents.forEach((event) => {
+      const date = eventToDate(event);
+      const calendar = calendarById[event.calId];
+      const uid = `${event.id}@coremail.demo`;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${escapeIcsText(uid)}`);
+      lines.push(`SUMMARY:${escapeIcsText(event.title || '未命名日程')}`);
+      if (event.isAllDay) {
+        const endDate = new Date(date.getTime() + DAY_MS);
+        lines.push(`DTSTART;VALUE=DATE:${formatIcsDate(date)}`);
+        lines.push(`DTEND;VALUE=DATE:${formatIcsDate(endDate)}`);
+      } else {
+        lines.push(`DTSTART:${formatIcsDateTime(date, event.startH || WORK_START_HOUR)}`);
+        lines.push(`DTEND:${formatIcsDateTime(date, (event.startH || WORK_START_HOUR) + (event.durationH || 1))}`);
+      }
+      if (event.location) lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+      if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+      if (calendar?.name) lines.push(`CATEGORIES:${escapeIcsText(calendar.name)}`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+
+    if (typeof document !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined') {
+      const safeName = getAccountDisplayLabel(account).replace(/[^\w.-]+/g, '_') || 'calendar';
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeName}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    triggerFeedback('L3', {
+      msg: `已导出 ${accountEvents.length} 条日程`,
+      icon: <FileText size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const deleteAccountCalendars = (accountId) => {
+    const account = accounts.find((item) => item.id === accountId);
+    const accountCalendarIds = calendars.filter((calendar) => calendar.accountId === accountId).map((calendar) => calendar.id);
+    const accountCalendarIdSet = new Set(accountCalendarIds);
+
+    if (!account || accountCalendarIds.length === 0) {
+      triggerFeedback('L3', {
+        msg: '该账户暂无可删除的日历',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-red-600',
+      });
+      return;
+    }
+
+    setCalendars((prev) => prev.filter((calendar) => !accountCalendarIdSet.has(calendar.id)));
+    setEvents((prev) => prev.filter((event) => !accountCalendarIdSet.has(event.calId)));
+    if (selectedEventId && events.some((event) => event.id === selectedEventId && accountCalendarIdSet.has(event.calId))) {
+      setSelectedEventId(null);
+      if (currentScreen === 'details') setCurrentScreen('calendar');
+    }
+    triggerFeedback('L3', {
+      msg: `已删除 ${getAccountDisplayLabel(account)} 的日历`,
+      icon: <Trash size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const requestDeleteAccountCalendars = (accountId) => {
+    const account = accounts.find((item) => item.id === accountId);
+    const accountCalendars = calendars.filter((calendar) => calendar.accountId === accountId);
+    if (!account || accountCalendars.length === 0) {
+      deleteAccountCalendars(accountId);
+      return;
+    }
+
+    setFeedback({
+      type: 'L4',
+      payload: {
+        title: '删除日历',
+        desc: `将删除 ${getAccountDisplayLabel(account)} 下的 ${accountCalendars.length} 个日历及相关日程。该操作仅作用于当前 demo 数据。`,
+        cancelText: '取消',
+        confirmText: '删除',
+        onConfirm: () => {
+          setFeedback({ type: null, payload: null });
+          deleteAccountCalendars(accountId);
+          closePermissionPanel();
+        },
+      },
+    });
+  };
+
   const getNextSharedTemplate = () => {
     const existingEmails = new Set(accounts.map((account) => account.email));
     return SHARED_ACCOUNT_TEMPLATES.find((item) => !existingEmails.has(item.email)) || SHARED_ACCOUNT_TEMPLATES[0];
@@ -6589,13 +6895,14 @@ function MainApp() {
 
   const openSharedCalendarDialog = (prefill = null) => {
     const template = prefill || null;
+    const hasPendingInvitations = shareInvitations.some((item) => item.status === 'pending');
     setSharedCalendarDialog({
       open: true,
-      tab: 'manual',
-      name: '',
-      email: '',
-      permissionId: 'all_details',
-      color: 'bg-cyan-500',
+      tab: template ? 'manual' : hasPendingInvitations ? 'inbox' : 'manual',
+      name: template?.name || '',
+      email: template?.email || '',
+      permissionId: template?.permissionId || 'all_details',
+      color: template?.color || 'bg-cyan-500',
     });
     setContextMenu(null);
   };
@@ -6645,7 +6952,7 @@ function MainApp() {
           id: nextAccountId,
           name: invite.senderName,
           email: invite.senderEmail,
-          role: '共享账户',
+          role: '共享日历',
           ownership: 'shared',
           color: invite.color,
           checked: true,
@@ -6698,7 +7005,7 @@ function MainApp() {
       ),
     );
     triggerFeedback('L3', {
-      msg: `已添加到共享账户 · 当前权限：${permissionLabel}`,
+      msg: `已添加到共享日历 · 当前权限：${permissionLabel}`,
       icon: <Check size={16} />,
       color: 'bg-emerald-600',
     });
@@ -6717,12 +7024,12 @@ function MainApp() {
 
   const submitSharedCalendarDialog = () => {
     const draft = sharedCalendarDialog;
-    const name = draft.name.trim();
     const email = draft.email.trim().toLowerCase();
+    const name = draft.name.trim() || email;
 
-    if (!name || !email) {
+    if (!email) {
       triggerFeedback('L3', {
-        msg: '请输入邮箱或日历地址',
+        msg: '请输入共享日历账号',
         icon: <AlertCircle size={16} />,
         color: 'bg-red-600',
       });
@@ -6740,7 +7047,7 @@ function MainApp() {
 
     if (accounts.some((account) => account.email.toLowerCase() === email)) {
     triggerFeedback('L3', {
-      msg: '该共享账户已存在',
+      msg: '该共享日历已存在',
       icon: <AlertCircle size={16} />,
       color: 'bg-red-600',
     });
@@ -6759,7 +7066,7 @@ function MainApp() {
           id: nextAccountId,
         name,
         email,
-        role: '共享账户',
+        role: '共享日历',
           ownership: 'shared',
           color: draft.color,
           checked: true,
@@ -6794,7 +7101,7 @@ function MainApp() {
       {
         id: nextCalendarId,
         accountId: nextAccountId,
-        name: `${name} 日历`,
+        name,
         type: 'shared',
         owner: name,
         color: draft.color,
@@ -6831,7 +7138,7 @@ function MainApp() {
     ]);
     setSharedCalendarDialog((prev) => ({ ...prev, open: false, tab: 'inbox' }));
     triggerFeedback('L3', {
-      msg: `已添加到共享账户 · 当前权限：${permissionLabel}`,
+      msg: `已添加到共享日历 · 当前权限：${permissionLabel}`,
       icon: <Check size={16} />,
       color: 'bg-emerald-600',
     });
@@ -11021,7 +11328,7 @@ function MainApp() {
             className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
           >
             <Calendar size={14} className="mr-2" />
-            添加共享账户
+            添加共享日历
           </button>
           <button
             onClick={() => {
@@ -11098,8 +11405,8 @@ function MainApp() {
                 onClick={() => { openMailboxPermissions(contextMenu.account.id); setContextMenu(null); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
-                <Settings size={14} className="mr-2 text-gray-400" />
-                账户权限
+                <Edit size={14} className="mr-2 text-gray-400" />
+                重命名与颜色
               </button>
               <button
                 onClick={() => { handleOpenSharingSettings(); setContextMenu(null); }}
@@ -11107,6 +11414,20 @@ function MainApp() {
               >
                 <Users size={14} className="mr-2 text-gray-400" />
                 共享与权限
+              </button>
+              <button
+                onClick={() => { exportAccountCalendar(contextMenu.account.id); setContextMenu(null); }}
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+              >
+                <FileText size={14} className="mr-2 text-gray-400" />
+                导出日历
+              </button>
+              <button
+                onClick={() => { requestDeleteAccountCalendars(contextMenu.account.id); setContextMenu(null); }}
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
+              >
+                <Trash size={14} className="mr-2" />
+                删除日历
               </button>
               <button
                 onClick={() => { toggleAccount(contextMenu.account.id); setContextMenu(null); }}
@@ -11159,8 +11480,10 @@ function MainApp() {
             </div>
             {accountMenuAnchor.account.ownership !== 'shared' ? (
               <>
-                <button onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Settings size={14} className="mr-2 text-gray-400" />账户权限</button>
+                <button onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Edit size={14} className="mr-2 text-gray-400" />重命名与颜色</button>
                 <button onClick={() => { handleOpenSharingSettings(); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Users size={14} className="mr-2 text-gray-400" />共享与权限</button>
+                <button onClick={() => { exportAccountCalendar(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><FileText size={14} className="mr-2 text-gray-400" />导出日历</button>
+                <button onClick={() => { requestDeleteAccountCalendars(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"><Trash size={14} className="mr-2" />删除日历</button>
                 <button onClick={() => { toggleAccount(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />{accountMenuAnchor.account.checked ? '隐藏账户' : '显示账户'}</button>
               </>
             ) : (
@@ -11197,7 +11520,12 @@ function MainApp() {
       {permissionPanel.type === 'mailbox' && selectedPermissionMailbox && (
         <MailboxPermissionModal
           account={selectedPermissionMailbox}
+          accountCalendars={selectedPermissionMailboxCalendars}
           onClose={closePermissionPanel}
+          onRenameAccount={renameAccount}
+          onUpdateAccountColor={updateAccountColor}
+          onExportAccountCalendar={exportAccountCalendar}
+          onDeleteAccountCalendars={requestDeleteAccountCalendars}
           onUpdateMember={(memberId, patch) => updateMailboxMember(selectedPermissionMailbox.id, memberId, patch)}
           onToggleMemberPermission={(memberId, key) => toggleMailboxMemberPermission(selectedPermissionMailbox.id, memberId, key)}
           onAddMember={() => addMailboxMember(selectedPermissionMailbox.id)}
