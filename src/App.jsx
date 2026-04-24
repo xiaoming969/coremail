@@ -236,7 +236,7 @@ const MOCK_SHARE_INVITATIONS = [
     color: 'bg-cyan-500',
     status: 'pending',
     createdAt: new Date(2026, 0, 8, 14, 20).getTime(),
-    message: '共享了季度预算与报销排期，接收后会出现在左侧“共享账户”。',
+    message: '共享了季度预算与报销排期，接收后会出现在左侧"共享账户"。',
   },
   {
     id: 'share-invite-2',
@@ -5880,7 +5880,7 @@ function AddSharedCalendarModal({
                 </label>
               </div>
               <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium leading-5 text-blue-700">
-                添加后会出现在左侧“共享账户”分组中；当前 demo 只模拟已授权场景，权限说明可在账户行点击查看。
+                添加后会出现在左侧"共享账户"分组中；当前 demo 只模拟已授权场景，权限说明可在账户行点击查看。
               </div>
             </>
           )}
@@ -6372,6 +6372,9 @@ function MainApp() {
   const [permissionRequests, setPermissionRequests] = useState(MOCK_PERMISSION_REQUESTS);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [calendarColorPicker, setCalendarColorPicker] = useState({ open: false, targetId: null, targetType: null });
+  const [calendarRenameDialog, setCalendarRenameDialog] = useState({ open: false, targetId: null, name: '' });
+  const [calendarDeleteConfirm, setCalendarDeleteConfirm] = useState({ open: false, targetId: null });
   const [calendarSyncReport, setCalendarSyncReport] = useState(null);
   const [splitAccountIds, setSplitAccountIds] = useState(
     MOCK_ACCOUNTS.filter((account) => account.checked)
@@ -7567,7 +7570,177 @@ function MainApp() {
     const currentPermissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
     const currentPermissionLabel = getCalendarPermissionLabel(currentPermissionId);
     triggerFeedback('L3', {
-      msg: `当前共享日历为“${currentPermissionLabel}”，无法执行此操作`,
+      msg: `当前共享日历为"${currentPermissionLabel}"，无法执行此操作`,
+      icon: <AlertCircle size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  /* ===== 日历颜色选择器 ===== */
+  const CALENDAR_COLORS = [
+    'bg-blue-500', 'bg-cyan-500', 'bg-sky-500',
+    'bg-emerald-500', 'bg-green-500', 'bg-teal-500',
+    'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500',
+    'bg-orange-500', 'bg-amber-500', 'bg-yellow-500',
+    'bg-red-500', 'bg-rose-500', 'bg-pink-500',
+    'bg-slate-500', 'bg-gray-500', 'bg-zinc-500',
+  ];
+
+  const openColorPicker = (targetId, targetType) => {
+    setCalendarColorPicker({ open: true, targetId, targetType });
+    setContextMenu(null);
+    closeAccountMenu();
+  };
+
+  const closeColorPicker = () => setCalendarColorPicker({ open: false, targetId: null, targetType: null });
+
+  const applyCalendarColor = (color) => {
+    const { targetId, targetType } = calendarColorPicker;
+    if (!targetId) return;
+    if (targetType === 'account') {
+      setAccounts((prev) => prev.map((a) => a.id === targetId ? { ...a, color } : a));
+      setCalendars((prev) => prev.map((c) => c.accountId === targetId ? { ...c, color } : c));
+    } else {
+      setCalendars((prev) => prev.map((c) => c.id === targetId ? { ...c, color } : c));
+      const targetCal = calendars.find((c) => c.id === targetId);
+      if (targetCal) {
+        setAccounts((prev) => prev.map((a) => a.id === targetCal.accountId ? { ...a, color } : a));
+      }
+    }
+    closeColorPicker();
+  };
+
+  /* ===== 日历重命名 ===== */
+  const openRenameDialog = (calendarId) => {
+    const cal = calendars.find((c) => c.id === calendarId);
+    setCalendarRenameDialog({ open: true, targetId: calendarId, name: cal?.name || '' });
+    setContextMenu(null);
+    closeAccountMenu();
+  };
+
+  const closeRenameDialog = () => setCalendarRenameDialog({ open: false, targetId: null, name: '' });
+
+  const submitRename = () => {
+    const { targetId, name } = calendarRenameDialog;
+    if (!targetId || !name.trim()) return;
+    setCalendars((prev) => prev.map((c) => c.id === targetId ? { ...c, name: name.trim() } : c));
+    closeRenameDialog();
+    triggerFeedback('L3', { msg: '日历名称已更新', icon: <Check size={16} />, color: 'bg-emerald-600' });
+  };
+
+  /* ===== 日历导出 .ics ===== */
+  const exportCalendarIcs = (calendarId) => {
+    const cal = calendars.find((c) => c.id === calendarId);
+    if (!cal) return;
+    setContextMenu(null);
+    closeAccountMenu();
+    const calEvents = events.filter((e) => e.calId === calendarId && !e.isAllDay);
+    const allDayEvents = events.filter((e) => e.calId === calendarId && e.isAllDay);
+    const fmtDate = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const fmtLocal = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Coremail Calendar//CN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nX-WR-CALNAME:' + cal.name.replace(/[\\;\\,]/g, '\\$&') + '\r\n';
+    allDayEvents.forEach((ev) => {
+      const sd = ev.date instanceof Date ? ev.date : new Date(ev.date);
+      const ed = new Date(sd); ed.setDate(ed.getDate() + Math.max(1, ev.allDaySpan || 1));
+      ics += 'BEGIN:VEVENT\r\nSUMMARY:' + (ev.title || '') + '\r\nDTSTART;VALUE=DATE:' + fmtLocal(sd) + '\r\nDTEND;VALUE=DATE:' + fmtLocal(ed) + '\r\nEND:VEVENT\r\n';
+    });
+    calEvents.forEach((ev) => {
+      const baseDate = ev.date instanceof Date ? ev.date : new Date(ev.date);
+      const sh = ev.startH || 9;
+      const sd = new Date(baseDate); sd.setUTCHours(sh, 0, 0, 0);
+      const dur = ev.durationH || 1;
+      const ed = new Date(sd); ed.setUTCHours(sd.getUTCHours() + dur);
+      ics += 'BEGIN:VEVENT\r\nSUMMARY:' + (ev.title || '') + '\r\nDTSTART:' + fmtDate(sd) + '\r\nDTEND:' + fmtDate(ed) + '\r\n';
+      if (ev.location) ics += 'LOCATION:' + ev.location + '\r\n';
+      if (ev.description) ics += 'DESCRIPTION:' + ev.description.replace(/\n/g, '\\n') + '\r\n';
+      ics += 'END:VEVENT\r\n';
+    });
+    ics += 'END:VCALENDAR\r\n';
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${cal.name}.ics`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    triggerFeedback('L3', { msg: `${cal.name} 已导出`, icon: <Check size={16} />, color: 'bg-emerald-600' });
+  };
+
+  /* ===== 删除日历确认 ===== */
+  const openDeleteConfirm = (calendarId) => {
+    setCalendarDeleteConfirm({ open: true, targetId: calendarId });
+    setContextMenu(null);
+    closeAccountMenu();
+  };
+
+  const closeDeleteConfirm = () => setCalendarDeleteConfirm({ open: false, targetId: null });
+
+  const confirmDeleteCalendar = () => {
+    const { targetId } = calendarDeleteConfirm;
+    if (!targetId) return;
+    const cal = calendars.find((c) => c.id === targetId);
+    setCalendars((prev) => prev.filter((c) => c.id !== targetId));
+    if (cal?.isPrimary) {
+      setAccounts((prev) => prev.filter((a) => a.id !== cal.accountId));
+    }
+    closeDeleteConfirm();
+    triggerFeedback('L3', { msg: cal ? `${cal.name} 已删除` : '日历已删除', icon: <Trash size={16} />, color: 'bg-red-600' });
+  };
+
+  const requestPermissionUpgrade = (calendarId, options = {}) => {
+    const calendar = calendars.find((item) => item.id === calendarId);
+    const account = calendar ? accountMap[calendar.accountId] : null;
+    if (!calendar || calendar.type !== 'shared') return;
+
+    const currentPermissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
+    const requestedPermissionId = options.requestedPermissionId || getNextPermissionLevel(currentPermissionId);
+    const currentUser = accounts.find((item) => item.ownership === 'self');
+    const matchedShare = calendar.sharing.find(
+      (share) =>
+        normalizeParticipantIdentity(share.email) === normalizeParticipantIdentity(currentUser?.email || '') ||
+        normalizeParticipantIdentity(share.name) === normalizeParticipantIdentity(currentUser?.name || ''),
+    );
+    const existingPending = permissionRequests.find(
+      (request) => request.targetSharedCalendarId === calendarId && request.status === 'pending',
+    );
+    if (existingPending) {
+      triggerFeedback('L3', {
+        msg: '已存在待处理的权限升级申请',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-slate-900',
+      });
+      return;
+    }
+
+    setPermissionRequests((prev) => [
+      {
+        id: `perm-request-${Date.now()}`,
+        calendarId: matchedShare ? calendar.id : null,
+        shareId: matchedShare?.id || null,
+        targetSharedCalendarId: calendarId,
+        ownerName: calendar.owner,
+        ownerEmail: calendar.receivedFrom || account?.email || '',
+        requesterName: currentUser?.name || '我',
+        requesterEmail: currentUser?.email || 'me@calendarpro.io',
+        calendarName: calendar.name,
+        currentPermissionId,
+        requestedPermissionId,
+        status: 'pending',
+        createdAt: Date.now(),
+        reason: options.reason || '需要编辑或调整共享日历中的日程。',
+      },
+      ...prev,
+    ]);
+    triggerFeedback('L3', {
+      msg: `已向 ${calendar.owner} 发送权限升级申请`,
+      icon: <ArrowRight size={16} />,
+      color: 'bg-blue-600',
+    });
+  };
+
+  const promptPermissionUpgrade = (calendarId) => {
+    const calendar = calendars.find((item) => item.id === calendarId);
+    if (!calendar || calendar.type !== 'shared') return;
+    const currentPermissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
+    const currentPermissionLabel = getCalendarPermissionLabel(currentPermissionId);
+    triggerFeedback('L3', {
+      msg: `当前共享日历为"${currentPermissionLabel}"，无法执行此操作`,
       icon: <AlertCircle size={16} />,
       color: 'bg-slate-900',
     });
@@ -9768,6 +9941,18 @@ function MainApp() {
           setShortcutHelpOpen(false);
           return;
         }
+        if (calendarColorPicker.open) {
+          closeColorPicker();
+          return;
+        }
+        if (calendarRenameDialog.open) {
+          closeRenameDialog();
+          return;
+        }
+        if (calendarDeleteConfirm.open) {
+          closeDeleteConfirm();
+          return;
+        }
         if (eventInteractionRef.current) {
           eventInteractionRef.current = null;
           setEventInteraction(null);
@@ -9882,6 +10067,9 @@ function MainApp() {
     sharedCalendarDialog.open,
     reminderDialogOpen,
     shortcutHelpOpen,
+    calendarColorPicker.open,
+    calendarRenameDialog.open,
+    calendarDeleteConfirm.open,
   ]);
 
   useEffect(() => {
@@ -11675,6 +11863,70 @@ function MainApp() {
 
       <ShortcutHelpModal open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
 
+      {/* ===== 日历颜色选择器 ===== */}
+      {calendarColorPicker.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeColorPicker}>
+          <div className="w-72 rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-3 text-sm font-bold text-gray-800">选择颜色</h3>
+            <div className="grid grid-cols-9 gap-2">
+              {CALENDAR_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={`h-8 w-8 rounded-full ${c} ring-offset-2 transition hover:scale-110 ${((calendarColorPicker.targetType === 'account' ? accounts.find(a => a.id === calendarColorPicker.targetId)?.color : calendars.find(c2 => c2.id === calendarColorPicker.targetId)?.color) === c) ? 'ring-2 ring-slate-800' : ''}`}
+                  onClick={() => applyCalendarColor(c)}
+                />
+              ))}
+            </div>
+            <button onClick={closeColorPicker} className="mt-4 w-full rounded-xl py-2 text-xs font-medium text-gray-500 transition hover:bg-slate-100">取消</button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 日历重命名 ===== */}
+      {calendarRenameDialog.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeRenameDialog}>
+          <div className="w-80 rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-3 text-sm font-bold text-gray-800">重命名日历</h3>
+            <input
+              autoFocus
+              value={calendarRenameDialog.name}
+              onChange={(e) => setCalendarRenameDialog((prev) => ({ ...prev, name: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') closeRenameDialog(); }}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30"
+              placeholder="输入日历名称"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={closeRenameDialog} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-500 transition hover:bg-slate-100">取消</button>
+              <button
+                onClick={submitRename}
+                disabled={!calendarRenameDialog.name.trim()}
+                className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-40"
+              >确认</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== 删除日历确认 ===== */}
+      {calendarDeleteConfirm.open && (() => {
+        const cal = calendars.find((c) => c.id === calendarDeleteConfirm.targetId);
+        return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeDeleteConfirm}>
+          <div className="w-80 rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1.5 text-sm font-bold text-gray-800">删除日历</h3>
+            <p className="mb-4 text-sm text-gray-500 leading-relaxed">
+              确认删除「<span className="font-medium text-gray-700">{cal?.name || '该日历'}</span>」？
+              删除后该日历下的所有日程将被移除，此操作不可撤销。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={closeDeleteConfirm} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-500 transition hover:bg-slate-100">取消</button>
+              <button onClick={confirmDeleteCalendar} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">确认删除</button>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
       {activeProduct === 'calendar' && currentScreen === 'calendar' && hoverPreview && previewedEvent && !eventInteraction && (
         <EventPreviewCard
           event={previewedEvent}
@@ -11800,14 +12052,25 @@ function MainApp() {
             <div className="text-xs font-bold text-gray-800 truncate">{getAccountDisplayLabel(contextMenu.account) || '未知账号'}</div>
             <div className="text-[11px] text-gray-400 mt-0.5 truncate">{contextMenu.account.email || ''}</div>
           </div>
+          {/* 颜色 */}
+          <button
+            onClick={() => {
+              const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id);
+              openColorPicker(cal ? cal.id : contextMenu.account.id, cal ? 'calendar' : 'account');
+            }}
+            className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+          >
+            <Palette size={14} className="mr-2 text-gray-400" />
+            颜色
+          </button>
           {contextMenu.account.ownership !== 'shared' ? (
             <>
               <button
-                onClick={() => { openMailboxPermissions(contextMenu.account.id); setContextMenu(null); }}
+                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) openRenameDialog(cal.id); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
                 <Edit size={14} className="mr-2 text-gray-400" />
-                重命名与颜色
+                重命名
               </button>
               <button
                 onClick={() => { handleOpenSharingSettings(); setContextMenu(null); }}
@@ -11817,14 +12080,14 @@ function MainApp() {
                 共享与权限
               </button>
               <button
-                onClick={() => { exportAccountCalendar(contextMenu.account.id); setContextMenu(null); }}
+                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) exportCalendarIcs(cal.id); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
                 <FileText size={14} className="mr-2 text-gray-400" />
                 导出日历
               </button>
               <button
-                onClick={() => { requestDeleteAccountCalendars(contextMenu.account.id); setContextMenu(null); }}
+                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) openDeleteConfirm(cal.id); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
               >
                 <Trash size={14} className="mr-2" />
@@ -11879,12 +12142,22 @@ function MainApp() {
               <div className="text-xs font-bold text-gray-800 truncate">{getAccountDisplayLabel(accountMenuAnchor.account)}</div>
               <div className="text-[11px] text-gray-400 mt-0.5 truncate">{accountMenuAnchor.account.email}</div>
             </div>
+            <button
+              onClick={() => {
+                const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id);
+                openColorPicker(cal ? cal.id : accountMenuAnchor.account.id, cal ? 'calendar' : 'account');
+              }}
+              className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+            >
+              <Palette size={14} className="mr-2 text-gray-400" />
+              颜色
+            </button>
             {accountMenuAnchor.account.ownership !== 'shared' ? (
               <>
-                <button onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Edit size={14} className="mr-2 text-gray-400" />重命名与颜色</button>
+                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) openRenameDialog(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Edit size={14} className="mr-2 text-gray-400" />重命名</button>
                 <button onClick={() => { handleOpenSharingSettings(); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Users size={14} className="mr-2 text-gray-400" />共享与权限</button>
-                <button onClick={() => { exportAccountCalendar(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><FileText size={14} className="mr-2 text-gray-400" />导出日历</button>
-                <button onClick={() => { requestDeleteAccountCalendars(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"><Trash size={14} className="mr-2" />删除日历</button>
+                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) exportCalendarIcs(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><FileText size={14} className="mr-2 text-gray-400" />导出</button>
+                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) openDeleteConfirm(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"><Trash size={14} className="mr-2" />删除日历</button>
                 <button onClick={() => { toggleAccount(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />{accountMenuAnchor.account.checked ? '隐藏账户' : '显示账户'}</button>
               </>
             ) : (
