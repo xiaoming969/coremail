@@ -27,6 +27,7 @@ import {
   MapPin,
   Minus,
   MoreHorizontal,
+  Palette,
   Paperclip,
   Plus,
   RefreshCw,
