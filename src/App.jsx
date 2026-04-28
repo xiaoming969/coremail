@@ -138,7 +138,7 @@ const MAIL_FOLDERS = [
 const MAIL_CONTACTS = [
   { id: 'mc1', name: '产品经理', email: 'pm@calendarpro.io', scope: 'internal' },
   { id: 'mc2', name: '行政助理组', email: 'ea-team@calendarpro.io', scope: 'internal' },
-  { id: 'mc3', name: '外部代理商', email: 'agency@vendor.com', scope: 'external' },
+  { id: 'mc3', name: '外部顾问', email: 'advisor@vendor.com', scope: 'external' },
   { id: 'mc4', name: '客户 CFO', email: 'cfo@externalcorp.com', scope: 'external' },
 ];
 const MODULE_COPY = {
@@ -156,31 +156,29 @@ const MODULE_COPY = {
   },
 };
 const CALENDAR_PERMISSION_OPTIONS = [
-  { id: 'busy_only', label: '仅查看忙闲' },
-  { id: 'titles_locations', label: '查看标题和地点' },
-  { id: 'all_details', label: '查看所有详细信息' },
+  { id: 'all_details', label: '仅查看' },
+  { id: 'busy_only', label: '闲忙' },
   { id: 'edit', label: '可编辑' },
-  { id: 'delegate', label: '代理人' },
 ];
-const EXTERNAL_CALENDAR_PERMISSION_OPTIONS = CALENDAR_PERMISSION_OPTIONS.filter(
-  (option) => !['edit', 'delegate'].includes(option.id),
-);
-const DEFAULT_CALENDAR_PERMISSION_OPTIONS = [
-  { id: 'none', label: '不共享' },
-  ...EXTERNAL_CALENDAR_PERMISSION_OPTIONS,
-];
-const DELEGATE_MEETING_OPTIONS = [
-  { id: 'delegate_only', label: '仅向代理人发送会议请求和响应' },
-  { id: 'delegate_copy', label: '向代理人发送，并给我保留副本' },
-  { id: 'delegate_and_me', label: '同时发送给我和代理人' },
-];
-const PUBLISH_PERMISSION_OPTIONS = EXTERNAL_CALENDAR_PERMISSION_OPTIONS;
-const CALENDAR_PERMISSION_LABELS = Object.fromEntries(
-  CALENDAR_PERMISSION_OPTIONS.map((option) => [option.id, option.label]),
-);
-const CALENDAR_PERMISSION_LABEL_TO_ID = Object.fromEntries(
-  CALENDAR_PERMISSION_OPTIONS.map((option) => [option.label, option.id]),
-);
+const CALENDAR_PERMISSION_LABELS = {
+  none: '不共享',
+  all_details: '仅查看',
+  titles_locations: '仅查看',
+  busy_only: '闲忙',
+  edit: '可编辑',
+};
+const CALENDAR_PERMISSION_LABEL_TO_ID = {
+  不共享: 'none',
+  仅查看: 'all_details',
+  查看所有详细信息: 'all_details',
+  查看标题和地点: 'all_details',
+  闲忙: 'busy_only',
+  可编辑: 'edit',
+  all_details: 'all_details',
+  titles_locations: 'all_details',
+  busy_only: 'busy_only',
+  edit: 'edit',
+};
 const CALENDAR_SHARE_STATUS_META = {
   pending: {
     label: '待接收',
@@ -199,31 +197,16 @@ const CALENDAR_SHARE_STATUS_META = {
     tone: 'border-rose-200 bg-rose-50 text-rose-700',
   },
 };
-const PERMISSION_REQUEST_STATUS_META = {
-  pending: {
-    label: '待审批',
-    tone: 'border-amber-200 bg-amber-50 text-amber-700',
-  },
-  approved: {
-    label: '已批准',
-    tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  },
-  rejected: {
-    label: '已拒绝',
-    tone: 'border-rose-200 bg-rose-50 text-rose-700',
-  },
-};
 const CALENDAR_PERMISSION_CAPABILITIES = {
-  busy_only: ['查看忙闲', '不可查看日程详情', '不可编辑'],
-  titles_locations: ['查看标题和地点', '不可查看正文', '不可编辑'],
-  all_details: ['查看完整详情', '不可编辑', '不可再次分享'],
-  edit: ['查看完整详情', '可新建 / 编辑 / 删除日程', '不可管理共享成员'],
-  delegate: ['查看完整详情', '可编辑日程', '可管理共享成员'],
+  busy_only: ['只能查看忙闲占用', '不能查看标题、地点和正文', '不能编辑日程'],
+  titles_locations: ['可查看日程详情', '不能编辑日程'],
+  all_details: ['可查看日程详情', '不能编辑日程'],
+  edit: ['可查看日程详情', '可新建、修改和删除日程'],
 };
 const MAX_SPLIT_ACCOUNTS = 3;
 const SHARED_ACCOUNT_TEMPLATES = [
   { name: '财务团队', email: 'finance@calendarpro.io', color: 'bg-cyan-500', permissionId: 'all_details' },
-  { name: '法务团队', email: 'legal@calendarpro.io', color: 'bg-fuchsia-500', permissionId: 'titles_locations' },
+  { name: '法务团队', email: 'legal@calendarpro.io', color: 'bg-fuchsia-500', permissionId: 'all_details' },
   { name: '客户成功', email: 'cs@calendarpro.io', color: 'bg-teal-500', permissionId: 'edit' },
   { name: '外部顾问', email: 'advisor@vendor.com', color: 'bg-amber-500', permissionId: 'busy_only' },
 ];
@@ -249,20 +232,6 @@ const MOCK_SHARE_INVITATIONS = [
     status: 'pending',
     createdAt: new Date(2026, 0, 9, 9, 5).getTime(),
     message: '仅开放忙闲占用，方便跨团队排会时快速查看空档。',
-  },
-];
-const MOCK_PERMISSION_REQUESTS = [
-  {
-    id: 'perm-request-1',
-    calendarId: 'c1',
-    shareId: 'share1',
-    requesterName: '产品经理',
-    requesterEmail: 'pm@calendarpro.io',
-    currentPermissionId: 'all_details',
-    requestedPermissionId: 'edit',
-    status: 'pending',
-    createdAt: new Date(2026, 0, 9, 11, 40).getTime(),
-    reason: '需要在下周评审前代为调整会议时间和参会人。',
   },
 ];
 const EVENT_KIND_DEFAULTS = {
@@ -482,7 +451,7 @@ const getSearchResultStatusTags = (event, calendar) => {
   else if (event.status === '已拒绝') tags.push('已拒绝');
   else if (event.status === '已接受') tags.push('我已接受');
   if (event.visibility === 'private') tags.push('私密');
-  if (getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only') tags.push('仅查看');
+  if (getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only') tags.push('闲忙');
   else if (canEditCalendarContent(calendar?.receivedPermissionId || calendar?.permission)) tags.push('可编辑');
 
   return Array.from(new Set(tags)).slice(0, 4);
@@ -1374,10 +1343,10 @@ const MOCK_CALENDARS = [
       },
       {
         id: 'share2',
-        name: 'EA Team',
+        name: 'ea-team@calendarpro.io',
         email: 'ea-team@calendarpro.io',
         scope: 'internal',
-        permission: 'delegate',
+        permission: 'edit',
         status: 'accepted',
         updatedAt: new Date(2026, 0, 8, 9, 10).getTime(),
         canViewPrivate: true,
@@ -1422,13 +1391,18 @@ const MOCK_CALENDARS = [
   {
     id: 'c3',
     accountId: 'acc2',
-    name: '张总 (领导)',
+    name: 'ea@calendarpro.io',
     type: 'shared',
-    owner: '张总',
+    owner: 'ea@calendarpro.io',
     color: 'bg-orange-500',
     checked: true,
-    permission: '代理人',
+    permission: '可编辑',
     isPrimary: true,
+    receivedFrom: 'ea@calendarpro.io',
+    receivedFromName: 'ea@calendarpro.io',
+    receivedPermissionId: 'edit',
+    receivedStatus: 'accepted',
+    updatedAt: new Date(2026, 0, 6, 18, 30).getTime(),
     defaultSharing: {
       organization: 'busy_only',
       external: 'none',
@@ -1456,13 +1430,18 @@ const MOCK_CALENDARS = [
   {
     id: 'c4',
     accountId: 'acc2',
-    name: '李四 (研发)',
+    name: 'ea@calendarpro.io 空闲忙碌',
     type: 'shared',
-    owner: '李四',
+    owner: 'ea@calendarpro.io',
     color: 'bg-slate-500',
     checked: true,
-    permission: '仅查看忙闲',
+    permission: '闲忙',
     isPrimary: true,
+    receivedFrom: 'ea@calendarpro.io',
+    receivedFromName: 'ea@calendarpro.io',
+    receivedPermissionId: 'busy_only',
+    receivedStatus: 'accepted',
+    updatedAt: new Date(2026, 0, 5, 11, 0).getTime(),
     defaultSharing: {
       organization: 'busy_only',
       external: 'none',
@@ -1490,13 +1469,18 @@ const MOCK_CALENDARS = [
   {
     id: 'c5',
     accountId: 'acc3',
-    name: '销售团队视图',
+    name: 'sales@calendarpro.io',
     type: 'shared',
-    owner: '销售团队',
+    owner: 'sales@calendarpro.io',
     color: 'bg-emerald-500',
     checked: true,
     permission: '可编辑',
     isPrimary: false,
+    receivedFrom: 'sales@calendarpro.io',
+    receivedFromName: 'sales@calendarpro.io',
+    receivedPermissionId: 'edit',
+    receivedStatus: 'accepted',
+    updatedAt: new Date(2026, 0, 4, 10, 10).getTime(),
     defaultSharing: {
       organization: 'titles_locations',
       external: 'busy_only',
@@ -1510,8 +1494,8 @@ const MOCK_CALENDARS = [
     sharing: [
       {
         id: 'share6',
-        name: '外部代理商',
-        email: 'agency@vendor.com',
+        name: '外部顾问',
+        email: 'advisor@vendor.com',
         scope: 'external',
         permission: 'titles_locations',
         status: 'accepted',
@@ -2736,6 +2720,7 @@ function CalendarSidebar({
   onAccountContextMenu,
   onFocusAccount,
   onAccountMenu,
+  pendingShareInvitationCount = 0,
   focusedAccountId,
   activeProduct,
   onSelectProduct,
@@ -2976,7 +2961,12 @@ function CalendarSidebar({
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <button onClick={() => toggleSection(group.key)} className="flex items-center min-w-0 text-left">
                     <ChevronDown size={14} className={`mr-1 text-gray-400 transition-transform ${collapsedSections[group.key] ? '-rotate-90' : ''}`} />
-                    <div className="text-[11px] font-bold text-gray-400 tracking-wide">{group.title}</div>
+                    <div className="relative text-[11px] font-bold text-gray-400 tracking-wide">
+                      {group.title}
+                      {group.ownership === 'shared' && pendingShareInvitationCount > 0 && (
+                        <span className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
+                      )}
+                    </div>
                   </button>
                   <div className="flex items-center gap-1">
                     {group.items.length > 0 && !group.items.every((item) => item.checked) && (
@@ -3060,10 +3050,15 @@ function CalendarSidebar({
                   {group.ownership === 'shared' && (
                     <button
                       onClick={onAddSharedCalendar}
-                      className="mt-0.5 flex w-full items-center justify-start gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600"
+                      className="relative mt-0.5 flex w-full items-center justify-start gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600"
                     >
                       <Plus size={13} />
                       添加共享日历
+                      {pendingShareInvitationCount > 0 && (
+                        <span className="ml-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                          {pendingShareInvitationCount}
+                        </span>
+                      )}
                     </button>
                   )}
                 </div>}
@@ -5179,351 +5174,95 @@ function CalendarSearchResults({
 
 function CalendarPermissionModal({
   calendar,
-  permissionRequests = [],
   onClose,
   onUpdateShare,
   onAddShare,
   onRemoveShare,
   onResendShare,
-  onHandlePermissionRequest,
-  onUpdateDefaultSharing,
-  onUpdatePublishing,
-  onResetPublishLinks,
-  onCopyPublishingLink,
 }) {
   if (!calendar) return null;
 
-  const pendingRequests = permissionRequests.filter((request) => request.calendarId === calendar.id && request.status === 'pending');
+  const visibleShares = calendar.sharing || [];
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-[720px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="w-[760px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
           <div>
-            <div className="text-lg font-black text-gray-900">共享与权限</div>
-            <div className="text-sm text-gray-500 mt-1">
-              {calendar.name} · {calendar.isPrimary ? '主日历' : '附加日历'}
-            </div>
+            <div className="text-lg font-black text-gray-900">共享权限</div>
+            <div className="text-sm text-gray-500 mt-1">{calendar.name}</div>
           </div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto max-h-[72vh]">
-          <div className="mb-4 rounded-xl bg-blue-50 border border-blue-100 p-4 text-sm text-blue-900">
-            参考 Outlook 企业版：内部成员可授予查看、编辑，主日历额外支持"代理人"；外部共享仅保留查看类权限，并支持发布日历链接。
+        <div className="p-6 overflow-y-auto max-h-[72vh] space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-gray-900">我共享给了谁</div>
+              <div className="mt-1 text-xs font-medium text-slate-400">只展示姓名、账号和权限，方便快速修改或移除。</div>
+            </div>
+            <button
+              onClick={() => onAddShare('internal')}
+              className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+            >
+              <Plus size={15} className="mr-1.5" />
+              添加成员
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-6 mb-6">
-            <div className="rounded-xl border border-gray-200 p-4">
-              <div className="text-sm font-black text-gray-900 mb-3">默认权限</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-xs font-bold text-gray-500">
-                  组织内默认权限
-                  <select
-                    value={calendar.defaultSharing.organization}
-                    onChange={(event) => onUpdateDefaultSharing('organization', event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white"
-                  >
-                    {DEFAULT_CALENDAR_PERMISSION_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs font-bold text-gray-500">
-                  组织外默认权限
-                  <select
-                    value={calendar.defaultSharing.external}
-                    onChange={(event) => onUpdateDefaultSharing('external', event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white"
-                  >
-                    {DEFAULT_CALENDAR_PERMISSION_OPTIONS.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="grid grid-cols-[1fr_220px_96px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
+              <div>成员</div>
+              <div>权限</div>
+              <div className="text-right">操作</div>
             </div>
-
-            <div className="rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-black text-gray-900">发布日历</div>
-                  <div className="text-xs text-gray-500 mt-1">对齐 Outlook 的 HTML / ICS 发布能力</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={calendar.publishing.enabled}
-                  onChange={(event) => onUpdatePublishing({ enabled: event.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                />
-              </div>
-              <label className="text-xs font-bold text-gray-500 block mt-4">
-                发布内容
-                <select
-                  value={calendar.publishing.permission}
-                  onChange={(event) => onUpdatePublishing({ permission: event.target.value })}
-                  disabled={!calendar.publishing.enabled}
-                  className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white disabled:bg-gray-100"
-                >
-                  {PUBLISH_PERMISSION_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="mt-4 space-y-2">
-                <div>
-                  <div className="text-[11px] font-black text-gray-400 uppercase mb-1">HTML</div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={calendar.publishing.enabled ? calendar.publishing.htmlLink : '未启用发布'}
-                      className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs text-gray-600 bg-gray-50"
-                    />
-                    <button
-                      onClick={() => onCopyPublishingLink('htmlLink')}
-                      disabled={!calendar.publishing.enabled}
-                    className="px-3 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed inline-flex items-center shrink-0"
-                    >
-                      <Copy size={12} className="mr-1.5" />
-                      复制
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-black text-gray-400 uppercase mb-1">ICS</div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={calendar.publishing.enabled ? calendar.publishing.icsLink : '未启用发布'}
-                      className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs text-gray-600 bg-gray-50"
-                    />
-                    <button
-                      onClick={() => onCopyPublishingLink('icsLink')}
-                      disabled={!calendar.publishing.enabled}
-                    className="px-3 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed inline-flex items-center shrink-0"
-                    >
-                      <Copy size={12} className="mr-1.5" />
-                      复制
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={onResetPublishLinks}
-                className="mt-4 px-3 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200"
-              >
-                重置发布链接
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {calendar.sharing.map((share) => {
+            {visibleShares.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">还没有共享给任何人。</div>
+            ) : (
+              visibleShares.map((share) => {
               const shareStatusMeta = CALENDAR_SHARE_STATUS_META[share.status || 'accepted'] || CALENDAR_SHARE_STATUS_META.accepted;
-              const options =
-                share.scope === 'external'
-                  ? EXTERNAL_CALENDAR_PERMISSION_OPTIONS
-                  : calendar.isPrimary
-                    ? CALENDAR_PERMISSION_OPTIONS
-                    : CALENDAR_PERMISSION_OPTIONS.filter((item) => item.id !== 'delegate');
               const isRevoked = share.status === 'revoked';
 
               return (
-                <div key={share.id} className="rounded-xl border border-gray-200 p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div title={share.name} className="text-sm font-bold text-gray-900 truncate">
-                          {share.name}
-                        </div>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${share.scope === 'external' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
-                          {share.scope === 'external' ? '外部' : '内部'}
-                        </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${shareStatusMeta.tone}`}>
-                          {shareStatusMeta.label}
-                        </span>
-                      </div>
-                      <div title={share.email} className="text-xs text-gray-500 mt-1 break-all">
-                        {share.email}
-                      </div>
-                      <div className="mt-2 text-[11px] font-semibold text-gray-400">
-                        当前权限：{getCalendarPermissionLabel(share.permission)} · 最近更新：{formatShareTimeLabel(share.updatedAt)}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!isRevoked && (
-                        <button
-                          onClick={() => onResendShare(share.id)}
-                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200"
-                        >
-                          重发通知
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onRemoveShare(share.id)}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100"
-                      >
-                        {isRevoked ? '已撤回' : '取消共享'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                    <label className="text-xs font-bold text-gray-500">
-                      姓名
-                      <input
-                        value={share.name}
-                        onChange={(event) => onUpdateShare(share.id, { name: event.target.value })}
-                        disabled={isRevoked}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white disabled:bg-gray-100"
-                      />
-                    </label>
-                    <label className="text-xs font-bold text-gray-500">
-                      账号 / 邮箱
-                      <input
-                        value={share.email}
-                        onChange={(event) => onUpdateShare(share.id, { email: event.target.value })}
-                        disabled={isRevoked}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white disabled:bg-gray-100"
-                      />
-                    </label>
-                    <label className="text-xs font-bold text-gray-500">
-                      共享对象
-                      <select
-                        value={share.scope}
-                        onChange={(event) => onUpdateShare(share.id, { scope: event.target.value })}
-                        disabled={isRevoked}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white disabled:bg-gray-100"
-                      >
-                        <option value="internal">组织内</option>
-                        <option value="external">组织外</option>
-                      </select>
-                    </label>
-                    <label className="text-xs font-bold text-gray-500">
-                      权限级别
-                      <select
-                        value={share.permission}
-                        onChange={(event) => onUpdateShare(share.id, { permission: event.target.value })}
-                        disabled={isRevoked}
-                        className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white disabled:bg-gray-100"
-                      >
-                        {options.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  {share.permission === 'delegate' && !isRevoked && (
-                    <div className="mt-4 rounded-xl bg-gray-50 border border-gray-200 p-4 space-y-3">
-                      <label className="flex items-center justify-between text-sm text-gray-700">
-                        <span className="font-bold">可查看私人项目</span>
-                        <input
-                          type="checkbox"
-                          checked={share.canViewPrivate}
-                          onChange={(event) => onUpdateShare(share.id, { canViewPrivate: event.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                        />
-                      </label>
-                      <label className="text-xs font-bold text-gray-500 block">
-                        会议请求处理
-                        <select
-                          value={share.meetingResponses}
-                          onChange={(event) => onUpdateShare(share.id, { meetingResponses: event.target.value })}
-                          className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-800 bg-white"
-                        >
-                          {DELEGATE_MEETING_OPTIONS.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-black text-gray-900">权限升级申请</div>
-                <div className="mt-1 text-xs text-gray-500">共享对象权限不足时，会在这里收到升级申请，审批结果会同步通知对方。</div>
-              </div>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-bold text-slate-600">
-                待处理 {pendingRequests.length}
-              </span>
-            </div>
-            {pendingRequests.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                {pendingRequests.map((request) => (
-                  <div key={request.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-slate-900">
-                          {request.requesterName} · 申请升级到 {getCalendarPermissionLabel(request.requestedPermissionId)}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500 break-all">
-                          {request.requesterEmail} · {formatShareTimeLabel(request.createdAt)}
-                        </div>
-                      </div>
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
-                        {getCalendarPermissionLabel(request.currentPermissionId)} → {getCalendarPermissionLabel(request.requestedPermissionId)}
+                <div key={share.id} className="grid grid-cols-[1fr_220px_96px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="truncate text-sm font-bold text-slate-900">{share.name || share.email}</div>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${shareStatusMeta.tone}`}>
+                        {shareStatusMeta.label}
                       </span>
                     </div>
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-                      {request.reason}
-                    </div>
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button
-                        onClick={() => onHandlePermissionRequest(request.id, 'reject')}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-                      >
-                        拒绝
-                      </button>
-                      <button
-                        onClick={() => onHandlePermissionRequest(request.id, 'approve')}
-                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800"
-                      >
-                        批准并升级
-                      </button>
-                    </div>
+                    <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{share.email}</div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                当前没有待处理的权限升级申请。
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              onClick={() => onAddShare('internal')}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center"
-            >
-              <Plus size={16} className="mr-2" />
-              添加组织内成员
-            </button>
-            <button
-              onClick={() => onAddShare('external')}
-              className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-gray-700 text-sm font-bold inline-flex items-center"
-            >
-              <Plus size={16} className="mr-2" />
-              添加外部对象
-            </button>
+                  <select
+                    value={getCalendarPermissionId(share.permission)}
+                    onChange={(event) => onUpdateShare(share.id, { permission: event.target.value })}
+                    disabled={isRevoked}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex justify-end gap-1">
+                    {!isRevoked && onResendShare && (
+                      <button onClick={() => onResendShare(share.id)} className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100">
+                        重发
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onRemoveShare(share.id)}
+                      className="rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50"
+                    >
+                      {isRevoked ? '已移除' : '移除'}
+                    </button>
+                  </div>
+                </div>
+              );
+            }))}
           </div>
         </div>
       </div>
@@ -5534,16 +5273,19 @@ function CalendarPermissionModal({
 function MailboxPermissionModal({
   account,
   accountCalendars = [],
+  pendingInvitations = [],
   onClose,
   onRenameAccount,
   onUpdateAccountColor,
   onExportAccountCalendar,
   onDeleteAccountCalendars,
-  onUpdateMember,
-  onSetMemberPermission,
-  onAddMember,
-  onRemoveMember,
-  onToggleSetting,
+  onUpdateCalendarShare,
+  onAddCalendarShare,
+  onRemoveCalendarShare,
+  onResendCalendarShare,
+  onSetInvitationPermission,
+  onAcceptInvitation,
+  onIgnoreInvitation,
 }) {
   if (!account) return null;
 
@@ -5555,6 +5297,15 @@ function MailboxPermissionModal({
 
   const accountLabel = getAccountDisplayLabel(account);
   const canSaveName = draftName.trim() && draftName.trim() !== getAccountEditableName(account);
+  const ownCalendars = accountCalendars.filter((calendar) => calendar.type !== 'shared');
+  const shareRows = ownCalendars.flatMap((calendar) =>
+    (calendar.sharing || []).map((share) => ({
+      calendar,
+      share,
+      statusMeta: CALENDAR_SHARE_STATUS_META[share.status || 'accepted'] || CALENDAR_SHARE_STATUS_META.accepted,
+    })),
+  );
+  const primaryCalendar = ownCalendars.find((calendar) => calendar.isPrimary) || ownCalendars[0] || accountCalendars[0];
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
@@ -5656,84 +5407,119 @@ function MailboxPermissionModal({
             )}
           </div>
 
+          {pendingInvitations.length > 0 && (
+            <div className="rounded-xl border border-red-100 bg-red-50/40 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-black text-gray-900">
+                    收到的共享请求
+                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                  </div>
+                  <div className="mt-0.5 text-xs font-medium text-slate-500">确认是谁、哪个账号发来的，再选择同意后的权限。</div>
+                </div>
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">{pendingInvitations.length}</span>
+              </div>
+              <div className="space-y-2">
+                {pendingInvitations.map((invite) => (
+                  <div key={invite.id} className="grid grid-cols-[1fr_180px_136px] items-center gap-3 rounded-xl border border-red-100 bg-white px-3 py-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold text-slate-900">{invite.senderName || invite.senderEmail}</div>
+                      <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{invite.senderEmail}</div>
+                      <div className="mt-1 truncate text-xs text-slate-500">{invite.calendarName}</div>
+                    </div>
+                    <select
+                      value={getCalendarPermissionId(invite.permissionId)}
+                      onChange={(event) => onSetInvitationPermission?.(invite.id, event.target.value)}
+                      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                    >
+                      {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex justify-end gap-1.5">
+                      <button onClick={() => onIgnoreInvitation?.(invite.id)} className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100">
+                        忽略
+                      </button>
+                      <button onClick={() => onAcceptInvitation?.(invite.id)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800">
+                        同意
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <div className="text-sm font-black text-gray-900">成员权限</div>
-                <div className="mt-0.5 text-xs text-slate-400">按成员列表选择一种权限，避免多项勾选造成关系混乱。</div>
+                <div className="text-sm font-black text-gray-900">我共享出去的权限</div>
+                <div className="mt-0.5 text-xs text-slate-400">每个人只保留一种权限：仅查看、闲忙、可编辑。</div>
               </div>
               <button
-                onClick={onAddMember}
-                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 flex items-center gap-1"
+                onClick={() => primaryCalendar && onAddCalendarShare?.(primaryCalendar.id, 'internal')}
+                disabled={!primaryCalendar}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 flex items-center gap-1"
               >
                 <Plus size={12} />
                 添加成员
               </button>
             </div>
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              <div className="grid grid-cols-[1fr_220px_72px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
-                <div>成员</div>
+              <div className="grid grid-cols-[1fr_150px_190px_92px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
+                <div>姓名 / 账号</div>
+                <div>日历</div>
                 <div>权限</div>
                 <div className="text-right">操作</div>
               </div>
-              {account.mailboxMembers.map((member) => (
-                <div key={member.id} className="grid grid-cols-[1fr_220px_72px] items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0">
-                  <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">
-                        {member.name?.[0] || '?'}
-                      </div>
+              {shareRows.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">还没有共享给任何人。</div>
+              ) : (
+                shareRows.map(({ calendar, share, statusMeta }) => {
+                  const isRevoked = share.status === 'revoked';
+                  return (
+                    <div key={`${calendar.id}-${share.id}`} className="grid grid-cols-[1fr_150px_190px_92px] items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-bold text-gray-900">{member.name}</div>
-                        <div className="truncate text-xs text-gray-400">{member.email}</div>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <div className="truncate text-sm font-bold text-gray-900">{share.name || share.email}</div>
+                          <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-bold ${statusMeta.tone}`}>{statusMeta.label}</span>
+                        </div>
+                        <div className="truncate text-xs text-gray-400">{share.email}</div>
                       </div>
-                  </div>
-                  <div>
-                    <select
-                      value={getMailboxMemberPermission(member)}
-                      onChange={(event) => onSetMemberPermission(member.id, event.target.value)}
-                      className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    >
-                      {MAILBOX_PERMISSION_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="mt-1 text-[11px] leading-4 text-slate-400">
-                      {MAILBOX_PERMISSION_OPTIONS.find((option) => option.id === getMailboxMemberPermission(member))?.description}
+                      <div className="truncate text-xs font-semibold text-slate-500">{calendar.name}</div>
+                      <div>
+                        <select
+                          value={getCalendarPermissionId(share.permission)}
+                          onChange={(event) => onUpdateCalendarShare?.(calendar.id, share.id, { permission: event.target.value })}
+                          disabled={isRevoked}
+                          className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end gap-1">
+                        {!isRevoked && onResendCalendarShare && (
+                          <button onClick={() => onResendCalendarShare(calendar.id, share.id)} className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100">
+                            重发
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onRemoveCalendarShare?.(calendar.id, share.id)}
+                          className="rounded-lg px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-50"
+                        >
+                          {isRevoked ? '已移除' : '移除'}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => onRemoveMember(member.id)}
-                    className="justify-self-end rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                  >
-                    移除
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 账户设置 */}
-          <div>
-            <div className="text-sm font-black text-gray-900 mb-3">账户设置</div>
-            <div className="rounded-xl border border-gray-200 divide-y divide-gray-100">
-              {[
-                ['showInAddressList', '显示在全局地址列表'],
-                ['saveSentItems', '在共享邮箱中保存已发送邮件'],
-                ['automap', '自动映射到 Outlook'],
-                ['mobileAccess', '允许移动端访问'],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center justify-between px-4 py-3 text-sm text-gray-700 cursor-pointer hover:bg-slate-50 first:rounded-t-xl last:rounded-b-xl">
-                  <span className="font-bold">{label}</span>
-                  <input
-                    type="checkbox"
-                    checked={account.mailboxSettings[key]}
-                    onChange={() => onToggleSetting(key)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                  />
-                </label>
-              ))}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -5752,6 +5538,7 @@ function AddSharedCalendarModal({
   onSubmit,
   onAcceptInvitation,
   onIgnoreInvitation,
+  onSetInvitationPermission,
 }) {
   if (!open) return null;
 
@@ -5808,6 +5595,18 @@ function AddSharedCalendarModal({
                         </div>
                         <div className="mt-0.5 text-xs text-slate-400 truncate">{invite.senderName} · {invite.senderEmail}</div>
                       </div>
+                      <select
+                        value={getCalendarPermissionId(invite.permissionId)}
+                        onChange={(event) => onSetInvitationPermission?.(invite.id, event.target.value)}
+                        className="h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                        title="同意后授予的权限"
+                      >
+                        {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                       <div className="flex items-center shrink-0 gap-1.5">
                         <button
                           onClick={() => onIgnoreInvitation(invite.id)}
@@ -5819,7 +5618,7 @@ function AddSharedCalendarModal({
                           onClick={() => onAcceptInvitation(invite.id)}
                           className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
                         >
-                          接收
+                          同意
                         </button>
                       </div>
                     </div>
@@ -5853,7 +5652,7 @@ function AddSharedCalendarModal({
                   />
                 </label>
                 <label className="text-xs font-bold text-gray-500">
-                  当前权限
+                  权限
                   <select
                     value={draft.permissionId}
                     onChange={(event) => onChange({ permissionId: event.target.value })}
@@ -6370,7 +6169,6 @@ function MainApp() {
     color: 'bg-cyan-500',
   });
   const [shareInvitations, setShareInvitations] = useState(MOCK_SHARE_INVITATIONS);
-  const [permissionRequests, setPermissionRequests] = useState(MOCK_PERMISSION_REQUESTS);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [calendarColorPicker, setCalendarColorPicker] = useState({ open: false, targetId: null, targetType: null });
@@ -7398,6 +7196,14 @@ function MainApp() {
       icon: <X size={16} />,
       color: 'bg-slate-900',
     });
+  };
+
+  const setShareInvitationPermission = (inviteId, permissionId) => {
+    setShareInvitations((prev) =>
+      prev.map((item) =>
+        item.id === inviteId ? { ...item, permissionId: getCalendarPermissionId(permissionId), updatedAt: Date.now() } : item,
+      ),
+    );
   };
 
   const submitSharedCalendarDialog = () => {
@@ -8447,22 +8253,20 @@ function MainApp() {
         const sharing = calendar.sharing.map((share) => {
           if (share.id !== shareId) return share;
 
-          const nextShare = { ...share, ...patch, updatedAt: Date.now() };
-          const allowedOptions =
-            nextShare.scope === 'external'
-              ? EXTERNAL_CALENDAR_PERMISSION_OPTIONS
-              : calendar.isPrimary
-                ? CALENDAR_PERMISSION_OPTIONS
-                : CALENDAR_PERMISSION_OPTIONS.filter((item) => item.id !== 'delegate');
+          const nextShare = {
+            ...share,
+            ...patch,
+            permission: getCalendarPermissionId(patch.permission ?? share.permission),
+            updatedAt: Date.now(),
+          };
+          const allowedOptions = CALENDAR_PERMISSION_OPTIONS;
 
           if (!allowedOptions.some((option) => option.id === nextShare.permission)) {
-            nextShare.permission = allowedOptions[allowedOptions.length - 1].id;
+            nextShare.permission = 'all_details';
           }
 
-          if (nextShare.permission !== 'delegate') {
-            nextShare.canViewPrivate = false;
-            nextShare.meetingResponses = 'delegate_only';
-          }
+          nextShare.canViewPrivate = false;
+          nextShare.meetingResponses = 'none';
 
           return nextShare;
         });
@@ -8490,14 +8294,14 @@ function MainApp() {
                 ...calendar.sharing,
                 {
                   id: `share-${Date.now()}`,
-                  name: scope === 'external' ? '外部共享对象' : '新共享成员',
-                  email: scope === 'external' ? 'external.partner@vendor.com' : 'new.member@calendarpro.io',
+                  name: '新共享成员',
+                  email: 'new.member@calendarpro.io',
                   scope,
-                  permission: scope === 'external' ? 'titles_locations' : calendar.isPrimary ? 'all_details' : 'edit',
+                  permission: 'all_details',
                   status: 'pending',
                   updatedAt: Date.now(),
                   canViewPrivate: false,
-                  meetingResponses: 'delegate_only',
+                  meetingResponses: 'none',
                 },
               ],
             }
@@ -8649,73 +8453,6 @@ function MainApp() {
       icon: <RefreshCw size={16} />,
       color: 'bg-blue-600',
     });
-  };
-
-  const handlePermissionRequest = (requestId, action) => {
-    const request = permissionRequests.find((item) => item.id === requestId);
-    if (!request) return;
-
-    setPermissionRequests((prev) =>
-      prev.map((item) =>
-        item.id === requestId
-          ? { ...item, status: action === 'approve' ? 'approved' : 'rejected', resolvedAt: Date.now() }
-          : item,
-      ),
-    );
-
-    if (action === 'approve') {
-      if (request.calendarId && request.shareId) {
-        setCalendars((prev) =>
-          prev.map((calendar) =>
-            calendar.id === request.calendarId
-              ? {
-                  ...calendar,
-                  sharing: calendar.sharing.map((share) =>
-                    share.id === request.shareId
-                      ? {
-                          ...share,
-                          permission: request.requestedPermissionId,
-                          status: 'accepted',
-                          updatedAt: Date.now(),
-                        }
-                      : share,
-                  ),
-                }
-              : calendar,
-          ),
-        );
-      }
-      if (request.targetSharedCalendarId) {
-        const approvedPermissionLabel = getCalendarPermissionLabel(request.requestedPermissionId);
-        setCalendars((prev) =>
-          prev.map((calendar) =>
-            calendar.id === request.targetSharedCalendarId
-              ? {
-                  ...calendar,
-                  permission: approvedPermissionLabel,
-                  receivedPermissionId: request.requestedPermissionId,
-                  receivedStatus: 'accepted',
-                  updatedAt: Date.now(),
-                }
-              : calendar,
-          ),
-        );
-      }
-      triggerFeedback('L3', {
-        msg: `已批准 ${request.requesterName} 的权限升级申请`,
-        icon: <Check size={16} />,
-        color: 'bg-emerald-600',
-      });
-      return;
-    }
-
-    if (action === 'reject') {
-      triggerFeedback('L3', {
-        msg: `已拒绝 ${request.requesterName} 的权限升级申请`,
-        icon: <X size={16} />,
-        color: 'bg-slate-900',
-      });
-    }
   };
 
   const updateMailboxMember = (accountId, memberId, patch) => {
@@ -10097,6 +9834,7 @@ function MainApp() {
   }, [currentScreen, saveDraft]);
 
   const showAccountLabel = calendarLayout === 'day' ? activeAccounts.length > 1 : false;
+  const pendingShareInvitations = shareInvitations.filter((item) => item.status === 'pending');
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-[#f7f7f5] text-gray-900 antialiased">
@@ -10120,6 +9858,7 @@ function MainApp() {
           onAccountContextMenu={handleAccountContextMenu}
           onFocusAccount={handleFocusAccount}
           onAccountMenu={handleAccountMenu}
+          pendingShareInvitationCount={pendingShareInvitations.length}
           focusedAccountId={focusedAccountId}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
@@ -10515,7 +10254,7 @@ function MainApp() {
                         {selectedEvent.type === 'busy_only' ? (
                           <div className="text-center py-16 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
                             <Lock className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                            <h2 className="text-xl font-black text-gray-800">仅查看忙闲</h2>
+                            <h2 className="text-xl font-black text-gray-800">闲忙</h2>
                             <p className="text-gray-500 mt-2 text-sm font-medium">由于权限限制，您仅能看到该时段被占用。</p>
                           </div>
                         ) : (
@@ -11844,6 +11583,7 @@ function MainApp() {
         onSubmit={submitSharedCalendarDialog}
         onAcceptInvitation={acceptShareInvitation}
         onIgnoreInvitation={ignoreShareInvitation}
+        onSetInvitationPermission={setShareInvitationPermission}
       />
 
       <ReminderModal
@@ -12178,17 +11918,11 @@ function MainApp() {
       {permissionPanel.type === 'calendar' && selectedPermissionCalendar && (
         <CalendarPermissionModal
           calendar={selectedPermissionCalendar}
-          permissionRequests={permissionRequests}
           onClose={closePermissionPanel}
           onUpdateShare={(shareId, patch) => updateCalendarShare(selectedPermissionCalendar.id, shareId, patch)}
-          onUpdateDefaultSharing={(key, value) => updateCalendarDefaultSharing(selectedPermissionCalendar.id, key, value)}
-          onUpdatePublishing={(patch) => updateCalendarPublishing(selectedPermissionCalendar.id, patch)}
-          onResetPublishLinks={() => resetCalendarPublishLinks(selectedPermissionCalendar.id)}
-          onCopyPublishingLink={(key) => copyCalendarPublishLink(selectedPermissionCalendar.id, key)}
           onAddShare={(scope) => addCalendarShare(selectedPermissionCalendar.id, scope)}
           onRemoveShare={(shareId) => removeCalendarShare(selectedPermissionCalendar.id, shareId)}
           onResendShare={(shareId) => resendCalendarShare(selectedPermissionCalendar.id, shareId)}
-          onHandlePermissionRequest={handlePermissionRequest}
         />
       )}
 
@@ -12201,11 +11935,14 @@ function MainApp() {
           onUpdateAccountColor={updateAccountColor}
           onExportAccountCalendar={exportAccountCalendar}
           onDeleteAccountCalendars={requestDeleteAccountCalendars}
-          onUpdateMember={(memberId, patch) => updateMailboxMember(selectedPermissionMailbox.id, memberId, patch)}
-          onSetMemberPermission={(memberId, key) => setMailboxMemberPermission(selectedPermissionMailbox.id, memberId, key)}
-          onAddMember={() => addMailboxMember(selectedPermissionMailbox.id)}
-          onRemoveMember={(memberId) => removeMailboxMember(selectedPermissionMailbox.id, memberId)}
-          onToggleSetting={(key) => toggleMailboxSetting(selectedPermissionMailbox.id, key)}
+          pendingInvitations={pendingShareInvitations}
+          onUpdateCalendarShare={updateCalendarShare}
+          onAddCalendarShare={addCalendarShare}
+          onRemoveCalendarShare={removeCalendarShare}
+          onResendCalendarShare={resendCalendarShare}
+          onSetInvitationPermission={setShareInvitationPermission}
+          onAcceptInvitation={acceptShareInvitation}
+          onIgnoreInvitation={ignoreShareInvitation}
         />
       )}
 
