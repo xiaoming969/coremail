@@ -213,9 +213,9 @@ const SHARED_ACCOUNT_TEMPLATES = [
 const MOCK_SHARE_INVITATIONS = [
   {
     id: 'share-invite-1',
-    senderName: '财务团队',
+    senderName: '王敏',
     senderEmail: 'finance@calendarpro.io',
-    calendarName: '财务团队协作日历',
+    calendarName: 'finance@calendarpro.io',
     permissionId: 'all_details',
     color: 'bg-cyan-500',
     status: 'pending',
@@ -224,9 +224,9 @@ const MOCK_SHARE_INVITATIONS = [
   },
   {
     id: 'share-invite-2',
-    senderName: '外部顾问',
+    senderName: '赵磊',
     senderEmail: 'advisor@vendor.com',
-    calendarName: '外部项目协作日历',
+    calendarName: 'advisor@vendor.com',
     permissionId: 'busy_only',
     color: 'bg-amber-500',
     status: 'pending',
@@ -1424,13 +1424,13 @@ const MOCK_CALENDARS = [
     accountId: 'acc2',
     name: 'ea@calendarpro.io',
     type: 'shared',
-    owner: 'ea@calendarpro.io',
+    owner: '张三',
     color: 'bg-orange-500',
     checked: true,
     permission: '可编辑',
     isPrimary: true,
     receivedFrom: 'ea@calendarpro.io',
-    receivedFromName: 'ea@calendarpro.io',
+    receivedFromName: '张三',
     receivedPermissionId: 'edit',
     receivedStatus: 'accepted',
     updatedAt: new Date(2026, 0, 6, 18, 30).getTime(),
@@ -1463,13 +1463,13 @@ const MOCK_CALENDARS = [
     accountId: 'acc2',
     name: 'ea@calendarpro.io 空闲忙碌',
     type: 'shared',
-    owner: 'ea@calendarpro.io',
+    owner: '张三',
     color: 'bg-slate-500',
     checked: true,
     permission: '闲忙',
     isPrimary: true,
     receivedFrom: 'ea@calendarpro.io',
-    receivedFromName: 'ea@calendarpro.io',
+    receivedFromName: '张三',
     receivedPermissionId: 'busy_only',
     receivedStatus: 'accepted',
     updatedAt: new Date(2026, 0, 5, 11, 0).getTime(),
@@ -1502,13 +1502,13 @@ const MOCK_CALENDARS = [
     accountId: 'acc3',
     name: 'sales@calendarpro.io',
     type: 'shared',
-    owner: 'sales@calendarpro.io',
+    owner: '李四',
     color: 'bg-emerald-500',
     checked: true,
     permission: '可编辑',
     isPrimary: false,
     receivedFrom: 'sales@calendarpro.io',
-    receivedFromName: 'sales@calendarpro.io',
+    receivedFromName: '李四',
     receivedPermissionId: 'edit',
     receivedStatus: 'accepted',
     updatedAt: new Date(2026, 0, 4, 10, 10).getTime(),
@@ -2986,29 +2986,14 @@ function CalendarSidebar({
                       )}
                     </div>
                   </button>
-                  <div className="flex items-center gap-1">
-                    {group.items.length > 0 && !group.items.every((item) => item.checked) && (
-                      <button
-                        onClick={() => onSetAccountGroupChecked(group.ownership)}
-                        className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-gray-400 transition hover:bg-slate-200/70"
-                      >
-                        全选
-                      </button>
-                    )}
-                    {group.ownership === 'self' && (
-                      <button
-                        onClick={() => {
-                          const target = group.items[0];
-                          if (target) onOpenMailboxPermissions?.(target.id, 'sharing');
-                          else onOpenSharingSettings?.();
-                        }}
-                        className="rounded-md p-0.5 text-gray-300 transition hover:bg-slate-200/70 hover:text-gray-500"
-                        title="共享权限"
-                      >
-                        <Settings size={12} />
-                      </button>
-                    )}
-                  </div>
+                  {group.items.length > 0 && !group.items.every((item) => item.checked) && (
+                    <button
+                      onClick={() => onSetAccountGroupChecked(group.ownership)}
+                      className="rounded-md px-1.5 py-0.5 text-[10px] font-medium text-gray-400 transition hover:bg-slate-200/70"
+                    >
+                      全选
+                    </button>
+                  )}
                 </div>
 		                {!collapsedSections[group.key] && <div className="space-y-[2px]">
 		                  {group.items.map((account) => {
@@ -5481,43 +5466,22 @@ function MailboxPermissionModal({
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="text-sm font-black text-gray-900">账户日历</div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  onClick={() => onExportAccountCalendar(account.id)}
-                  className="inline-flex items-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                >
-                  <FileText size={13} className="mr-1.5" />
-                  导出日历
-                </button>
-                <button
-                  onClick={() => onDeleteAccountCalendars(account.id)}
-                  className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
-                >
-                  <Trash size={13} className="mr-1.5" />
-                  删除日历
-                </button>
-              </div>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+              <button
+                onClick={() => onExportAccountCalendar(account.id)}
+                className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                <FileText size={13} className="mr-1.5" />
+                导出日历
+              </button>
+              <button
+                onClick={() => onDeleteAccountCalendars(account.id)}
+                className="inline-flex items-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
+              >
+                <Trash size={13} className="mr-1.5" />
+                删除日历
+              </button>
             </div>
-            {accountCalendars.length > 0 ? (
-              <div className="space-y-1.5">
-                {accountCalendars.map((calendar) => (
-                  <div key={calendar.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${calendar.color || account.color || 'bg-blue-500'}`}></span>
-                    <div className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{calendar.name}</div>
-                    <span className="shrink-0 text-xs font-medium text-slate-400">{calendar.isPrimary ? '默认' : '普通'}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
-                该账户下暂无日历。
-              </div>
-            )}
           </div>
             </>
           )}
@@ -5661,7 +5625,7 @@ function AddSharedCalendarModal({
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
       <div
-        className="w-[640px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+        className="w-[760px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
@@ -5692,24 +5656,29 @@ function AddSharedCalendarModal({
           {draft.tab === 'inbox' ? (
             <div className="space-y-4">
               {pendingInvitations.length > 0 ? (
-                <div className="space-y-2.5">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="grid grid-cols-[1.2fr_1fr_150px_120px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
+                    <div>共享方</div>
+                    <div>共享日历</div>
+                    <div>权限</div>
+                    <div className="text-right">操作</div>
+                  </div>
                   {pendingInvitations.map((invite) => (
-                    <div key={invite.id} className="group/invite flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:border-slate-300 hover:shadow-sm">
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${invite.color}`}></span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 truncate">{invite.calendarName}</span>
-                          <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-[2px] text-[10px] font-bold text-amber-700">
-                            {getCalendarPermissionLabel(invite.permissionId)}
-                          </span>
+                    <div key={invite.id} className="grid grid-cols-[1.2fr_1fr_150px_120px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${invite.color}`}></span>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-bold text-slate-900">{invite.senderName || invite.senderEmail}</div>
+                          <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{invite.senderEmail}</div>
                         </div>
-                        <div className="mt-0.5 text-xs text-slate-400 truncate">{invite.senderName} · {invite.senderEmail}</div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-bold text-slate-800">{invite.calendarName}</div>
                       </div>
                       <select
                         value={getCalendarPermissionId(invite.permissionId)}
                         onChange={(event) => onSetInvitationPermission?.(invite.id, event.target.value)}
-                        className="h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
-                        title="同意后授予的权限"
+                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
                       >
                         {CALENDAR_PERMISSION_OPTIONS.map((option) => (
                           <option key={option.id} value={option.id}>
@@ -5717,7 +5686,7 @@ function AddSharedCalendarModal({
                           </option>
                         ))}
                       </select>
-                      <div className="flex items-center shrink-0 gap-1.5">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => onIgnoreInvitation(invite.id)}
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
@@ -5814,7 +5783,6 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
 
   const permissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
   const permissionLabel = getCalendarPermissionLabel(permissionId);
-  const receivedStatusMeta = CALENDAR_SHARE_STATUS_META[calendar.receivedStatus || 'accepted'] || CALENDAR_SHARE_STATUS_META.accepted;
   const accountLabel = getAccountDisplayLabel(account);
   const sourceName = calendar.receivedFromName || calendar.owner || calendar.receivedFrom || '未知共享方';
   const sourceAccount = calendar.receivedFrom || calendar.ownerEmail || '未提供账号';
@@ -5828,23 +5796,17 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
             <span className={`h-4 w-4 shrink-0 rounded-full ${calendar.color || account?.color || 'bg-gray-400'}`}></span>
             <div className="min-w-0">
               <div className="truncate text-lg font-black text-gray-900">{accountLabel || calendar.name}</div>
-              <div className="mt-0.5 truncate text-sm text-gray-500">共享日历权限</div>
+              <div className="mt-0.5 truncate text-sm text-gray-500">{sourceName} · {sourceAccount}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${receivedStatusMeta.tone}`}>
-              {receivedStatusMeta.label}
-            </span>
-            <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-              <X size={16} />
-            </button>
-          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <X size={16} />
+          </button>
         </div>
 
         <div className="max-h-[72vh] overflow-y-auto p-6 space-y-5">
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="text-sm font-black text-slate-900">我的访问权限</div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg bg-white px-3 py-3">
                 <div className="text-xs font-bold text-slate-400">共享方</div>
                 <div className="mt-1 text-sm font-black text-slate-900">{sourceName}</div>
@@ -5855,26 +5817,10 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
                 <div className="mt-1 text-sm font-black text-slate-900">{permissionLabel}</div>
                 <div className="mt-0.5 text-xs font-medium text-slate-400">更新于 {formatShareTimeLabel(calendar.updatedAt)}</div>
               </div>
-              <div className="rounded-lg bg-white px-3 py-3">
-                <div className="text-xs font-bold text-slate-400">共享日历</div>
-                <div className="mt-1 truncate text-sm font-black text-slate-900">{calendar.name || accountLabel}</div>
-                <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{accountLabel || '共享账户'}</div>
-              </div>
-              <div className="rounded-lg bg-white px-3 py-3">
-                <div className="text-xs font-bold text-slate-400">接收状态</div>
-                <div className="mt-1 text-sm font-black text-slate-900">{receivedStatusMeta.label}</div>
-              </div>
             </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-	              <div className="text-sm font-black text-slate-900">我可以做什么</div>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">{permissionLabel}</span>
-            </div>
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
               {capabilityItems.map((item) => {
-                const isBlocked = item.includes('不可');
+                const isBlocked = item.includes('不可') || item.includes('不能');
                 return (
                   <div key={item} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
                     <span
