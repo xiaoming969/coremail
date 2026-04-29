@@ -144,15 +144,15 @@ const MAIL_CONTACTS = [
 const MODULE_COPY = {
   mail: {
     title: '邮件中心',
-    desc: '这里可以承接收件箱、会话流、星标邮件与提醒回执。当前演示聚焦日历模块，邮件页先保留为占位。',
+    desc: '',
   },
   contacts: {
     title: '通讯录',
-    desc: '这里可以承接组织架构、常用联系人、群组与共享目录。当前演示保留基础模块占位。',
+    desc: '',
   },
   settings: {
     title: '设置中心',
-    desc: '这里可以承接账户、安全、签名与同步策略。当前演示保留系统配置入口占位。',
+    desc: '',
   },
 };
 const CALENDAR_PERMISSION_OPTIONS = [
@@ -395,6 +395,48 @@ const formatDurationLabel = (durationH) => {
   return parts.length > 0 ? parts.join(' ') : '0分钟';
 };
 const normalizeParticipantIdentity = (value = '') => value.trim().toLowerCase();
+const parseShareMemberInput = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const angleMatch = raw.match(/^(.+?)\s*<([^>]+)>$/);
+  if (angleMatch) {
+    return {
+      name: angleMatch[1].trim(),
+      email: angleMatch[2].trim(),
+    };
+  }
+
+  const contact = MAIL_CONTACTS.find(
+    (item) => normalizeParticipantIdentity(item.email) === normalizeParticipantIdentity(raw) ||
+      normalizeParticipantIdentity(item.name) === normalizeParticipantIdentity(raw),
+  );
+  if (contact) return { name: contact.name, email: contact.email, scope: contact.scope };
+
+  const emailMatch = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (emailMatch) {
+    const email = emailMatch[0];
+    const name = raw.replace(email, '').replace(/[<>]/g, '').trim();
+    return { name: name || email, email };
+  }
+
+  return { name: raw, email: raw };
+};
+const getShareContactSuggestions = (value = '', existingShares = []) => {
+  const query = normalizeParticipantIdentity(value);
+  if (!query) return [];
+
+  const existingKeys = new Set(
+    existingShares.flatMap((share) => [share.email, share.name]).filter(Boolean).map((item) => normalizeParticipantIdentity(item)),
+  );
+
+  return MAIL_CONTACTS.filter((contact) => {
+    const name = normalizeParticipantIdentity(contact.name);
+    const email = normalizeParticipantIdentity(contact.email);
+    if (existingKeys.has(name) || existingKeys.has(email)) return false;
+    return name.includes(query) || email.includes(query);
+  }).slice(0, 5);
+};
 const TIME_SELECT_OPTIONS = Array.from({ length: DAY_END_HOUR * 2 }, (_, index) => {
   const value = index * HALF_HOUR_STEP;
   return { value: String(value), label: formatTimeSelectLabel(value) };
@@ -467,18 +509,7 @@ const getCalendarPermissionId = (permission) => CALENDAR_PERMISSION_LABEL_TO_ID[
 const getCalendarPermissionLabel = (permission) => CALENDAR_PERMISSION_LABELS[getCalendarPermissionId(permission)] || permission || '查看所有详细信息';
 const canEditCalendarContent = (calendarOrPermission) => {
   const permissionId = typeof calendarOrPermission === 'string' ? getCalendarPermissionId(calendarOrPermission) : getCalendarPermissionId(calendarOrPermission?.permission);
-  return ['edit', 'delegate'].includes(permissionId);
-};
-const canManageCalendarSharing = (calendarOrPermission) => {
-  const permissionId = typeof calendarOrPermission === 'string' ? getCalendarPermissionId(calendarOrPermission) : getCalendarPermissionId(calendarOrPermission?.permission);
-  return permissionId === 'delegate';
-};
-const canReshareCalendar = (calendarOrPermission) => canManageCalendarSharing(calendarOrPermission);
-const getNextPermissionLevel = (permission) => {
-  const ordered = ['busy_only', 'titles_locations', 'all_details', 'edit', 'delegate'];
-  const currentId = getCalendarPermissionId(permission);
-  const currentIndex = ordered.indexOf(currentId);
-  return ordered[Math.min(currentIndex + 1, ordered.length - 1)] || 'edit';
+  return permissionId === 'edit';
 };
 const formatShareTimeLabel = (timestamp) => {
   if (!timestamp) return '刚刚更新';
@@ -2013,7 +2044,7 @@ function ModulePlaceholder({ moduleId, onBack }) {
           {moduleId === 'settings' && <Settings size={22} />}
         </div>
         <h2 className="text-3xl font-black text-gray-900 mb-4">{copy.title}</h2>
-        <p className="text-gray-600 leading-relaxed mb-8">{copy.desc}</p>
+        {copy.desc && <p className="text-gray-600 leading-relaxed mb-8">{copy.desc}</p>}
         <button
           onClick={onBack}
           className="inline-flex items-center px-5 py-3 rounded-xl bg-blue-600 text-white font-bold shadow-md"
@@ -2034,13 +2065,8 @@ function UtilitySidebar({ activeProduct, onSelectProduct }) {
     >
       <div className="border-b border-slate-200 bg-[#f1f3f5] p-6">
         <div className="text-lg font-black text-gray-900">{MODULE_COPY[activeProduct]?.title || '模块'}</div>
-        <div className="text-sm text-gray-500 mt-2 leading-relaxed">{MODULE_COPY[activeProduct]?.desc || '当前模块正在补齐中。'}</div>
       </div>
-      <div className="flex-1 bg-[#f1f3f5] p-5">
-        <div className="border-t border-dashed border-slate-300 px-1 pt-5 text-sm text-gray-500 leading-relaxed">
-          这里预留给该模块自己的侧栏信息，例如目录、标签、常用操作或共享设置。
-        </div>
-      </div>
+      <div className="flex-1 bg-[#f1f3f5] p-5"></div>
       <div className="border-t border-slate-200 bg-[#f1f3f5] p-4">
         <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
       </div>
@@ -2196,7 +2222,6 @@ function MailWorkspace({
           <div className="flex items-center justify-between">
             <div>
               <div className="text-lg font-black text-gray-900">邮件</div>
-              <div className="text-xs text-gray-500 mt-1">按账户联看收件箱，交互方式参考 Outlook 阅读窗格。</div>
             </div>
             <button onClick={() => onCompose('new')} className="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold">
               <SquarePen size={15} className="mr-2" />
@@ -2315,7 +2340,7 @@ function MailWorkspace({
 
       <div className="flex-1 min-w-0 bg-[#f8f8f7]">
         {!selectedMail ? (
-          <div className="h-full flex items-center justify-center text-gray-400">请选择一封邮件查看详情。</div>
+          <div className="h-full flex items-center justify-center text-gray-400">未选择邮件</div>
         ) : (
           <div className="h-full flex flex-col">
             <div className="border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
@@ -2399,10 +2424,7 @@ function MailWorkspace({
               {selectedMailHasSchedulingIntent && !selectedMail.availabilityProposal && (
                 <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <div className="text-sm font-semibold text-blue-900">识别到这封邮件在讨论排期</div>
-                      <div className="mt-1 text-xs text-blue-700">可以直接插入你的空闲时间卡片，不用手动在正文里打字描述。</div>
-                    </div>
+	                    <div className="text-sm font-semibold text-blue-900">识别到排期需求</div>
                     <button
                       onClick={() => onOpenAvailabilityPicker(selectedMail.id)}
                       className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
@@ -2426,8 +2448,7 @@ function MailWorkspace({
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <div className="text-sm font-semibold text-amber-900">邀请被拒绝，建议直接寻找新时间</div>
-                      <div className="mt-1 text-xs text-amber-700">系统已经剔除当前冲突时段，并基于最新忙闲状态重新推荐时间。</div>
+                      <div className="text-sm font-semibold text-amber-900">邀请被拒绝</div>
                     </div>
                     <button
                       onClick={() => onOpenReschedule(selectedMail.rescheduleRequestForEventId)}
@@ -2463,7 +2484,6 @@ function MailWorkspace({
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-rose-900">这场会议已经取消</div>
-                      <div className="mt-1 text-xs text-rose-700">可直接打开日程查看详情，或从日历中删除这条无效会议。</div>
                     </div>
                     <button
                       onClick={() => onOpenLinkedEvent(selectedLinkedEvent.id)}
@@ -2499,8 +2519,7 @@ function MailWorkspace({
 
       <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 bg-[#fcfcfb] xl:flex xl:flex-col">
         <div className="border-b border-slate-200 px-5 py-4">
-          <div className="text-sm font-semibold text-slate-900">近期日程</div>
-          <div className="mt-1 text-xs text-slate-500">看邮件时也能顺手确认最近有没有会。</div>
+	          <div className="text-sm font-semibold text-slate-900">近期日程</div>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <div className="space-y-3">
@@ -2684,8 +2703,7 @@ function MailComposerModal({
           />
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-          <div className="text-xs text-gray-500">支持回复、转发、草稿保存和基于邮件生成日程。</div>
+	        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end">
           <div className="flex items-center gap-3">
             <button onClick={onSaveDraft} className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-bold text-gray-700">
               存草稿
@@ -2979,9 +2997,13 @@ function CalendarSidebar({
                     )}
                     {group.ownership === 'self' && (
                       <button
-                        onClick={onOpenSharingSettings}
+                        onClick={() => {
+                          const target = group.items[0];
+                          if (target) onOpenMailboxPermissions?.(target.id, 'sharing');
+                          else onOpenSharingSettings?.();
+                        }}
                         className="rounded-md p-0.5 text-gray-300 transition hover:bg-slate-200/70 hover:text-gray-500"
-                        title="共享与权限管理"
+                        title="共享权限"
                       >
                         <Settings size={12} />
                       </button>
@@ -4398,11 +4420,6 @@ function MonthView({
     return (
       <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">
         <div className="space-y-3">
-          {monthAccounts.length > MAX_SPLIT_ACCOUNTS && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700">
-              当前显示日历较多，月视图按日期格内轻量标注来源；需要逐人对比时建议切换到日/周视图。
-            </div>
-          )}
           {renderMonthGrid(events, null, 'month-source-grouped', monthWeekdayStickyTop, { groupBySource: true })}
         </div>
       </div>
@@ -4822,7 +4839,7 @@ function CalendarSearchResults({
                     onSearch(event.currentTarget.value);
                   }
                 }}
-                placeholder="继续搜索主题、正文、参会人、组织者、时间、地点..."
+                placeholder="搜索日程"
                 className="ml-2 flex-1 border-none bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
               />
               {query && (
@@ -4839,10 +4856,7 @@ function CalendarSearchResults({
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-sm font-black text-slate-900">搜索结果</div>
-            <div className="text-sm text-slate-500">
-              {trimmedQuery ? `关键词 "${trimmedQuery}" 共匹配到 ${results.length} 场日程` : '输入关键词后查看搜索结果'}
-            </div>
-            <div className="text-sm text-slate-400">单击查看摘要，双击打开详情</div>
+            {trimmedQuery && <div className="text-sm text-slate-500">关键词 "{trimmedQuery}" · {results.length} 场日程</div>}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -4900,8 +4914,7 @@ function CalendarSearchResults({
           <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 text-center text-slate-400">
             <div>
               <Search className="mx-auto mb-4 h-10 w-10" />
-              <div className="text-base font-bold text-slate-700">输入关键词开始搜索</div>
-              <div className="mt-2 text-sm leading-6">支持搜索主题、正文、参会人、组织者、时间、地点，以及账户和日历信息。</div>
+              <div className="text-base font-bold text-slate-700">搜索日程</div>
             </div>
           </div>
         ) : results.length === 0 ? (
@@ -4909,9 +4922,6 @@ function CalendarSearchResults({
             <div>
               <Search className="mx-auto mb-4 h-10 w-10" />
               <div className="text-base font-bold text-slate-700">没有找到相关日程</div>
-              <div className="mt-2 text-sm leading-6">
-                可以试试会议标题、组织者、参会人、会议室、时间或地点关键词。
-              </div>
             </div>
           </div>
         ) : (
@@ -4956,7 +4966,6 @@ function CalendarSearchResults({
                               className={`w-full border-b border-slate-100 px-4 py-4 text-left transition outline-none last:border-b-0 ${
                                 isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
                               }`}
-                              title="双击查看详情"
                             >
                               <div className="flex gap-4">
                                 <div className="w-40 shrink-0 pt-0.5">
@@ -5159,14 +5168,104 @@ function CalendarSearchResults({
                 <div className="flex h-full items-center justify-center p-8 text-center text-slate-400">
                   <div>
                     <Search className="mx-auto mb-4 h-10 w-10" />
-                    <div className="text-base font-bold text-slate-700">从左侧选择一条日程</div>
-                    <div className="mt-2 text-sm leading-6">单击查看摘要，双击打开完整详情。</div>
+                    <div className="text-base font-bold text-slate-700">未选择日程</div>
                   </div>
                 </div>
               )}
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ShareMemberComposer({ existingShares = [], onAdd }) {
+  const [memberInput, setMemberInput] = useState('');
+  const [permissionId, setPermissionId] = useState('all_details');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestions = useMemo(() => getShareContactSuggestions(memberInput, existingShares), [memberInput, existingShares]);
+
+  const addMember = (candidate = null) => {
+    const member = candidate ? { name: candidate.name, email: candidate.email, scope: candidate.scope } : parseShareMemberInput(memberInput);
+    if (!member) return;
+
+    onAdd?.({
+      ...member,
+      permission: permissionId,
+      permissionId,
+      scope: member.scope || (String(member.email || '').includes('@calendarpro.io') ? 'internal' : 'external'),
+    });
+    setMemberInput('');
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_150px_88px]">
+        <div className="relative">
+          <input
+            value={memberInput}
+            onChange={(event) => {
+              setMemberInput(event.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                addMember();
+              }
+              if (event.key === 'Escape') {
+                setShowSuggestions(false);
+              }
+            }}
+            placeholder="姓名或邮箱"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              {suggestions.map((contact) => (
+                <button
+                  key={contact.id}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    addMember(contact);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-slate-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-900">{contact.name}</span>
+                    <span className="block truncate text-xs font-medium text-slate-400">{contact.email}</span>
+                  </span>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                    {contact.scope === 'external' ? '外部' : '组织内'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <select
+          value={permissionId}
+          onChange={(event) => setPermissionId(event.target.value)}
+          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        >
+          {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => addMember()}
+          disabled={!memberInput.trim()}
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          添加
+        </button>
       </div>
     </div>
   );
@@ -5197,19 +5296,8 @@ function CalendarPermissionModal({
           </button>
         </div>
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-black text-gray-900">我共享给了谁</div>
-              <div className="mt-1 text-xs font-medium text-slate-400">只展示姓名、账号和权限，方便快速修改或移除。</div>
-            </div>
-            <button
-              onClick={() => onAddShare('internal')}
-              className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
-            >
-              <Plus size={15} className="mr-1.5" />
-              添加成员
-            </button>
-          </div>
+          <div className="text-sm font-black text-gray-900">我共享给了谁</div>
+          <ShareMemberComposer existingShares={visibleShares} onAdd={onAddShare} />
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="grid grid-cols-[1fr_220px_96px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
@@ -5274,6 +5362,7 @@ function MailboxPermissionModal({
   account,
   accountCalendars = [],
   pendingInvitations = [],
+  initialTab = 'settings',
   onClose,
   onRenameAccount,
   onUpdateAccountColor,
@@ -5290,10 +5379,15 @@ function MailboxPermissionModal({
   if (!account) return null;
 
   const [draftName, setDraftName] = useState(getAccountEditableName(account));
+  const [activeTab, setActiveTab] = useState(initialTab || 'settings');
 
   useEffect(() => {
     setDraftName(getAccountEditableName(account));
   }, [account.id, account.displayName, account.name, account.email]);
+
+  useEffect(() => {
+    setActiveTab(initialTab || 'settings');
+  }, [initialTab, account.id]);
 
   const accountLabel = getAccountDisplayLabel(account);
   const canSaveName = draftName.trim() && draftName.trim() !== getAccountEditableName(account);
@@ -5323,6 +5417,28 @@ function MailboxPermissionModal({
           </button>
         </div>
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {[
+              ['settings', '设置'],
+              ['sharing', `共享权限${pendingInvitations.length > 0 ? ` (${pendingInvitations.length})` : ''}`],
+            ].map(([tabId, label]) => (
+              <button
+                key={tabId}
+                onClick={() => setActiveTab(tabId)}
+                className={`relative rounded-lg px-4 py-2 text-sm font-bold transition ${
+                  activeTab === tabId ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+                {tabId === 'sharing' && pendingInvitations.length > 0 && (
+                  <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'settings' && (
+            <>
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
             <div className="grid gap-4 md:grid-cols-[1fr_220px]">
               <div>
@@ -5369,10 +5485,7 @@ function MailboxPermissionModal({
 
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-black text-gray-900">账户日历</div>
-                <div className="mt-0.5 text-xs text-slate-400">导出或删除会作用于该账户下的日历。</div>
-              </div>
+              <div className="text-sm font-black text-gray-900">账户日历</div>
               <div className="flex shrink-0 gap-2">
                 <button
                   onClick={() => onExportAccountCalendar(account.id)}
@@ -5406,17 +5519,18 @@ function MailboxPermissionModal({
               </div>
             )}
           </div>
+            </>
+          )}
 
+          {activeTab === 'sharing' && (
+            <>
           {pendingInvitations.length > 0 && (
             <div className="rounded-xl border border-red-100 bg-red-50/40 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-black text-gray-900">
-                    收到的共享请求
-                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                  </div>
-                  <div className="mt-0.5 text-xs font-medium text-slate-500">确认是谁、哪个账号发来的，再选择同意后的权限。</div>
-                </div>
+	                <div className="flex items-center gap-2 text-sm font-black text-gray-900">
+	                  收到的共享请求
+	                  <span className="h-2 w-2 rounded-full bg-red-500" />
+	                </div>
                 <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">{pendingInvitations.length}</span>
               </div>
               <div className="space-y-2">
@@ -5454,19 +5568,16 @@ function MailboxPermissionModal({
 
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="text-sm font-black text-gray-900">我共享出去的权限</div>
-                <div className="mt-0.5 text-xs text-slate-400">每个人只保留一种权限：仅查看、闲忙、可编辑。</div>
-              </div>
-              <button
-                onClick={() => primaryCalendar && onAddCalendarShare?.(primaryCalendar.id, 'internal')}
-                disabled={!primaryCalendar}
-                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 flex items-center gap-1"
-              >
-                <Plus size={12} />
-                添加成员
-              </button>
+              <div className="text-sm font-black text-gray-900">我共享出去的权限</div>
             </div>
+            {primaryCalendar && (
+              <div className="mb-3">
+                <ShareMemberComposer
+                  existingShares={shareRows.map(({ share }) => share)}
+                  onAdd={(member) => onAddCalendarShare?.(primaryCalendar.id, member)}
+                />
+              </div>
+            )}
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
               <div className="grid grid-cols-[1fr_150px_190px_92px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
                 <div>姓名 / 账号</div>
@@ -5522,6 +5633,8 @@ function MailboxPermissionModal({
               )}
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -5552,10 +5665,7 @@ function AddSharedCalendarModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
-          <div>
-            <div className="text-lg font-black text-gray-900">添加共享日历</div>
-            <div className="mt-0.5 text-sm text-slate-500">接收共享邀请，或通过对方账号添加共享日历。</div>
-          </div>
+	          <div className="text-lg font-black text-gray-900">添加共享日历</div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
@@ -5638,7 +5748,7 @@ function AddSharedCalendarModal({
                   <input
                     value={draft.name}
                     onChange={(event) => onChange({ name: event.target.value })}
-                    placeholder="不填则使用账号本身"
+	                    placeholder="显示名称"
                     className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </label>
@@ -5679,10 +5789,7 @@ function AddSharedCalendarModal({
                   </div>
                 </label>
               </div>
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-medium leading-5 text-blue-700">
-                添加后会出现在左侧"共享账户"分组中；当前 demo 只模拟已授权场景，权限说明可在账户行点击查看。
-              </div>
-            </>
+	            </>
           )}
         </div>
 
@@ -5756,17 +5863,13 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
               <div className="rounded-lg bg-white px-3 py-3">
                 <div className="text-xs font-bold text-slate-400">接收状态</div>
                 <div className="mt-1 text-sm font-black text-slate-900">{receivedStatusMeta.label}</div>
-                <div className="mt-0.5 text-xs font-medium text-slate-400">仅展示你对该日历的权限</div>
               </div>
             </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-black text-slate-900">我可以做什么</div>
-                <div className="mt-0.5 text-xs font-medium text-slate-400">权限由共享方设置，本页不展示其他成员权限。</div>
-              </div>
+	              <div className="text-sm font-black text-slate-900">我可以做什么</div>
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">{permissionLabel}</span>
             </div>
             <div className="space-y-2">
@@ -5788,10 +5891,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs font-medium leading-5 text-slate-500">
-            这是共享给你的日历，只能查看你当前拥有的权限；共享方给其他人的权限、成员列表和管理记录不会在这里展示。
-          </div>
-        </div>
+	        </div>
       </div>
     </div>
   );
@@ -5807,10 +5907,7 @@ function ReminderModal({ open, onClose, pendingEvents, upcomingEvents, accountMa
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
-          <div>
-            <div className="text-lg font-black text-gray-900">近期提醒</div>
-            <div className="text-sm text-gray-500 mt-1">查看近期日程、会议邀请和待处理事项。</div>
-          </div>
+	          <div className="text-lg font-black text-gray-900">近期提醒</div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
@@ -5819,14 +5916,12 @@ function ReminderModal({ open, onClose, pendingEvents, upcomingEvents, accountMa
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
-              <div className="text-xs font-black text-orange-700 uppercase">待响应邀请</div>
-              <div className="mt-2 text-2xl font-black text-orange-900">{pendingEvents.length}</div>
-              <div className="mt-1 text-sm text-orange-800">需要尽快确认的会议邀请</div>
+	              <div className="text-xs font-black text-orange-700 uppercase">待响应邀请</div>
+	              <div className="mt-2 text-2xl font-black text-orange-900">{pendingEvents.length}</div>
             </div>
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-              <div className="text-xs font-black text-blue-700 uppercase">近期会议</div>
-              <div className="mt-2 text-2xl font-black text-blue-900">{upcomingEvents.length}</div>
-              <div className="mt-1 text-sm text-blue-800">接下来几天内的日程与会面安排</div>
+	              <div className="text-xs font-black text-blue-700 uppercase">近期会议</div>
+	              <div className="mt-2 text-2xl font-black text-blue-900">{upcomingEvents.length}</div>
             </div>
           </div>
 
@@ -5920,10 +6015,10 @@ function ShortcutHelpModal({ open, onClose }) {
       ['R', '同步当前日历'],
     ],
     [
-      ['?', '打开快捷键说明'],
+      ['?', '快捷键'],
       ['Esc', '关闭弹窗 / 返回上一级'],
       ['Delete', '删除当前详情中的日程'],
-      ['双击空白时间', '快速创建日程'],
+      ['双击空白时间', '新建日程'],
     ],
   ];
 
@@ -5934,10 +6029,7 @@ function ShortcutHelpModal({ open, onClose }) {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
-          <div>
-            <div className="text-lg font-black text-gray-900">快捷键</div>
-            <div className="text-sm text-gray-500 mt-1">参考 Google Calendar 和 Notion Calendar 的桌面操作方式做了常用键盘交互。</div>
-          </div>
+	          <div className="text-lg font-black text-gray-900">快捷键</div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
             <X size={18} />
           </button>
@@ -5969,10 +6061,7 @@ function AvailabilityProposalCard({ proposal, onPickSlot, onRemove, actionLabel 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-        <div>
-          <div className="text-sm font-semibold text-slate-900">可用时间</div>
-          <div className="mt-1 text-xs text-slate-500">{proposal.reason || '勾选几个空闲时段后，可直接插入到邮件正文中。'}</div>
-        </div>
+	        <div className="text-sm font-semibold text-slate-900">可用时间</div>
         {onRemove && proposal.status !== 'confirmed' && (
           <button
             onClick={onRemove}
@@ -6013,7 +6102,7 @@ function AvailabilityProposalCard({ proposal, onPickSlot, onRemove, actionLabel 
                     <div className="text-sm font-semibold text-slate-900">
                       {formatSuggestedSlotLabel(new Date(slot.dateMs), slot.startH, slot.durationH)}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">{slot.summary || '工作时间内可直接锁定'}</div>
+	                    {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
                   </div>
                   {isConfirmed ? (
                     <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -6028,7 +6117,6 @@ function AvailabilityProposalCard({ proposal, onPickSlot, onRemove, actionLabel 
           })}
         </div>
 
-        {proposal.privacyNote && <div className="text-xs text-slate-400">{proposal.privacyNote}</div>}
       </div>
     </div>
   );
@@ -6052,12 +6140,7 @@ function AvailabilityProposalModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <div>
-            <div className="text-lg font-semibold text-slate-900">插入可用时间</div>
-            <div className="mt-1 text-sm text-slate-500">
-              先选 3-5 个你自己的空闲时段，系统会把它们变成一张结构化时间卡片。
-            </div>
-          </div>
+	          <div className="text-lg font-semibold text-slate-900">插入可用时间</div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
             <X size={16} />
           </button>
@@ -6085,7 +6168,7 @@ function AvailabilityProposalModal({
                       <div className="text-sm font-semibold text-slate-900">
                         {formatSuggestedSlotLabel(new Date(slot.dateMs), slot.startH, slot.durationH)}
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">{slot.summary || '工作时间内可直接分享'}</div>
+	                      {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
                     </div>
                     <span
                       className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border ${
@@ -6101,8 +6184,7 @@ function AvailabilityProposalModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
-          <div className="text-xs text-slate-500">建议选 3-5 个时间，收件人可以直接在邮件里点选确认。</div>
+	        <div className="flex items-center justify-end border-t border-slate-200 bg-slate-50 px-6 py-4">
           <div className="flex items-center gap-3">
             <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white">
               取消
@@ -6833,8 +6915,8 @@ function MainApp() {
     setContextMenu(null);
   };
 
-  const openMailboxPermissions = (accountId) => {
-    setPermissionPanel({ type: 'mailbox', targetId: accountId });
+  const openMailboxPermissions = (accountId, tab = 'settings') => {
+    setPermissionPanel({ type: 'mailbox', targetId: accountId, tab });
     setContextMenu(null);
   };
 
@@ -7490,69 +7572,6 @@ function MainApp() {
     triggerFeedback('L3', { msg: cal ? `${cal.name} 已删除` : '日历已删除', icon: <Trash size={16} />, color: 'bg-red-600' });
   };
 
-  const requestPermissionUpgrade = (calendarId, options = {}) => {
-    const calendar = calendars.find((item) => item.id === calendarId);
-    const account = calendar ? accountMap[calendar.accountId] : null;
-    if (!calendar || calendar.type !== 'shared') return;
-
-    const currentPermissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
-    const requestedPermissionId = options.requestedPermissionId || getNextPermissionLevel(currentPermissionId);
-    const currentUser = accounts.find((item) => item.ownership === 'self');
-    const matchedShare = calendar.sharing.find(
-      (share) =>
-        normalizeParticipantIdentity(share.email) === normalizeParticipantIdentity(currentUser?.email || '') ||
-        normalizeParticipantIdentity(share.name) === normalizeParticipantIdentity(currentUser?.name || ''),
-    );
-    const existingPending = permissionRequests.find(
-      (request) => request.targetSharedCalendarId === calendarId && request.status === 'pending',
-    );
-    if (existingPending) {
-      triggerFeedback('L3', {
-        msg: '已存在待处理的权限升级申请',
-        icon: <AlertCircle size={16} />,
-        color: 'bg-slate-900',
-      });
-      return;
-    }
-
-    setPermissionRequests((prev) => [
-      {
-        id: `perm-request-${Date.now()}`,
-        calendarId: matchedShare ? calendar.id : null,
-        shareId: matchedShare?.id || null,
-        targetSharedCalendarId: calendarId,
-        ownerName: calendar.owner,
-        ownerEmail: calendar.receivedFrom || account?.email || '',
-        requesterName: currentUser?.name || '我',
-        requesterEmail: currentUser?.email || 'me@calendarpro.io',
-        calendarName: calendar.name,
-        currentPermissionId,
-        requestedPermissionId,
-        status: 'pending',
-        createdAt: Date.now(),
-        reason: options.reason || '需要编辑或调整共享日历中的日程。',
-      },
-      ...prev,
-    ]);
-    triggerFeedback('L3', {
-      msg: `已向 ${calendar.owner} 发送权限升级申请`,
-      icon: <ArrowRight size={16} />,
-      color: 'bg-blue-600',
-    });
-  };
-
-  const promptPermissionUpgrade = (calendarId) => {
-    const calendar = calendars.find((item) => item.id === calendarId);
-    if (!calendar || calendar.type !== 'shared') return;
-    const currentPermissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
-    const currentPermissionLabel = getCalendarPermissionLabel(currentPermissionId);
-    triggerFeedback('L3', {
-      msg: `当前共享日历为"${currentPermissionLabel}"，无法执行此操作`,
-      icon: <AlertCircle size={16} />,
-      color: 'bg-slate-900',
-    });
-  };
-
   const startTimeSelection = (slot) => {
     const normalized = normalizeSelectionSlot({
       ...slot,
@@ -7930,8 +7949,8 @@ function MainApp() {
       status: 'open',
       confirmedSlotId: null,
       lockedEventId: null,
-      reason: `建议时间 · ${availabilityPickerAccount?.email || availabilityPickerAccount?.name || '当前账户'} 的工作时间与空闲时段`,
-      privacyNote: '收件人确认时只需选择时间，系统会在后台自动生成日历邀请并通知双方。',
+      reason: '',
+      privacyNote: '',
       slots: selectedSlots,
     };
 
@@ -8284,20 +8303,60 @@ function MainApp() {
     }
   };
 
-  const addCalendarShare = (calendarId, scope = 'internal') => {
+  const addCalendarShare = (calendarId, member = {}) => {
+    const targetCalendar = calendars.find((calendar) => calendar.id === calendarId);
+    const isLegacyScope = typeof member === 'string';
+    const parsedMember = isLegacyScope ? null : parseShareMemberInput(member.email || member.name || '');
+    const nextMember = isLegacyScope
+      ? {
+          name: '新共享成员',
+          email: 'new.member@calendarpro.io',
+          scope: member,
+          permission: 'all_details',
+        }
+      : {
+          ...(parsedMember || {}),
+          ...member,
+          permission: getCalendarPermissionId(member.permission || member.permissionId || 'all_details'),
+        };
+    const normalizedEmail = normalizeParticipantIdentity(nextMember.email || nextMember.name || '');
+
+    if (!targetCalendar || !normalizedEmail) {
+      triggerFeedback('L3', {
+        msg: '请输入姓名或邮箱',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-red-600',
+      });
+      return;
+    }
+
+    const duplicated = (targetCalendar.sharing || []).some(
+      (share) =>
+        normalizeParticipantIdentity(share.email || '') === normalizedEmail ||
+        normalizeParticipantIdentity(share.name || '') === normalizeParticipantIdentity(nextMember.name || ''),
+    );
+    if (duplicated) {
+      triggerFeedback('L3', {
+        msg: '该成员已在共享列表中',
+        icon: <AlertCircle size={16} />,
+        color: 'bg-slate-900',
+      });
+      return;
+    }
+
     setCalendars((prev) =>
       prev.map((calendar) =>
         calendar.id === calendarId
           ? {
               ...calendar,
               sharing: [
-                ...calendar.sharing,
+                ...(calendar.sharing || []),
                 {
                   id: `share-${Date.now()}`,
-                  name: '新共享成员',
-                  email: 'new.member@calendarpro.io',
-                  scope,
-                  permission: 'all_details',
+                  name: nextMember.name || nextMember.email,
+                  email: nextMember.email || nextMember.name,
+                  scope: nextMember.scope || (String(nextMember.email || '').includes('@calendarpro.io') ? 'internal' : 'external'),
+                  permission: nextMember.permission,
                   status: 'pending',
                   updatedAt: Date.now(),
                   canViewPrivate: false,
@@ -8309,7 +8368,7 @@ function MainApp() {
       ),
     );
     triggerFeedback('L3', {
-      msg: '共享通知已发送，对方接收后会出现在共享日历中',
+      msg: `已添加 ${nextMember.name || nextMember.email}`,
       icon: <Send size={16} />,
       color: 'bg-blue-600',
     });
@@ -9408,11 +9467,11 @@ function MainApp() {
   const createDraftRequiredText =
     draftForm.attendees.length > 0
       ? `已添加 ${draftForm.attendees.length} 位必需参与人${createDraftRequiredUnmatchedCount > 0 ? `，其中 ${createDraftRequiredUnmatchedCount} 位暂未识别到组织内日历` : ''}`
-      : '先添加需要参加的人，支持一次粘贴多人';
+      : '';
   const createDraftOptionalText =
     (draftForm.optionalAttendees || []).length > 0
       ? `已添加 ${(draftForm.optionalAttendees || []).length} 位可选参与人${createDraftOptionalUnmatchedCount > 0 ? `，其中 ${createDraftOptionalUnmatchedCount} 位暂未识别到组织内日历` : ''}`
-      : '没有可选参与人也可以直接发送，支持批量粘贴';
+      : '';
   const createDraftRequiredPreviewCount = createDraftMassAudience ? 5 : 8;
   const createDraftOptionalPreviewCount = createDraftMassAudience ? 4 : 6;
   const createDraftVisibleRequiredAttendees =
@@ -9440,7 +9499,7 @@ function MainApp() {
           optionalCount: createDraftScopeOptionalCount,
           permissionLimitedCount: createDraftPermissionLimitedCount,
         })
-      : `暂未识别到组织内可检查忙闲的参会人，先按 ${createDraftAccountLabel} 的工作时间给出建议。`;
+      : '';
   const createDraftPrimarySuggestion = createDraftBestSuggestion || scheduleSuggestions[0] || null;
   const createDraftPrimarySuggestionMeta = createDraftPrimarySuggestion
     ? getSuggestedTimeStatusMeta(createDraftPrimarySuggestion, createDraftRequiredMatchedCount, createDraftOptionalMatchedCount)
@@ -9479,23 +9538,9 @@ function MainApp() {
     !!createDraftPrimarySuggestion &&
     sameDay(createDraftPrimarySuggestion.date, draftForm.date) &&
     Math.abs(createDraftPrimarySuggestion.startH - draftForm.startH) < 0.01;
-  const createDraftRecommendationSummary =
-    createDraftScopeRequiredCount + createDraftScopeOptionalCount > 0
-      ? `系统已纳入 ${createDraftScopeRequiredCount} 位必需成员${createDraftScopeOptionalCount > 0 ? `、${createDraftScopeOptionalCount} 位可选成员` : ''} 的忙闲状态。`
-      : `当前还没有组织内忙闲数据，推荐结果仅基于 ${createDraftAccountLabel} 的工作时间。`;
-  const createDraftVisibilitySummary =
-    createDraftUnmatchedInviteeCount > 0
-      ? `另有 ${createDraftUnmatchedInviteeCount} 位外部或未匹配成员会收到会议邀请，但不会进入忙闲计算。`
-      : createDraftPermissionLimitedCount > 0
-        ? `${createDraftPermissionLimitedCount} 位成员仅提供忙闲权限，不展示具体会议内容。`
-        : '当前已覆盖可识别到的组织内成员忙闲。';
   const createDraftDirectSuggestionHeading = createDraftCurrentMatchesPrimary ? '其他可直接发出的时间' : '可直接发出的时间';
   const createDraftSuggestionPrivacyText =
-    createDraftPermissionLimitedCount > 0
-      ? `其中 ${createDraftPermissionLimitedCount} 位仅授予忙闲权限，因此这里只展示建议时间，不暴露他人的具体会议内容。`
-      : createDraftLargeAudience
-        ? '人数较多时默认先展示忙闲汇总和推荐结果，避免上百人名单带来认知负担。'
-        : '需要微调时，仍可继续手动调整开始和结束时间。';
+    createDraftPermissionLimitedCount > 0 ? `${createDraftPermissionLimitedCount} 位仅忙闲权限` : '';
 
   const handleContextMenu = (event, entry) => {
     event.preventDefault();
@@ -10076,7 +10121,6 @@ function MainApp() {
 	                        <div className="text-center text-gray-400">
 	                          <Calendar className="mx-auto h-12 w-12 mb-4" />
 	                          <p className="font-bold">未选择账户</p>
-	                          <p className="text-sm mt-2">请先在左侧勾选至少一个账户。</p>
 	                        </div>
 	                      </div>
 	                    ) : calendarLayout === 'month' ? (
@@ -10596,7 +10640,7 @@ function MainApp() {
                                 type="text"
                                 value={draftForm.title}
                                 onChange={(event) => patchDraft({ title: event.target.value })}
-                                placeholder="请输入标题"
+                                placeholder="标题"
                                 className="min-w-0 w-full border-none bg-transparent py-1 text-[28px] font-semibold tracking-tight text-slate-900 placeholder:text-slate-300 focus:outline-none"
                                 autoFocus
                               />
@@ -10652,18 +10696,11 @@ function MainApp() {
                                     仅忙闲权限 {createDraftRequiredBusyOnlyCount} 位
                                   </span>
                                 )}
-                                {createDraftLargeAudience && (
-                                  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-semibold text-blue-700">
-                                    大会场景已自动折叠名单
-                                  </span>
-                                )}
                               </div>
                               {createDraftLargeAudience ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-                                    <div className="text-xs text-slate-500">
-                                      默认只展示前 {createDraftRequiredPreviewCount} 位，先让组织者确认总量和覆盖率，再按需展开完整名单。
-                                    </div>
+                                    <div className="text-xs font-semibold text-slate-600">必需参会人</div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <button
                                         onClick={() =>
@@ -10739,7 +10776,7 @@ function MainApp() {
                                     value={draftForm.inviteInput}
                                     onChange={(event) => patchDraft({ inviteInput: event.target.value })}
                                     onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
-                                    placeholder="输入名字或邮箱，回车添加；支持一次粘贴多位（分号 / 换行分隔）"
+	                                    placeholder="姓名或邮箱"
                                     className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                                   />
                                   <button
@@ -10761,8 +10798,7 @@ function MainApp() {
                               )}
                               {createDraftPanels.requiredBulkOpen && (
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <div className="text-xs font-medium text-slate-600">每行一个姓名或邮箱，也支持分号分隔；适合从邮件、Excel 或群组名单直接粘贴。</div>
-                                  <textarea
+	                                  <textarea
                                     value={createDraftBulkInputs.attendees}
                                     onChange={(event) => setCreateDraftBulkInputs((prev) => ({ ...prev, attendees: event.target.value }))}
                                     rows={createDraftMassAudience ? 6 : 4}
@@ -10796,7 +10832,7 @@ function MainApp() {
                                     value={draftForm.inviteInput}
                                     onChange={(event) => patchDraft({ inviteInput: event.target.value })}
                                     onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
-                                    placeholder="继续追加名字或邮箱，回车即可添加"
+	                                    placeholder="姓名或邮箱"
                                     className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                                   />
                                   <button
@@ -10808,7 +10844,7 @@ function MainApp() {
                                   </button>
                                 </div>
                               )}
-                              <div className="mt-2 text-xs text-slate-400">{createDraftRequiredText}</div>
+	                              {createDraftRequiredText && <div className="mt-2 text-xs text-slate-400">{createDraftRequiredText}</div>}
                             </div>
                           </div>
 
@@ -10836,9 +10872,7 @@ function MainApp() {
                               {createDraftLargeAudience ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-                                    <div className="text-xs text-slate-500">
-                                      可选名单默认折叠，避免和必需参会人混在一起。只有需要核对时再展开查看。
-                                    </div>
+                                    <div className="text-xs font-semibold text-slate-600">可选参会人</div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <button
                                         onClick={() =>
@@ -10914,7 +10948,7 @@ function MainApp() {
                                     value={draftForm.optionalInviteInput || ''}
                                     onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
                                     onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
-                                    placeholder="输入可选参与人，支持批量粘贴"
+	                                    placeholder="可选参与人"
                                     className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                                   />
                                   <button
@@ -10936,8 +10970,7 @@ function MainApp() {
                               )}
                               {createDraftPanels.optionalBulkOpen && (
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <div className="text-xs font-medium text-slate-600">适合粘贴观察员、抄送名单或可选参与人列表，系统会自动去重。</div>
-                                  <textarea
+	                                  <textarea
                                     value={createDraftBulkInputs.optionalAttendees}
                                     onChange={(event) =>
                                       setCreateDraftBulkInputs((prev) => ({ ...prev, optionalAttendees: event.target.value }))
@@ -10973,7 +11006,7 @@ function MainApp() {
                                     value={draftForm.optionalInviteInput || ''}
                                     onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
                                     onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
-                                    placeholder="继续追加可选参与人，回车即可添加"
+	                                    placeholder="可选参与人"
                                     className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
                                   />
                                   <button
@@ -10985,7 +11018,7 @@ function MainApp() {
                                   </button>
                                 </div>
                               )}
-                              <div className="mt-2 text-xs text-slate-400">{createDraftOptionalText}</div>
+	                              {createDraftOptionalText && <div className="mt-2 text-xs text-slate-400">{createDraftOptionalText}</div>}
                             </div>
                           </div>
 
@@ -11086,8 +11119,7 @@ function MainApp() {
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <div className="text-sm font-semibold text-slate-900">建议时间</div>
-                                    <div className="mt-1 text-xs text-slate-500">{createDraftSuggestionReason}</div>
-                                    <div className="mt-2 text-xs text-slate-500">{createDraftRecommendationSummary}</div>
+	                                    {createDraftSuggestionReason && <div className="mt-1 text-xs text-slate-500">{createDraftSuggestionReason}</div>}
                                   </div>
                                   <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${createDraftCurrentSelectionMeta.tone}`}>
                                     {createDraftCurrentMatchesPrimary ? '当前时间可直接发出' : `当前时间：${createDraftCurrentSelectionMeta.emphasis}`}
@@ -11120,7 +11152,7 @@ function MainApp() {
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="min-w-0">
                                         <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-500">
-                                          {createDraftCurrentMatchesPrimary ? '推荐结果' : '系统建议改到'}
+                                          {createDraftCurrentMatchesPrimary ? '推荐结果' : '推荐时间'}
                                         </div>
                                         <div className="mt-1 text-base font-semibold text-slate-900">
                                           {formatSuggestedSlotLabel(createDraftPrimarySuggestion.date, createDraftPrimarySuggestion.startH, draftForm.durationH)}
@@ -11153,9 +11185,6 @@ function MainApp() {
                                         <div className="mt-1 text-xs text-slate-500">{createDraftCurrentSelectionMeta.summary}</div>
                                       </div>
                                     )}
-                                    <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                                      {createDraftVisibilitySummary}
-                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -11239,15 +11268,12 @@ function MainApp() {
                                 )}
                               </div>
 
-                              <div className="text-xs text-slate-500">{createDraftSuggestionPrivacyText}</div>
+	                              {createDraftSuggestionPrivacyText && <div className="text-xs text-slate-500">{createDraftSuggestionPrivacyText}</div>}
 
                               {createDraftConflictSourceStates.length > 0 ? createDraftLargeAudience ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-                                    <div>
-                                      <div className="text-xs font-semibold text-slate-700">冲突明细</div>
-                                      <div className="text-[11px] text-slate-500">人数较多时默认只列出有冲突的参与人，避免用一整屏展示全部可用成员。</div>
-                                    </div>
+	                                    <div className="text-xs font-semibold text-slate-700">冲突明细</div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
                                         当前冲突 {createDraftConflictSourceStates.length} 位
@@ -11306,9 +11332,7 @@ function MainApp() {
                                         );
                                       })}
                                     </div>
-                                  ) : (
-                                    <div className="px-3 py-4 text-sm text-slate-500">当前已识别到的组织内参会者都可参加，可以优先使用推荐时间。</div>
-                                  )}
+	                                  ) : null}
                                 </div>
                               ) : (
                                 <div className="flex flex-wrap gap-2">
@@ -11370,9 +11394,9 @@ function MainApp() {
                                   <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 </div>
                               )}
-                              <div className="text-xs text-slate-400">
-                                {draftForm.repeat === 'does_not_repeat' ? '当前只创建这一场日程' : `当前规则：${REPEAT_LABELS[draftForm.repeat] || '每周'}`}
-                              </div>
+	                              {draftForm.repeat !== 'does_not_repeat' && (
+	                                <div className="text-xs text-slate-400">{REPEAT_LABELS[draftForm.repeat] || '每周'}</div>
+	                              )}
                             </div>
                           </div>
 
@@ -11386,7 +11410,7 @@ function MainApp() {
                                     type="text"
                                     value={draftForm.location}
                                     onChange={(event) => patchDraft({ location: event.target.value })}
-                                    placeholder="补充地点或会议室"
+	                                    placeholder="地点或会议室"
                                     className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                                   />
                                 </div>
@@ -11793,46 +11817,21 @@ function MainApp() {
             <div className="text-xs font-bold text-gray-800 truncate">{getAccountDisplayLabel(contextMenu.account) || '未知账号'}</div>
             <div className="text-[11px] text-gray-400 mt-0.5 truncate">{contextMenu.account.email || ''}</div>
           </div>
-          {/* 颜色 */}
-          <button
-            onClick={() => {
-              const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id);
-              openColorPicker(cal ? cal.id : contextMenu.account.id, cal ? 'calendar' : 'account');
-            }}
-            className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
-          >
-            <Palette size={14} className="mr-2 text-gray-400" />
-            颜色
-          </button>
           {contextMenu.account.ownership !== 'shared' ? (
             <>
               <button
-                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) openRenameDialog(cal.id); }}
+                onClick={() => { openMailboxPermissions(contextMenu.account.id, 'settings'); setContextMenu(null); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
-                <Edit size={14} className="mr-2 text-gray-400" />
-                重命名
+                <Settings size={14} className="mr-2 text-gray-400" />
+                设置
               </button>
               <button
-                onClick={() => { handleOpenSharingSettings(); setContextMenu(null); }}
+                onClick={() => { openMailboxPermissions(contextMenu.account.id, 'sharing'); setContextMenu(null); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
                 <Users size={14} className="mr-2 text-gray-400" />
-                共享与权限
-              </button>
-              <button
-                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) exportCalendarIcs(cal.id); }}
-                className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
-              >
-                <FileText size={14} className="mr-2 text-gray-400" />
-                导出日历
-              </button>
-              <button
-                onClick={() => { const cal = calendars.find((c) => c.accountId === contextMenu.account.id && c.type === 'my') || calendars.find((c) => c.accountId === contextMenu.account.id); if (cal) openDeleteConfirm(cal.id); }}
-                className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
-              >
-                <Trash size={14} className="mr-2" />
-                删除日历
+                共享权限
               </button>
               <button
                 onClick={() => { toggleAccount(contextMenu.account.id); setContextMenu(null); }}
@@ -11849,7 +11848,7 @@ function MainApp() {
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
                 <Eye size={14} className="mr-2 text-gray-400" />
-                权限说明
+                查看权限
               </button>
               <button
                 onClick={() => { toggleAccount(contextMenu.account.id); setContextMenu(null); }}
@@ -11883,27 +11882,27 @@ function MainApp() {
               <div className="text-xs font-bold text-gray-800 truncate">{getAccountDisplayLabel(accountMenuAnchor.account)}</div>
               <div className="text-[11px] text-gray-400 mt-0.5 truncate">{accountMenuAnchor.account.email}</div>
             </div>
-            <button
-              onClick={() => {
-                const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id);
-                openColorPicker(cal ? cal.id : accountMenuAnchor.account.id, cal ? 'calendar' : 'account');
-              }}
-              className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
-            >
-              <Palette size={14} className="mr-2 text-gray-400" />
-              颜色
-            </button>
             {accountMenuAnchor.account.ownership !== 'shared' ? (
               <>
-                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) openRenameDialog(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Edit size={14} className="mr-2 text-gray-400" />重命名</button>
-                <button onClick={() => { handleOpenSharingSettings(); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Users size={14} className="mr-2 text-gray-400" />共享与权限</button>
-                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) exportCalendarIcs(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><FileText size={14} className="mr-2 text-gray-400" />导出</button>
-                <button onClick={() => { const cal = calendars.find((c) => c.accountId === accountMenuAnchor.account.id && c.type === 'my') || calendars.find((c) => c.accountId === accountMenuAnchor.account.id); if (cal) openDeleteConfirm(cal.id); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"><Trash size={14} className="mr-2" />删除日历</button>
+                <button
+                  onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id, 'settings'); closeAccountMenu(); }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  <Settings size={14} className="mr-2 text-gray-400" />
+                  设置
+                </button>
+                <button
+                  onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id, 'sharing'); closeAccountMenu(); }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  <Users size={14} className="mr-2 text-gray-400" />
+                  共享权限
+                </button>
                 <button onClick={() => { toggleAccount(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />{accountMenuAnchor.account.checked ? '隐藏账户' : '显示账户'}</button>
               </>
             ) : (
               <>
-                <button onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />权限说明</button>
+                <button onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />查看权限</button>
                 <button onClick={() => { toggleAccount(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Check size={14} className="mr-2 text-gray-400" />{accountMenuAnchor.account.checked ? '隐藏账户' : '显示账户'}</button>
                 <button
                   onClick={() => requestRemoveSharedAccount(accountMenuAnchor.account)}
@@ -11930,6 +11929,7 @@ function MainApp() {
         <MailboxPermissionModal
           account={selectedPermissionMailbox}
           accountCalendars={selectedPermissionMailboxCalendars}
+          initialTab={permissionPanel.tab || 'settings'}
           onClose={closePermissionPanel}
           onRenameAccount={renameAccount}
           onUpdateAccountColor={updateAccountColor}
