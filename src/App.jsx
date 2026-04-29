@@ -5402,7 +5402,7 @@ function MailboxPermissionModal({
           </button>
         </div>
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
-          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <div className="grid gap-3 sm:grid-cols-2">
             {[
               ['settings', '设置'],
               ['sharing', `共享权限${pendingInvitations.length > 0 ? ` (${pendingInvitations.length})` : ''}`],
@@ -5410,13 +5410,15 @@ function MailboxPermissionModal({
               <button
                 key={tabId}
                 onClick={() => setActiveTab(tabId)}
-                className={`relative rounded-lg px-4 py-2 text-sm font-bold transition ${
-                  activeTab === tabId ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`relative flex h-12 items-center justify-center rounded-xl border px-4 text-sm font-black transition ${
+                  activeTab === tabId
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800'
                 }`}
               >
                 {label}
                 {tabId === 'sharing' && pendingInvitations.length > 0 && (
-                  <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
+                  <span className="absolute right-4 top-3 h-1.5 w-1.5 rounded-full bg-red-500" />
                 )}
               </button>
             ))}
@@ -5424,12 +5426,13 @@ function MailboxPermissionModal({
 
           {activeTab === 'settings' && (
             <>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-              <div>
-                <label className="text-xs font-bold text-slate-500">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-black text-slate-900">基本信息</div>
+                <label className="mt-4 block text-xs font-bold text-slate-500">
                   显示名称
-                  <div className="mt-1 flex gap-2">
+                  <div className="mt-2 flex gap-2">
                     <input
                       value={draftName}
                       onChange={(event) => setDraftName(event.target.value)}
@@ -5446,18 +5449,21 @@ function MailboxPermissionModal({
                     </button>
                   </div>
                 </label>
-                <div className="mt-3 text-xs font-medium text-slate-500">账户：{account.email || account.name}</div>
+                <div className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-500">
+                  <span className="mr-2 text-xs font-bold text-slate-400">账号</span>
+                  {account.email || account.name}
+                </div>
               </div>
 
-              <div>
-                <div className="text-xs font-bold text-slate-500">账户颜色</div>
-                <div className="mt-2 flex flex-wrap gap-2">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-black text-slate-900">账号颜色</div>
+                <div className="mt-4 grid grid-cols-5 gap-3">
                   {ACCOUNT_COLOR_OPTIONS.map((color) => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => onUpdateAccountColor(account.id, color)}
-                      className={`h-7 w-7 rounded-full ${color} transition ${
+                      className={`h-8 w-8 rounded-full ${color} transition ${
                         account.color === color ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105'
                       }`}
                       title="修改颜色"
@@ -5466,7 +5472,7 @@ function MailboxPermissionModal({
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <button
                 onClick={() => onExportAccountCalendar(account.id)}
                 className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
