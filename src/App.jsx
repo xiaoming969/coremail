@@ -179,6 +179,7 @@ const CALENDAR_PERMISSION_LABEL_TO_ID = {
   busy_only: 'busy_only',
   edit: 'edit',
 };
+const HUAWEI_CALENDAR_ID = 'c-huawei';
 const MAX_SPLIT_ACCOUNTS = 3;
 const SHARED_ACCOUNT_TEMPLATES = [
   { name: '王敏', email: 'finance@calendarpro.io', color: 'bg-cyan-500', permissionId: 'all_details' },
@@ -344,6 +345,52 @@ const getDraftEndMeta = (date, startH, durationH) => {
     hour: end.getHours() + (end.getMinutes() >= 30 ? 0.5 : 0),
   };
 };
+const isHuaweiMakeupWorkday = (date) => {
+  const target = stripTime(date);
+  return target.getDay() === 6 && addDays(target, 7).getMonth() !== target.getMonth();
+};
+const createAllDayCalendarEvent = ({ id, title, date, span = 1, calId, description = '', type = 'normal' }) => {
+  const parts = dateToEventParts(date);
+
+  return {
+    id,
+    title,
+    ...parts,
+    startH: 0,
+    durationH: 24,
+    calId,
+    location: '',
+    organizer: '华为日历',
+    status: '已接受',
+    description,
+    type,
+    attendees: ['华为日历'],
+    meetingProvider: 'none',
+    meetingLink: '',
+    repeat: 'does_not_repeat',
+    reminder: 'none',
+    availability: 'free',
+    visibility: 'default',
+    kind: 'event',
+    isAllDay: true,
+    allDaySpan: span,
+  };
+};
+const buildHuaweiMakeupWorkdayEvents = (year) =>
+  Array.from({ length: 12 }, (_, month) => {
+    const lastDay = new Date(year, month + 1, 0);
+    const offsetToSaturday = (lastDay.getDay() - 6 + 7) % 7;
+    const date = addDays(lastDay, -offsetToSaturday);
+
+    return createAllDayCalendarEvent({
+      id: `huawei-workday-${year}-${String(month + 1).padStart(2, '0')}`,
+      title: '华为补班',
+      date,
+      calId: HUAWEI_CALENDAR_ID,
+      description: '每月最后一个周六上班。',
+      type: 'makeup_workday',
+    });
+  });
 const getDraftDurationBetween = (startDate, startH, endDate, endH) => {
   const start = buildDateTimeAtHour(startDate, startH);
   const end = buildDateTimeAtHour(endDate, endH);
@@ -1401,6 +1448,28 @@ const MOCK_CALENDARS = [
     ],
   },
   {
+    id: HUAWEI_CALENDAR_ID,
+    accountId: 'acc1',
+    name: '华为日历',
+    type: 'my',
+    owner: '华为日历',
+    color: 'bg-red-500',
+    checked: true,
+    permission: '仅查看',
+    isPrimary: false,
+    defaultSharing: {
+      organization: 'busy_only',
+      external: 'none',
+    },
+    publishing: {
+      enabled: false,
+      permission: 'all_details',
+      htmlLink: 'https://calendarpro.io/publish/c-huawei/html',
+      icsLink: 'https://calendarpro.io/publish/c-huawei/ics',
+    },
+    sharing: [],
+  },
+  {
     id: 'c3',
     accountId: 'acc2',
     name: '张三',
@@ -1530,7 +1599,64 @@ const MOCK_CALENDARS = [
   },
 ];
 
+const HUAWEI_HOLIDAY_EVENTS = [
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-new-year',
+    title: '元旦',
+    date: new Date(2026, 0, 1),
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-spring-festival',
+    title: '春节假期',
+    date: new Date(2026, 1, 16),
+    span: 7,
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-qingming',
+    title: '清明节',
+    date: new Date(2026, 3, 5),
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-labor',
+    title: '劳动节',
+    date: new Date(2026, 4, 1),
+    span: 3,
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-dragon-boat',
+    title: '端午节',
+    date: new Date(2026, 5, 19),
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-mid-autumn',
+    title: '中秋节',
+    date: new Date(2026, 8, 25),
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-national-day',
+    title: '国庆假期',
+    date: new Date(2026, 9, 1),
+    span: 7,
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+];
+
 const MOCK_EVENTS = [
+  ...HUAWEI_HOLIDAY_EVENTS,
+  ...buildHuaweiMakeupWorkdayEvents(2026),
   {
     id: 'e1',
     title: '周度产研对齐会',
@@ -2703,6 +2829,7 @@ function MailComposerModal({
 function CalendarSidebar({
   accounts,
   miniMonthEventMap,
+  showHuaweiWorkdayBadges = false,
   focusDate,
   calendarLayout,
   collapsed,
@@ -2911,6 +3038,7 @@ function CalendarSidebar({
               const dayMeta = miniMonthEventMap.get(formatDateLabel(cell.date));
               const markerColors = dayMeta?.colors?.slice(0, 4) || [];
               const isSelectedDate = sameDay(cell.date, focusDate);
+              const showHuaweiWorkdayBadge = showHuaweiWorkdayBadges && cell.isCurrentMonth && isHuaweiMakeupWorkday(cell.date);
               const showWeekRange = (calendarLayout === 'week' || calendarLayout === 'work_week') && inActiveWeek;
 
               return (
@@ -2941,6 +3069,11 @@ function CalendarSidebar({
                     <div className="pointer-events-none absolute left-1/2 z-[1] flex -translate-x-1/2 items-center justify-center" style={{ bottom: '1px' }}>
                       <span className={`h-[2px] w-[6px] rounded-full ${isSelectedDate ? 'bg-white' : 'bg-blue-500'}`}></span>
                     </div>
+                  )}
+                  {showHuaweiWorkdayBadge && (
+                    <span className="pointer-events-none absolute right-0 top-0 z-[2] flex h-3 min-w-3 items-center justify-center rounded-full bg-orange-500 px-[2px] text-[8px] font-black leading-none text-white">
+                      班
+                    </span>
                   )}
                 </div>
               );
@@ -6401,6 +6534,7 @@ function MainApp() {
 
     return nextMap;
   }, [activeEvents, calendarMap]);
+  const showHuaweiWorkdayBadges = activeCalIds.includes(HUAWEI_CALENDAR_ID);
   const reminderEvents = useMemo(() => {
     const now = TODAY_DATE.getTime();
     const visible = events
@@ -9701,6 +9835,7 @@ function MainApp() {
         <CalendarSidebar
           accounts={accounts}
           miniMonthEventMap={miniMonthEventMap}
+          showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
           focusDate={focusDate}
           calendarLayout={calendarLayout}
           collapsed={calendarSidebarCollapsed}
