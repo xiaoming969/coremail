@@ -181,10 +181,10 @@ const CALENDAR_PERMISSION_LABEL_TO_ID = {
 };
 const MAX_SPLIT_ACCOUNTS = 3;
 const SHARED_ACCOUNT_TEMPLATES = [
-  { name: '财务团队', email: 'finance@calendarpro.io', color: 'bg-cyan-500', permissionId: 'all_details' },
-  { name: '法务团队', email: 'legal@calendarpro.io', color: 'bg-fuchsia-500', permissionId: 'all_details' },
-  { name: '客户成功', email: 'cs@calendarpro.io', color: 'bg-teal-500', permissionId: 'edit' },
-  { name: '外部顾问', email: 'advisor@vendor.com', color: 'bg-amber-500', permissionId: 'busy_only' },
+  { name: '王敏', email: 'finance@calendarpro.io', color: 'bg-cyan-500', permissionId: 'all_details' },
+  { name: '钱宁', email: 'legal@calendarpro.io', color: 'bg-fuchsia-500', permissionId: 'all_details' },
+  { name: '孙越', email: 'cs@calendarpro.io', color: 'bg-teal-500', permissionId: 'edit' },
+  { name: '赵磊', email: 'advisor@vendor.com', color: 'bg-amber-500', permissionId: 'busy_only' },
 ];
 const MOCK_SHARE_INVITATIONS = [
   {
@@ -513,7 +513,15 @@ const ACCOUNT_COLOR_OPTIONS = [
   'bg-indigo-500',
   'bg-slate-500',
 ];
-const getAccountDisplayLabel = (account) => account?.displayName || account?.email || account?.name || '';
+const getAccountPersonLabel = (account) => account?.displayName || account?.ownerName || account?.contactName || account?.name || account?.email || '';
+const getAccountDisplayLabel = (account) => getAccountPersonLabel(account);
+const getAccountFullLabel = (account) => {
+  const person = getAccountPersonLabel(account);
+  const email = account?.email || account?.name || '';
+  if (!person) return email;
+  if (!email || person === email) return person;
+  return `${person} · ${email}`;
+};
 const getAccountEditableName = (account) => account?.displayName || account?.name || account?.email || '';
 const MAILBOX_PERMISSION_OPTIONS = [
   {
@@ -1253,6 +1261,7 @@ const MOCK_ACCOUNTS = [
   {
     id: 'acc1',
     name: 'me@calendarpro.io',
+    displayName: '小华',
     email: 'me@calendarpro.io',
     role: '我的账户',
     ownership: 'self',
@@ -1272,6 +1281,7 @@ const MOCK_ACCOUNTS = [
   {
     id: 'acc2',
     name: 'ea@calendarpro.io',
+    displayName: '张三',
     email: 'ea@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -1291,6 +1301,7 @@ const MOCK_ACCOUNTS = [
   {
     id: 'acc3',
     name: 'sales@calendarpro.io',
+    displayName: '李四',
     email: 'sales@calendarpro.io',
     role: '其他账户',
     ownership: 'shared',
@@ -1313,9 +1324,9 @@ const MOCK_CALENDARS = [
   {
     id: 'c1',
     accountId: 'acc1',
-    name: '我的工作日历',
+    name: '小华',
     type: 'my',
-    owner: '我',
+    owner: '小华',
     color: 'bg-blue-500',
     checked: true,
     permission: '可编辑',
@@ -1333,7 +1344,7 @@ const MOCK_CALENDARS = [
     sharing: [
       {
         id: 'share1',
-        name: '产品经理',
+        name: '陈晨',
         email: 'pm@calendarpro.io',
         scope: 'internal',
         permission: 'all_details',
@@ -1344,8 +1355,8 @@ const MOCK_CALENDARS = [
       },
       {
         id: 'share2',
-        name: 'ea-team@calendarpro.io',
-        email: 'ea-team@calendarpro.io',
+        name: '刘洋',
+        email: 'liuyang@calendarpro.io',
         scope: 'internal',
         permission: 'edit',
         status: 'accepted',
@@ -1358,9 +1369,9 @@ const MOCK_CALENDARS = [
   {
     id: 'c2',
     accountId: 'acc1',
-    name: '市场活动排期',
+    name: '小华',
     type: 'my',
-    owner: '我',
+    owner: '小华',
     color: 'bg-violet-500',
     checked: true,
     permission: '可编辑',
@@ -1378,8 +1389,8 @@ const MOCK_CALENDARS = [
     sharing: [
       {
         id: 'share3',
-        name: '市场负责人',
-        email: 'marketing@calendarpro.io',
+        name: '周琳',
+        email: 'zhoulin@calendarpro.io',
         scope: 'internal',
         permission: 'edit',
         status: 'pending',
@@ -1392,7 +1403,7 @@ const MOCK_CALENDARS = [
   {
     id: 'c3',
     accountId: 'acc2',
-    name: 'ea@calendarpro.io',
+    name: '张三',
     type: 'shared',
     owner: '张三',
     color: 'bg-orange-500',
@@ -1431,7 +1442,7 @@ const MOCK_CALENDARS = [
   {
     id: 'c4',
     accountId: 'acc2',
-    name: 'ea@calendarpro.io 空闲忙碌',
+    name: '张三',
     type: 'shared',
     owner: '张三',
     color: 'bg-slate-500',
@@ -1470,7 +1481,7 @@ const MOCK_CALENDARS = [
   {
     id: 'c5',
     accountId: 'acc3',
-    name: 'sales@calendarpro.io',
+    name: '李四',
     type: 'shared',
     owner: '李四',
     color: 'bg-emerald-500',
@@ -1495,7 +1506,7 @@ const MOCK_CALENDARS = [
     sharing: [
       {
         id: 'share6',
-        name: '外部顾问',
+        name: '赵磊',
         email: 'advisor@vendor.com',
         scope: 'external',
         permission: 'titles_locations',
@@ -2968,14 +2979,11 @@ function CalendarSidebar({
 		                {!collapsedSections[group.key] && <div className="space-y-[2px]">
 		                  {group.items.map((account) => {
 				const displayName = getAccountDisplayLabel(account);
-                    const handleAccountRowClick = () => {
-                      onFocusAccount?.(account.id);
-                    };
+                    const fullLabel = getAccountFullLabel(account);
                     return (
                     <div
 	                    key={account.id}
 	                    className="group/account relative -mx-1 flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 transition-colors duration-120 hover:bg-white/65"
-                      onClick={handleAccountRowClick}
 	                    onContextMenu={(e) => onAccountContextMenu(e, account)}
 	                  >
 	                    {/* Checkbox - independent click zone */}
@@ -2992,7 +3000,7 @@ function CalendarSidebar({
 	                    </button>
 	                    {/* Content area - click to open details */}
 	                    <div
-                        title={displayName}
+                        title={fullLabel}
                         className="min-w-0 flex-1 truncate rounded px-1 py-0.5 -mx-1"
                       >
 			                        <span className="text-[14px] leading-snug font-semibold text-gray-800">
@@ -5322,7 +5330,7 @@ function MailboxPermissionModal({
     setActiveTab(initialTab || 'settings');
   }, [initialTab, account.id]);
 
-  const accountLabel = getAccountDisplayLabel(account);
+  const accountLabel = getAccountFullLabel(account);
   const canSaveName = draftName.trim() && draftName.trim() !== getAccountEditableName(account);
   const ownCalendars = accountCalendars.filter((calendar) => calendar.type !== 'shared');
   const primaryCalendar = ownCalendars.find((calendar) => calendar.isPrimary) || ownCalendars[0] || accountCalendars[0];
@@ -5658,7 +5666,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
 
   const permissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
   const permissionLabel = getCalendarPermissionLabel(permissionId);
-  const accountLabel = getAccountDisplayLabel(account);
+  const accountLabel = getAccountFullLabel(account);
   const sourceName = calendar.receivedFromName || calendar.owner || calendar.receivedFrom || '未知共享方';
   const sourceAccount = calendar.receivedFrom || calendar.ownerEmail || '未提供账号';
 
@@ -7000,7 +7008,11 @@ function MainApp() {
         ),
       );
       setAccounts((prev) =>
-        prev.map((account) => (account.id === existingCalendar.accountId ? { ...account, checked: true } : account)),
+        prev.map((account) =>
+          account.id === existingCalendar.accountId
+            ? { ...account, checked: true, name: account.email || invite.senderEmail, displayName: invite.senderName }
+            : account,
+        ),
       );
     } else {
       const stamp = Date.now();
@@ -7010,7 +7022,8 @@ function MainApp() {
         ...prev,
         {
           id: nextAccountId,
-          name: invite.senderName,
+          name: invite.senderEmail,
+          displayName: invite.senderName,
           email: invite.senderEmail,
           role: '共享日历',
           ownership: 'shared',
@@ -7030,7 +7043,7 @@ function MainApp() {
         {
           id: nextCalendarId,
           accountId: nextAccountId,
-          name: invite.calendarName,
+          name: invite.senderName,
           type: 'shared',
           owner: invite.senderName,
           color: invite.color,
@@ -7133,7 +7146,8 @@ function MainApp() {
       ...prev,
         {
           id: nextAccountId,
-        name,
+        name: email,
+        displayName: name,
         email,
         role: '共享日历',
           ownership: 'shared',
