@@ -5338,6 +5338,7 @@ function MailboxPermissionModal({
     .filter((share) => share.status !== 'revoked')
     .map((share) => ({ calendar: primaryCalendar, share }));
   const panelTitle = activeTab === 'sharing' ? '共享权限' : '账户设置';
+  const isSharedAccount = account.ownership === 'shared';
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
@@ -5405,22 +5406,24 @@ function MailboxPermissionModal({
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                <button
-                  onClick={() => onExportAccountCalendar(account.id)}
-                  className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-                >
-                  <FileText size={15} className="mr-2" />
-                  导出日历
-                </button>
-                <button
-                  onClick={() => onDeleteAccountCalendars(account.id)}
-                  className="inline-flex h-10 items-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 transition hover:bg-red-100"
-                >
-                  <Trash size={15} className="mr-2" />
-                  删除日历
-                </button>
-              </div>
+              {!isSharedAccount && (
+                <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <button
+                    onClick={() => onExportAccountCalendar(account.id)}
+                    className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <FileText size={15} className="mr-2" />
+                    导出日历
+                  </button>
+                  <button
+                    onClick={() => onDeleteAccountCalendars(account.id)}
+                    className="inline-flex h-10 items-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 transition hover:bg-red-100"
+                  >
+                    <Trash size={15} className="mr-2" />
+                    删除日历
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -5466,6 +5469,22 @@ function MailboxPermissionModal({
 
               <div>
                 <div className="mb-3 text-sm font-black text-gray-900">我共享出去的权限</div>
+                <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="grid grid-cols-[1fr_120px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
+                    <div>当前共享对象</div>
+                    <div className="text-right">人数</div>
+                  </div>
+                  <div className="grid grid-cols-[1fr_120px] items-center gap-3 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`h-3 w-3 shrink-0 rounded-full ${account.color || 'bg-blue-500'}`}></span>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-bold text-gray-900">{getAccountDisplayLabel(account)}</div>
+                        <div className="mt-0.5 truncate text-xs text-gray-400">{account.email || account.name}</div>
+                      </div>
+                    </div>
+                    <div className="text-right text-sm font-black text-slate-900">{shareRows.length} 人</div>
+                  </div>
+                </div>
                 {primaryCalendar && (
                   <div className="mb-3">
                     <ShareMemberComposer
@@ -7267,7 +7286,10 @@ function MainApp() {
   };
 
   const handleAddSharedCalendar = () => {
-    openSharedCalendarDialog();
+    const targetAccount = accounts.find((account) => account.ownership === 'self') || accounts[0];
+    if (targetAccount) {
+      openMailboxPermissions(targetAccount.id, 'sharing');
+    }
   };
 
   const notifyPermissionDenied = (calendarId) => {
@@ -11509,7 +11531,7 @@ function MainApp() {
           </button>
           <button
             onClick={() => {
-              openSharedCalendarDialog();
+              handleAddSharedCalendar();
               setContextMenu(null);
               clearTimeSelection();
             }}
@@ -11614,6 +11636,13 @@ function MainApp() {
           ) : (
             <>
               <button
+                onClick={() => { openMailboxPermissions(contextMenu.account.id, 'settings'); setContextMenu(null); }}
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+              >
+                <Settings size={14} className="mr-2 text-gray-400" />
+                设置
+              </button>
+              <button
                 onClick={() => { openSharedCalendarAccess(contextMenu.account.id); setContextMenu(null); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
@@ -11672,6 +11701,13 @@ function MainApp() {
               </>
             ) : (
               <>
+                <button
+                  onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id, 'settings'); closeAccountMenu(); }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  <Settings size={14} className="mr-2 text-gray-400" />
+                  设置
+                </button>
                 <button onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />查看权限</button>
                 <button onClick={() => { toggleAccount(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Check size={14} className="mr-2 text-gray-400" />{accountMenuAnchor.account.checked ? '隐藏账户' : '显示账户'}</button>
                 <button
