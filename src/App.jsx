@@ -7429,10 +7429,7 @@ function MainApp() {
   };
 
   const handleAddSharedCalendar = () => {
-    const targetAccount = accounts.find((account) => account.ownership === 'self') || accounts[0];
-    if (targetAccount) {
-      openMailboxPermissions(targetAccount.id, 'sharing');
-    }
+    openSharedCalendarDialog();
   };
 
   const notifyPermissionDenied = (calendarId) => {
