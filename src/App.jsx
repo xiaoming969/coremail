@@ -5645,7 +5645,7 @@ function MailboxPermissionModal({
                     className="inline-flex h-10 items-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 transition hover:bg-red-100"
                   >
                     <X size={15} className="mr-2" />
-                    从列表移除
+                    删除共享日历
                   </button>
                 )}
               </div>
@@ -6951,10 +6951,10 @@ function MainApp() {
     setFeedback({
       type: 'L4',
       payload: {
-        title: '移除共享日历',
+        title: '删除共享日历',
         desc: `移除后，${getAccountDisplayLabel(account)} 将不再显示在左侧共享日历和当前日历视图中。`,
         cancelText: '取消',
-        confirmText: '移除',
+        confirmText: '删除',
         onConfirm: () => {
           setFeedback({ type: null, payload: null });
           removeSharedAccount(account.id);
