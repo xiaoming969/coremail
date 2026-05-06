@@ -3118,7 +3118,7 @@ function CalendarSidebar({
                     )}
                   </button>
                   {showHuaweiWorkdayBadge && (
-                    <span className="pointer-events-none absolute right-[3px] top-[1px] z-[3] text-[9px] font-bold leading-none text-red-500">
+                    <span className="pointer-events-none absolute right-[1px] top-[-1px] z-[4] flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-red-200 bg-white/95 px-[2px] text-[8px] font-bold leading-none text-red-500 shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
                       班
                     </span>
                   )}
