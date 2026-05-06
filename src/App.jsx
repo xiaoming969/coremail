@@ -4783,9 +4783,16 @@ function CalendarEventSidebar({
   onDeleteEvent,
   onRespond,
 }) {
-  const attendeeList = Array.from(new Set([event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])])).filter(Boolean);
+  const organizerLabel = event.organizer || account?.name || '我';
+  const attendeeList = Array.from(new Set([...(event.attendees || []), ...(event.optionalAttendees || [])])).filter(
+    (person) => person && person !== organizerLabel && person !== event.organizer,
+  );
+  const participantPreview = attendeeList.slice(0, 4);
+  const hiddenParticipantCount = Math.max(attendeeList.length - participantPreview.length, 0);
   const locationLabel =
     event.location || (event.meetingProvider && event.meetingProvider !== 'none' ? MEETING_PROVIDER_LABELS[event.meetingProvider] : '未填写地点');
+  const sourceLabel = calendar?.name || account?.email || account?.name || '日历';
+  const statusLabel = event.status && event.status !== '已接受' ? event.status : null;
 
   return (
     <aside
@@ -4804,66 +4811,71 @@ function CalendarEventSidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8f8f7] p-4">
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
-            {account && (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {account.email || account.name}
-              </span>
-            )}
-            {calendar?.name && (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {calendar.name}
-              </span>
-            )}
-            {event.status && event.status !== '已接受' && (
-              <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getAgendaStatusTone(event.status)}`}>
-                {event.status}
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
+            <span className="truncate">{sourceLabel}</span>
+            {statusLabel && (
+              <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${getAgendaStatusTone(statusLabel)}`}>
+                {statusLabel}
               </span>
             )}
           </div>
 
-          <div className="text-xl font-black text-slate-900" style={clampLinesStyle(3)}>
+          <div className="text-xl font-black leading-tight text-slate-900" style={clampLinesStyle(3)}>
             {event.title || '无标题'}
           </div>
 
-          <div className="space-y-3 text-sm text-slate-600">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">时间</div>
-              <div className="font-semibold text-slate-900">{formatAgendaEventLabel(event)}</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">地点</div>
-              <div className="font-semibold text-slate-900">{locationLabel}</div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">组织者</div>
-              <div className="font-semibold text-slate-900">{event.organizer || '我'}</div>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">参会人</div>
-            {attendeeList.length > 0 ? (
-              <div className="space-y-2">
-                {attendeeList.map((person) => (
-                  <div key={person} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-                    {person}
-                  </div>
-                ))}
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50 text-sm">
+            <div className="flex gap-3 px-3 py-3">
+              <Clock size={16} className="mt-0.5 shrink-0 text-blue-500" />
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold text-slate-400">时间</div>
+                <div className="font-bold text-slate-900">{formatAgendaEventLabel(event)}</div>
               </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-400">当前没有参会人</div>
-            )}
-          </div>
-
-          <div>
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">日程说明</div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm leading-6 text-slate-600">
-              {event.description || '暂无详细说明。'}
+            </div>
+            <div className="flex gap-3 px-3 py-3">
+              <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-500" />
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold text-slate-400">地点</div>
+                <div className="truncate font-semibold text-slate-800">{locationLabel}</div>
+              </div>
+            </div>
+            <div className="flex gap-3 px-3 py-3">
+              <Users size={16} className="mt-0.5 shrink-0 text-slate-400" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-semibold text-slate-400">人员</div>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-900 ring-1 ring-slate-200">
+                    {organizerLabel}
+                    <span className="ml-1 text-[11px] font-semibold text-blue-600">组织者</span>
+                  </span>
+                  {participantPreview.map((person) => (
+                    <span key={person} className="max-w-full truncate rounded-md bg-white px-2 py-1 font-medium text-slate-700 ring-1 ring-slate-200">
+                      {person}
+                    </span>
+                  ))}
+                  {hiddenParticipantCount > 0 && (
+                    <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-500 ring-1 ring-slate-200">
+                      +{hiddenParticipantCount}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+
+          {event.description && (
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400">
+                <AlignLeft size={14} />
+                日程说明
+              </div>
+              <div className="text-sm leading-6 text-slate-700" style={clampLinesStyle(4)}>
+                {event.description}
+              </div>
+            </div>
+          )}
 
           {event.status === '待响应' && (
             <div className="flex gap-2 pt-1">
@@ -4884,8 +4896,9 @@ function CalendarEventSidebar({
 
           <button
             onClick={() => onDeleteEvent(event.id)}
-            className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
           >
+            <Trash size={15} />
             删除日程
           </button>
         </div>
