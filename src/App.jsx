@@ -10165,11 +10165,29 @@ function MainApp() {
 
                 {currentScreen === 'details' && selectedEvent && createPortal(
                   (
-	                  <div className="fixed inset-0 z-[70] flex justify-center overflow-y-auto bg-white px-6 py-4 md:px-10 md:py-6">
-	                    <div
-	                      className="flex h-max w-full flex-col overflow-hidden bg-white"
-	                      style={{ maxWidth: '860px' }}
-	                    >
+	                  <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
+	                    <div className="h-[calc(100vh-32px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+	                      <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
+	                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
+	                          <div className="min-w-0">
+	                            <div className="truncate font-semibold text-slate-900">日历详情</div>
+	                          </div>
+	                          <div className="ml-4 flex items-center gap-1 text-slate-400">
+	                            <button className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-600" aria-label="最小化">
+	                              <Minus size={16} />
+	                            </button>
+	                            <button className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-600" aria-label="窗口化">
+	                              <Square size={14} />
+	                            </button>
+	                            <button
+	                              onClick={() => navTo(calendarReturnScreen || 'calendar')}
+	                              className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-700"
+	                              aria-label="关闭"
+	                            >
+	                              <X size={16} />
+	                            </button>
+	                          </div>
+	                        </div>
                       {selectedEvent.status === '已取消' && (
                         <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
                           <div className="flex items-center text-red-800 text-sm font-bold">
@@ -10197,38 +10215,6 @@ function MainApp() {
                           </button>
                         </div>
                       )}
-
-	                      <div className="flex flex-col gap-3 border-b border-slate-200 bg-[#fcfcfb] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <button onClick={() => navTo(calendarReturnScreen || 'calendar')} className="text-gray-600 hover:text-gray-900 flex items-center text-sm font-bold">
-                          <ChevronLeft size={16} className="mr-1" />
-                          {calendarReturnScreen === 'search' ? '返回搜索结果' : '返回日历'}
-                        </button>
-                        <div className="flex space-x-2">
-                          {selectedEvent.status === '已拒绝' && (
-                            <button
-                              onClick={() => openRescheduleView(selectedEvent.id)}
-                              className="p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600 rounded-xl bg-white border border-gray-200"
-                              title="寻找新时间"
-                            >
-                              <RefreshCw size={16} />
-                            </button>
-                          )}
-                          {selectedEvent.type !== 'busy_only' && selectedEvent.status !== '已取消' && (
-                            <button
-                              onClick={() => navTo('create', selectedEvent.id)}
-                              className="p-2 text-gray-500 hover:bg-blue-50 hover:text-blue-600 rounded-xl bg-white border border-gray-200"
-                            >
-                              <Edit size={16} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteEvent(selectedEvent.id)}
-                            className="p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 rounded-xl bg-white border border-gray-200"
-                          >
-                            <Trash size={16} />
-                          </button>
-                        </div>
-                      </div>
 
                       <div className="p-6 md:p-8">
                         {selectedEvent.type === 'busy_only' ? (
@@ -10425,6 +10411,7 @@ function MainApp() {
                           </>
                         )}
                       </div>
+                    </div>
                     </div>
                   </div>
                   ),
