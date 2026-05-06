@@ -5820,6 +5820,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
   const accountLabel = getAccountFullLabel(account);
   const sourceName = calendar.receivedFromName || calendar.owner || calendar.receivedFrom || '未知共享方';
   const sourceAccount = calendar.receivedFrom || calendar.ownerEmail || '未提供账号';
+  const enabledCapabilities = capabilities.filter((item) => item.enabled).slice(0, 2);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
@@ -5837,49 +5838,28 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
           </button>
         </div>
 
-        <div className="max-h-[72vh] overflow-y-auto p-6 space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+        <div className="max-h-[72vh] overflow-y-auto p-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-xs font-bold text-slate-400">共享方</div>
-                <div className="mt-2 truncate text-sm font-black text-slate-900">{sourceName}</div>
-                <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{sourceAccount}</div>
+                <div className="mt-2 truncate text-base font-black text-slate-900">{sourceName}</div>
+                <div className="mt-1 truncate text-sm font-medium text-slate-400">{sourceAccount}</div>
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-slate-400">当前权限</div>
-                <div className="mt-2 flex items-center gap-2">
-                  <PermissionBadge permission={permissionId} />
+              <PermissionBadge permission={permissionId} />
+            </div>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <div className="text-sm font-medium leading-relaxed text-slate-500">{permissionOption.desc}</div>
+              {enabledCapabilities.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {enabledCapabilities.map((item) => (
+                    <span key={item.label} className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
+                      <Check size={13} className="mr-1.5" />
+                      {item.label}
+                    </span>
+                  ))}
                 </div>
-                <div className="mt-1 text-xs font-medium leading-snug text-slate-500">{permissionOption.desc}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold text-slate-400">共享日历</div>
-            <div className="mt-2 flex min-w-0 items-center gap-3">
-              <span className={`h-3 w-3 shrink-0 rounded-full ${calendar.color || account?.color || 'bg-gray-400'}`}></span>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-black text-slate-900">{getAccountDisplayLabel(account) || calendar.name}</div>
-                <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{account?.email || calendar.receivedFrom || calendar.name}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold text-slate-400">权限范围</div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {capabilities.map((item) => (
-                <span
-                  key={item.label}
-                  className={`inline-flex items-center rounded-lg px-3 py-2 text-xs font-bold ${
-                    item.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  {item.enabled ? <Check size={13} className="mr-1.5" /> : <X size={12} className="mr-1.5" />}
-                  {item.label}
-                </span>
-              ))}
+              )}
             </div>
           </div>
         </div>
