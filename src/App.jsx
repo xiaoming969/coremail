@@ -3106,24 +3106,17 @@ function CalendarSidebar({
                         : ''
                     }`}
                   >
-                    {cell.date.getDate()}
-                  </button>
-                  {markerColors.length > 0 && (
-                    <div
-                      className={`pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center justify-center ${isSelectedDate ? 'z-[2]' : 'z-[1]'}`}
-                      style={{ bottom: '1px' }}
-                    >
+                    <span className="relative z-[1] leading-none">{cell.date.getDate()}</span>
+                    {markerColors.length > 0 && (
                       <span
-                        className={`rounded-full transition-colors ${
-                          isSelectedDate
-                            ? 'h-[2px] w-[6px] bg-white'
-                            : 'h-[2px] w-[6px] bg-blue-500 group-hover/day:bg-blue-600'
+                        className={`pointer-events-none absolute left-1/2 bottom-[2px] h-[2px] w-[6px] -translate-x-1/2 rounded-full ${
+                          isSelectedDate ? 'bg-white' : 'bg-blue-500'
                         }`}
                       ></span>
-                    </div>
-                  )}
+                    )}
+                  </button>
                   {showHuaweiWorkdayBadge && (
-                    <span className="pointer-events-none absolute right-[2px] top-[2px] z-[3] flex h-3 min-w-3 items-center justify-center rounded-full border border-red-200/80 bg-white/90 px-[2px] text-[7px] font-bold leading-none text-red-500/80 shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
+                    <span className="pointer-events-none absolute right-[3px] top-[1px] z-[3] text-[9px] font-bold leading-none text-red-500">
                       班
                     </span>
                   )}
