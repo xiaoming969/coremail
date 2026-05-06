@@ -9955,7 +9955,7 @@ function MainApp() {
         <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden bg-[#f8f8f7]">
           {activeProduct === 'calendar' ? (
               <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden bg-[#f8f8f7]">
-                {currentScreen === 'calendar' && (
+                {(currentScreen === 'calendar' || currentScreen === 'create') && (
                   <div className="relative flex flex-1 min-w-0 min-h-0 flex-col bg-[#f8f8f7]">
                     <header className="relative flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-[#fcfcfb] px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:px-8" style={{ zIndex: 10 }}>
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
@@ -10428,9 +10428,9 @@ function MainApp() {
                 )}
 
                 {currentScreen === 'create' && (
-                  <div className="relative z-50 h-full w-full overflow-hidden bg-[#f6f8fb]">
-                    <div className="h-full overflow-y-auto px-4 py-5 md:px-6 md:py-6">
-                      <div className="mx-auto flex min-h-[calc(100vh-112px)] w-full max-w-[1220px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/25 px-4 py-5 backdrop-blur-[1px]">
+                    <div className="h-[min(92vh,900px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-2xl">
+                      <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
                           <div className="flex min-w-0 items-center gap-3">
                             <div className="relative min-w-[220px] max-w-[320px]">
