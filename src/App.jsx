@@ -10428,8 +10428,8 @@ function MainApp() {
                 )}
 
                 {currentScreen === 'create' && (
-                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/25 px-4 py-5 backdrop-blur-[1px]">
-                    <div className="h-[min(92vh,900px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-2xl">
+                  <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
+                    <div className="h-[calc(100vh-32px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
                       <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
                           <div className="flex min-w-0 items-center gap-3">
