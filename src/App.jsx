@@ -179,6 +179,7 @@ const CALENDAR_PERMISSION_LABEL_TO_ID = {
   busy_only: 'busy_only',
   edit: 'edit',
 };
+const HUAWEI_ACCOUNT_ID = 'acc-huawei-calendar';
 const HUAWEI_CALENDAR_ID = 'c-huawei';
 const MAX_SPLIT_ACCOUNTS = 3;
 const SHARED_ACCOUNT_TEMPLATES = [
@@ -384,10 +385,10 @@ const buildHuaweiMakeupWorkdayEvents = (year) =>
 
     return createAllDayCalendarEvent({
       id: `huawei-workday-${year}-${String(month + 1).padStart(2, '0')}`,
-      title: '华为补班',
+      title: '华为小周末',
       date,
       calId: HUAWEI_CALENDAR_ID,
-      description: '每月最后一个周六上班。',
+      description: '每月最后一个周六为华为小周末。',
       type: 'makeup_workday',
     });
   });
@@ -1326,6 +1327,23 @@ const MOCK_ACCOUNTS = [
     },
   },
   {
+    id: HUAWEI_ACCOUNT_ID,
+    name: 'huawei-calendar@calendarpro.io',
+    displayName: '华为日历',
+    email: 'huawei-calendar@calendarpro.io',
+    role: '我的账户',
+    ownership: 'self',
+    color: 'bg-red-500',
+    checked: true,
+    mailboxMembers: [],
+    mailboxSettings: {
+      showInAddressList: true,
+      saveSentItems: false,
+      automap: false,
+      mobileAccess: true,
+    },
+  },
+  {
     id: 'acc2',
     name: 'ea@calendarpro.io',
     displayName: '张三',
@@ -1449,7 +1467,7 @@ const MOCK_CALENDARS = [
   },
   {
     id: HUAWEI_CALENDAR_ID,
-    accountId: 'acc1',
+    accountId: HUAWEI_ACCOUNT_ID,
     name: '华为日历',
     type: 'my',
     owner: '华为日历',
@@ -3071,7 +3089,7 @@ function CalendarSidebar({
                     </div>
                   )}
                   {showHuaweiWorkdayBadge && (
-                    <span className="pointer-events-none absolute right-0 top-0 z-[2] flex h-3 min-w-3 items-center justify-center rounded-full bg-orange-500 px-[2px] text-[8px] font-black leading-none text-white">
+                    <span className="pointer-events-none absolute right-[2px] top-[2px] z-[2] flex h-3 min-w-3 items-center justify-center rounded-full border border-orange-200/80 bg-white/85 px-[2px] text-[7px] font-bold leading-none text-orange-500/75">
                       班
                     </span>
                   )}
