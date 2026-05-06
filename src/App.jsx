@@ -3060,24 +3060,24 @@ function CalendarSidebar({
               const showWeekRange = (calendarLayout === 'week' || calendarLayout === 'work_week') && inActiveWeek;
 
               return (
-                <div key={cell.key} className="relative flex h-9 cursor-pointer items-center justify-center">
+                <div key={cell.key} className="group/day relative flex h-9 cursor-pointer items-center justify-center">
                   {showWeekRange && <div className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-100"></div>}
                   <button
                     type="button"
                     onClick={() => onSelectDate(cell.date)}
                     className={`relative z-[1] aspect-square w-7 flex items-center justify-center rounded-full font-medium transition-colors ${
-                      cell.isCurrentMonth ? 'text-gray-700 hover:bg-slate-200' : 'text-gray-300'
-                    } ${
-                      isSelectedDate && !cell.isToday
-                        ? 'bg-blue-600 text-white font-bold'
-                        : ''
+                      isSelectedDate
+                        ? 'bg-blue-600 text-white font-bold hover:bg-blue-600'
+                        : cell.isCurrentMonth
+                          ? 'text-gray-700 hover:bg-slate-200'
+                          : 'text-gray-300 hover:bg-slate-100'
                     } ${
                       cell.isToday && !isSelectedDate
                         ? 'ring-2 ring-blue-500 ring-offset-1 font-bold text-blue-600'
                         : ''
                     } ${
                       cell.isToday && isSelectedDate
-                        ? 'bg-blue-600 text-white font-bold ring-2 ring-blue-300 ring-offset-1'
+                        ? 'ring-2 ring-blue-300 ring-offset-1'
                         : ''
                     }`}
                   >
@@ -3085,11 +3085,15 @@ function CalendarSidebar({
                   </button>
                   {markerColors.length > 0 && (
                     <div className="pointer-events-none absolute left-1/2 z-[1] flex -translate-x-1/2 items-center justify-center" style={{ bottom: '1px' }}>
-                      <span className={`h-[2px] w-[6px] rounded-full ${isSelectedDate ? 'bg-white' : 'bg-blue-500'}`}></span>
+                      <span className={`h-[2px] w-[6px] rounded-full transition-colors ${isSelectedDate ? 'bg-white' : 'bg-blue-500 group-hover/day:bg-blue-600'}`}></span>
                     </div>
                   )}
                   {showHuaweiWorkdayBadge && (
-                    <span className="pointer-events-none absolute right-[2px] top-[2px] z-[2] flex h-3 min-w-3 items-center justify-center rounded-full border border-orange-200/80 bg-white/85 px-[2px] text-[7px] font-bold leading-none text-orange-500/75">
+                    <span className={`pointer-events-none absolute right-[2px] top-[2px] z-[2] flex h-3 min-w-3 items-center justify-center rounded-full border px-[2px] text-[7px] font-bold leading-none transition-colors ${
+                      isSelectedDate
+                        ? 'border-white/50 bg-white/20 text-white/80'
+                        : 'border-orange-200/80 bg-white/85 text-orange-500/75 group-hover/day:border-orange-200 group-hover/day:bg-orange-50 group-hover/day:text-orange-600'
+                    }`}>
                       班
                     </span>
                   )}
