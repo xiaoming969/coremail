@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   AlignLeft,
@@ -10162,8 +10163,9 @@ function MainApp() {
                   />
                 )}
 
-                {currentScreen === 'details' && selectedEvent && (
-	                  <div className="relative flex h-full w-full justify-center overflow-y-auto bg-white px-6 py-4 md:px-10 md:py-6">
+                {currentScreen === 'details' && selectedEvent && createPortal(
+                  (
+	                  <div className="fixed inset-0 z-[70] flex justify-center overflow-y-auto bg-white px-6 py-4 md:px-10 md:py-6">
 	                    <div
 	                      className="flex h-max w-full flex-col overflow-hidden bg-white"
 	                      style={{ maxWidth: '860px' }}
@@ -10425,9 +10427,12 @@ function MainApp() {
                       </div>
                     </div>
                   </div>
+                  ),
+                  document.body,
                 )}
 
-                {currentScreen === 'create' && (
+                {currentScreen === 'create' && createPortal(
+                  (
                   <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
                     <div className="h-[calc(100vh-32px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
                       <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
@@ -11468,6 +11473,8 @@ function MainApp() {
                       </div>
                     </div>
                   </div>
+                  ),
+                  document.body,
                 )}
               </div>
           ) : activeProduct === 'mail' ? (
