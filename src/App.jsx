@@ -5655,7 +5655,6 @@ function MailboxPermissionModal({
           {activeTab === 'sharing' && (
             <div className="space-y-5">
               <div>
-                <div className="mb-3 text-sm font-black text-gray-900">我共享出去的权限</div>
                 {primaryCalendar && (
                   <div className="mb-3">
                     <ShareMemberComposer
@@ -5664,6 +5663,7 @@ function MailboxPermissionModal({
                     />
                   </div>
                 )}
+                <div className="mb-3 text-sm font-black text-gray-900">我共享出去的权限</div>
                 <div className="rounded-xl border border-gray-200 bg-white">
                   <div className="grid grid-cols-[1fr_190px_72px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
                     <div>姓名 / 账号</div>
