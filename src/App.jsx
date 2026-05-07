@@ -5800,45 +5800,43 @@ function MailboxPermissionModal({
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
 
           {activeTab === 'settings' && (
-            <div className="space-y-6">
-              <section className="grid gap-5 lg:grid-cols-[132px_minmax(0,1fr)]">
-                <div className="text-sm font-black text-slate-900">基本信息</div>
-                <div className="min-w-0 space-y-4">
-                  <div>
-                    <label className="mb-2 block text-xs font-bold text-slate-500">显示名称</label>
-                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_88px]">
-                      <input
-                        value={draftName}
-                        onChange={(event) => setDraftName(event.target.value)}
-                        className="h-11 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      />
-                      <button
-                        disabled={!canSaveName}
-                        onClick={() => onRenameAccount(account.id, draftName)}
-                        className={`h-11 rounded-xl px-4 text-sm font-bold transition ${
-                          canSaveName ? 'bg-slate-900 text-white hover:bg-slate-800' : 'cursor-not-allowed bg-slate-200 text-slate-400'
-                        }`}
-                      >
-                        保存
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex min-w-0 items-center gap-3 text-sm">
-                    <span className="shrink-0 text-xs font-bold text-slate-400">账号</span>
-                    <span className="truncate font-semibold text-slate-600">{account.email || account.name}</span>
-                  </div>
+            <div className="space-y-7">
+              <section>
+                <div className="mb-4 text-sm font-black text-slate-900">基本信息</div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_96px]">
+                  <label className="block min-w-0">
+                    <span className="mb-2 block text-xs font-bold text-slate-500">显示名称</span>
+                    <input
+                      value={draftName}
+                      onChange={(event) => setDraftName(event.target.value)}
+                      className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </label>
+                  <button
+                    disabled={!canSaveName}
+                    onClick={() => onRenameAccount(account.id, draftName)}
+                    className={`mt-6 h-11 rounded-xl px-4 text-sm font-bold transition sm:mt-6 ${
+                      canSaveName ? 'bg-slate-900 text-white hover:bg-slate-800' : 'cursor-not-allowed bg-slate-200 text-slate-400'
+                    }`}
+                  >
+                    保存
+                  </button>
+                </div>
+                <div className="mt-4 flex min-w-0 items-center gap-3 text-sm">
+                  <span className="shrink-0 text-xs font-bold text-slate-400">账号</span>
+                  <span className="truncate font-semibold text-slate-600">{account.email || account.name}</span>
                 </div>
               </section>
 
-              <section className="grid gap-5 border-t border-slate-100 pt-6 lg:grid-cols-[132px_minmax(0,1fr)]">
-                <div className="text-sm font-black text-slate-900">账号颜色</div>
-                <div className="flex flex-wrap gap-3">
+              <section className="border-t border-slate-100 pt-6">
+                <div className="mb-4 text-sm font-black text-slate-900">账号颜色</div>
+                <div className="flex flex-wrap gap-3.5">
                   {ACCOUNT_COLOR_OPTIONS.map((color) => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => onUpdateAccountColor(account.id, color)}
-                      className={`h-8 w-8 rounded-full ${color} transition ${
+                      className={`h-9 w-9 rounded-full ${color} transition ${
                         account.color === color ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105'
                       }`}
                       title="修改颜色"
