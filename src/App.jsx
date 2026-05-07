@@ -5800,13 +5800,13 @@ function MailboxPermissionModal({
         <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
 
           {activeTab === 'settings' && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="space-y-6">
+              <section className="grid gap-5 lg:grid-cols-[132px_minmax(0,1fr)]">
                 <div className="text-sm font-black text-slate-900">基本信息</div>
-                <div className="mt-4 grid gap-4">
-                  <label className="block text-xs font-bold text-slate-500">
-                    显示名称
-                    <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_88px]">
+                <div className="min-w-0 space-y-4">
+                  <div>
+                    <label className="mb-2 block text-xs font-bold text-slate-500">显示名称</label>
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_88px]">
                       <input
                         value={draftName}
                         onChange={(event) => setDraftName(event.target.value)}
@@ -5822,32 +5822,32 @@ function MailboxPermissionModal({
                         保存
                       </button>
                     </div>
-                  </label>
-                  <div className="rounded-xl bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-600">
-                    <span className="mr-2 text-xs font-bold text-slate-400">账号</span>
-                    {account.email || account.name}
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3 text-sm">
+                    <span className="shrink-0 text-xs font-bold text-slate-400">账号</span>
+                    <span className="truncate font-semibold text-slate-600">{account.email || account.name}</span>
                   </div>
                 </div>
-              </div>
+              </section>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
+              <section className="grid gap-5 border-t border-slate-100 pt-6 lg:grid-cols-[132px_minmax(0,1fr)]">
                 <div className="text-sm font-black text-slate-900">账号颜色</div>
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3">
                   {ACCOUNT_COLOR_OPTIONS.map((color) => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => onUpdateAccountColor(account.id, color)}
-                      className={`h-9 w-9 rounded-full ${color} transition ${
+                      className={`h-8 w-8 rounded-full ${color} transition ${
                         account.color === color ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105'
                       }`}
                       title="修改颜色"
                     />
                   ))}
                 </div>
-              </div>
+              </section>
 
-              <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-6">
                 {!isSharedAccount ? (
                   <>
                   <button
