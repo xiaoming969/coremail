@@ -161,23 +161,25 @@ const MODULE_COPY = {
   },
 };
 const CALENDAR_PERMISSION_OPTIONS = [
-  { id: 'all_details', label: '仅查看', desc: '可查看标题、时间、地点和正文，不能修改日程。' },
-  { id: 'busy_only', label: '闲忙', desc: '只显示忙闲占用，不显示标题、地点和正文。' },
+  { id: 'all_details', label: '仅查看详情', desc: '可查看标题、时间、地点和正文，不能修改日程。' },
+  { id: 'busy_only', label: '仅查看闲忙', desc: '只显示忙闲占用，不显示标题、地点和正文。' },
   { id: 'edit', label: '可编辑', desc: '可查看详情，并可新建、修改和删除日程。' },
 ];
 const CALENDAR_PERMISSION_LABELS = {
   none: '不共享',
-  all_details: '仅查看',
-  titles_locations: '仅查看',
-  busy_only: '闲忙',
+  all_details: '仅查看详情',
+  titles_locations: '仅查看详情',
+  busy_only: '仅查看闲忙',
   edit: '可编辑',
 };
 const CALENDAR_PERMISSION_LABEL_TO_ID = {
   不共享: 'none',
   仅查看: 'all_details',
+  仅查看详情: 'all_details',
   查看所有详细信息: 'all_details',
   查看标题和地点: 'all_details',
   闲忙: 'busy_only',
+  仅查看闲忙: 'busy_only',
   可编辑: 'edit',
   all_details: 'all_details',
   titles_locations: 'all_details',
@@ -586,7 +588,7 @@ const getSearchResultStatusTags = (event, calendar) => {
   else if (event.status === '已拒绝') tags.push('已拒绝');
   else if (event.status === '已接受') tags.push('我已接受');
   if (event.visibility === 'private') tags.push('私密');
-  if (getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only') tags.push('闲忙');
+  if (getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only') tags.push('仅查看闲忙');
   else if (canEditCalendarContent(calendar?.receivedPermissionId || calendar?.permission)) tags.push('可编辑');
 
   return Array.from(new Set(tags)).slice(0, 4);
@@ -599,7 +601,7 @@ const getAgendaStatusTone = (status) => {
   return 'bg-emerald-50 text-emerald-700 border-emerald-200';
 };
 const getCalendarPermissionId = (permission) => CALENDAR_PERMISSION_LABEL_TO_ID[permission] || permission || 'all_details';
-const getCalendarPermissionLabel = (permission) => CALENDAR_PERMISSION_LABELS[getCalendarPermissionId(permission)] || permission || '查看所有详细信息';
+const getCalendarPermissionLabel = (permission) => CALENDAR_PERMISSION_LABELS[getCalendarPermissionId(permission)] || permission || '仅查看详情';
 const getCalendarPermissionOption = (permission) =>
   CALENDAR_PERMISSION_OPTIONS.find((option) => option.id === getCalendarPermissionId(permission)) || CALENDAR_PERMISSION_OPTIONS[0];
 const getCalendarPermissionCapabilities = (permission) => {
@@ -1569,7 +1571,7 @@ const MOCK_CALENDARS = [
     owner: '华为日历',
     color: 'bg-red-500',
     checked: true,
-    permission: '仅查看',
+    permission: '仅查看详情',
     isPrimary: false,
     defaultSharing: {
       organization: 'busy_only',
@@ -1630,7 +1632,7 @@ const MOCK_CALENDARS = [
     owner: '张三',
     color: 'bg-slate-500',
     checked: true,
-    permission: '闲忙',
+    permission: '仅查看闲忙',
     isPrimary: true,
     receivedFrom: 'ea@calendarpro.io',
     receivedFromName: '张三',
@@ -5471,10 +5473,13 @@ function PermissionDropdown({ value, onChange, className = '' }) {
     const spaceBelow = window.innerHeight - rect.bottom;
     const openAbove = spaceBelow < menuHeight + 16 && rect.top > menuHeight + 16;
 
+    const menuWidth = Math.max(rect.width, 300);
+    const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - menuWidth - 12));
+
     setMenuRect({
-      left: rect.left,
+      left,
       top: openAbove ? Math.max(12, rect.top - menuHeight - 6) : rect.bottom + 6,
-      width: rect.width,
+      width: menuWidth,
       maxHeight: openAbove ? Math.max(180, rect.top - 20) : Math.max(180, window.innerHeight - rect.bottom - 18),
     });
   };
@@ -5511,7 +5516,7 @@ function PermissionDropdown({ value, onChange, className = '' }) {
         className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left outline-none transition hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       >
         <span className="min-w-0">
-          <span className="block truncate text-sm font-black text-slate-900">{selected.label}</span>
+          <span className="block truncate whitespace-nowrap text-sm font-black text-slate-900">{selected.label}</span>
         </span>
         <ChevronDown size={15} className="shrink-0 text-slate-500" />
       </button>
@@ -5604,7 +5609,7 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_88px]">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_260px_96px]">
         <div className="relative">
           <input
             value={memberInput}
@@ -5693,7 +5698,7 @@ function CalendarPermissionModal({
           <ShareMemberComposer existingShares={visibleShares} onAdd={onAddShare} />
 
           <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="grid grid-cols-[1fr_220px_96px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
+            <div className="grid grid-cols-[minmax(0,1fr)_280px_96px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
               <div>成员</div>
               <div>权限</div>
               <div className="text-right">操作</div>
@@ -5702,7 +5707,7 @@ function CalendarPermissionModal({
               <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">还没有共享给任何人。</div>
             ) : (
               visibleShares.map((share) => (
-                <div key={share.id} className="grid grid-cols-[1fr_220px_96px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                <div key={share.id} className="grid grid-cols-[minmax(0,1fr)_280px_96px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="truncate text-sm font-bold text-slate-900">{share.name || share.email}</div>
@@ -5886,7 +5891,7 @@ function MailboxPermissionModal({
                 )}
                 <div className="mb-3 text-sm font-black text-gray-900">我共享出去的权限</div>
                 <div className="rounded-xl border border-gray-200 bg-white">
-                  <div className="grid grid-cols-[1fr_190px_72px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
+                  <div className="grid grid-cols-[minmax(0,1fr)_280px_72px] gap-3 border-b border-gray-100 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400">
                     <div>姓名 / 账号</div>
                     <div>权限</div>
                     <div className="text-right">操作</div>
@@ -5895,7 +5900,7 @@ function MailboxPermissionModal({
                     <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">还没有共享给任何人。</div>
                   ) : (
                     shareRows.map(({ calendar, share }) => (
-                      <div key={`${calendar.id}-${share.id}`} className="grid grid-cols-[1fr_190px_72px] items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0">
+                      <div key={`${calendar.id}-${share.id}`} className="grid grid-cols-[minmax(0,1fr)_280px_72px] items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0">
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-2">
                             <div className="truncate text-sm font-bold text-gray-900">{share.name || share.email}</div>
@@ -6040,7 +6045,7 @@ function AddSharedCalendarModal({
           <div>
             <div className="mb-3 text-sm font-black text-gray-900">通过账号添加</div>
             <div className="overflow-visible rounded-xl border border-slate-200 bg-white p-3">
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)_96px]">
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(240px,280px)_96px]">
                 <div className="relative min-w-0">
                   <input
                     value={draft.email}
@@ -6695,7 +6700,7 @@ function MainApp() {
     (selectedEvent && calendarMap[selectedEvent.calId]) || {
       color: 'bg-gray-500',
       name: '未知日历',
-      permission: '仅查看',
+      permission: '仅查看详情',
       accountId: '',
       owner: '我',
     };
@@ -10619,7 +10624,7 @@ function MainApp() {
                         {selectedEvent.type === 'busy_only' ? (
                           <div className="text-center py-16 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
                             <Lock className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                            <h2 className="text-xl font-black text-gray-800">闲忙</h2>
+                            <h2 className="text-xl font-black text-gray-800">仅查看闲忙</h2>
                             <p className="text-gray-500 mt-2 text-sm font-medium">由于权限限制，您仅能看到该时段被占用。</p>
                           </div>
                         ) : (
