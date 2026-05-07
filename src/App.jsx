@@ -2173,25 +2173,80 @@ const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 'acc1' 
   };
 };
 
+function ProductActiveIcon({ id, size = 20 }) {
+  const commonProps = {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    xmlns: 'http://www.w3.org/2000/svg',
+    'aria-hidden': true,
+  };
+
+  if (id === 'mail') {
+    return (
+      <svg {...commonProps}>
+        <path
+          fill="currentColor"
+          d="M4.75 5.5h14.5c1.38 0 2.5 1.12 2.5 2.5v8.5c0 1.38-1.12 2.5-2.5 2.5H4.75a2.5 2.5 0 0 1-2.5-2.5V8c0-1.38 1.12-2.5 2.5-2.5Zm.66 2.1a.75.75 0 0 0-.84 1.24l6.1 4.13c.8.54 1.86.54 2.66 0l6.1-4.13a.75.75 0 1 0-.84-1.24L12.5 11.72a.9.9 0 0 1-1 0L5.41 7.6Z"
+        />
+      </svg>
+    );
+  }
+
+  if (id === 'calendar') {
+    return (
+      <svg {...commonProps}>
+        <path fill="currentColor" d="M7 2.25a1 1 0 0 1 1 1V5h8V3.25a1 1 0 1 1 2 0V5h.25A2.75 2.75 0 0 1 21 7.75v10.5A2.75 2.75 0 0 1 18.25 21H5.75A2.75 2.75 0 0 1 3 18.25V7.75A2.75 2.75 0 0 1 5.75 5H6V3.25a1 1 0 0 1 1-1Z" />
+        <path fill="white" fillOpacity=".92" d="M5.25 9.25h13.5v8.7c0 .44-.36.8-.8.8H6.05a.8.8 0 0 1-.8-.8v-8.7Z" />
+        <path fill="currentColor" fillOpacity=".86" d="M7.4 11.5h2.05v2.05H7.4V11.5Zm3.58 0h2.05v2.05h-2.05V11.5Zm3.57 0h2.05v2.05h-2.05V11.5ZM7.4 15h2.05v2.05H7.4V15Zm3.58 0h2.05v2.05h-2.05V15Z" />
+      </svg>
+    );
+  }
+
+  if (id === 'contacts') {
+    return (
+      <svg {...commonProps}>
+        <path fill="currentColor" d="M9.25 11.25a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Zm0 1.75c-3.34 0-6.25 1.88-6.25 4.48v1.02c0 .97.78 1.75 1.75 1.75h9c.97 0 1.75-.78 1.75-1.75v-1.02c0-2.6-2.91-4.48-6.25-4.48Zm7.45-2.16a3.45 3.45 0 1 0-.04-6.89 5.72 5.72 0 0 1-.24 6.9l.28-.01Zm.6 2.02a6.67 6.67 0 0 0-1.88.27 5.86 5.86 0 0 1 2.08 4.35v.77h1.75c.97 0 1.75-.78 1.75-1.75v-.35c0-1.98-1.71-3.29-3.7-3.29Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps}>
+      <path
+        fill="currentColor"
+        d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.3 7.3 0 0 0-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.5.42l-.38 2.65c-.61.24-1.18.56-1.69.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.02.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.13.23.4.32.6.22l2.49-1c.51.4 1.08.74 1.69.98l.38 2.65c.05.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.24 1.18-.56 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65Z"
+      />
+      <path fill="white" fillOpacity=".92" d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z" />
+    </svg>
+  );
+}
+
 function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = false }) {
   const buttonSize = compact ? 'h-10 w-10' : 'h-11 w-11';
 
   return (
     <div className={`${vertical ? 'grid grid-cols-1' : 'grid grid-cols-4'} ${compact ? 'gap-1.5' : 'gap-2'}`}>
-      {PRODUCT_TABS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => onSelect(id)}
-          title={label}
-          className={`${buttonSize} mx-auto flex items-center justify-center rounded-xl transition-all duration-200 ${
-            activeProduct === id
-              ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200'
-              : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
-          }`}
-        >
-          <Icon size={compact ? 17 : 19} strokeWidth={activeProduct === id ? 2.5 : 2.1} />
-        </button>
-      ))}
+      {PRODUCT_TABS.map(({ id, label, icon: Icon }) => {
+        const selected = activeProduct === id;
+        return (
+          <button
+            key={id}
+            onClick={() => onSelect(id)}
+            title={label}
+            className={`${buttonSize} mx-auto flex items-center justify-center rounded-xl transition-colors duration-150 ${
+              selected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {selected ? (
+              <ProductActiveIcon id={id} size={compact ? 18 : 21} />
+            ) : (
+              <Icon size={compact ? 18 : 21} strokeWidth={2.1} />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
