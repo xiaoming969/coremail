@@ -2229,9 +2229,9 @@ function ProductActiveIcon({ id, size = 20 }) {
   if (id === 'calendar') {
     return (
       <svg {...commonProps}>
-        <path fill="currentColor" d="M7 2.25a1 1 0 0 1 1 1V5h8V3.25a1 1 0 1 1 2 0V5h.25A2.75 2.75 0 0 1 21 7.75v10.5A2.75 2.75 0 0 1 18.25 21H5.75A2.75 2.75 0 0 1 3 18.25V7.75A2.75 2.75 0 0 1 5.75 5H6V3.25a1 1 0 0 1 1-1Z" />
-        <path fill="white" fillOpacity=".92" d="M5.25 9.25h13.5v8.7c0 .44-.36.8-.8.8H6.05a.8.8 0 0 1-.8-.8v-8.7Z" />
-        <path fill="currentColor" fillOpacity=".86" d="M7.4 11.5h2.05v2.05H7.4V11.5Zm3.58 0h2.05v2.05h-2.05V11.5Zm3.57 0h2.05v2.05h-2.05V11.5ZM7.4 15h2.05v2.05H7.4V15Zm3.58 0h2.05v2.05h-2.05V15Z" />
+        <path fill="currentColor" d="M6.7 2.1a1 1 0 0 1 1 1v1.75h8.6V3.1a1 1 0 1 1 2 0v1.75h.35a2.9 2.9 0 0 1 2.9 2.9v10.5a2.9 2.9 0 0 1-2.9 2.9H5.35a2.9 2.9 0 0 1-2.9-2.9V7.75a2.9 2.9 0 0 1 2.9-2.9h.35V3.1a1 1 0 0 1 1-1Z" />
+        <path fill="white" fillOpacity=".94" d="M4.8 9.1h14.4v8.9c0 .47-.38.85-.85.85H5.65A.85.85 0 0 1 4.8 18V9.1Z" />
+        <path fill="currentColor" fillOpacity=".9" d="M7 11.25h2.3v2.3H7v-2.3Zm3.85 0h2.3v2.3h-2.3v-2.3Zm3.85 0H17v2.3h-2.3v-2.3ZM7 15.1h2.3v2.3H7v-2.3Zm3.85 0h2.3v2.3h-2.3v-2.3Z" />
       </svg>
     );
   }
@@ -2272,7 +2272,7 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
             }`}
           >
             {selected ? (
-              <ProductActiveIcon id={id} size={compact ? 18 : 21} />
+              <ProductActiveIcon id={id} size={compact ? 20 : 23} />
             ) : (
               <Icon size={compact ? 18 : 21} strokeWidth={2.1} />
             )}
