@@ -483,6 +483,38 @@ const parseShareMemberInput = (value = '') => {
 
   return { name: raw, email: raw };
 };
+const resolveKnownShareMember = (value = '', selectedContact = null) => {
+  if (selectedContact) {
+    return {
+      name: selectedContact.name,
+      email: selectedContact.email,
+      scope: selectedContact.scope,
+    };
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const exactContact = getShareContactDirectory().find(
+    (item) => normalizeParticipantIdentity(item.email) === normalizeParticipantIdentity(raw) ||
+      normalizeParticipantIdentity(item.name) === normalizeParticipantIdentity(raw),
+  );
+  if (exactContact) {
+    return {
+      name: exactContact.name,
+      email: exactContact.email,
+      scope: exactContact.scope,
+    };
+  }
+
+  const parsed = parseShareMemberInput(raw);
+  const email = String(parsed?.email || '').trim();
+  if (email && /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(email)) {
+    return parsed;
+  }
+
+  return null;
+};
 const getShareContactSuggestions = (value = '', existingShares = [], limit = 5, extraContacts = []) => {
   const query = normalizeParticipantIdentity(value);
   if (!query) return [];
@@ -5533,14 +5565,30 @@ function PermissionBadge({ permission }) {
   );
 }
 
+function ShareStatusBadge({ status }) {
+  const accepted = status === 'accepted';
+
+  return (
+    <span
+      className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-bold ${
+        accepted ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+      }`}
+    >
+      {accepted ? '已生效' : '待接受'}
+    </span>
+  );
+}
+
 function ShareMemberComposer({ existingShares = [], onAdd }) {
   const [memberInput, setMemberInput] = useState('');
   const [permissionId, setPermissionId] = useState('all_details');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
   const suggestions = useMemo(() => getShareContactSuggestions(memberInput, existingShares), [memberInput, existingShares]);
+  const resolvedMember = useMemo(() => resolveKnownShareMember(memberInput, selectedMember), [memberInput, selectedMember]);
 
-  const addMember = (candidate = null) => {
-    const member = candidate ? { name: candidate.name, email: candidate.email, scope: candidate.scope } : parseShareMemberInput(memberInput);
+  const addMember = () => {
+    const member = resolveKnownShareMember(memberInput, selectedMember);
     if (!member) return;
 
     onAdd?.({
@@ -5550,6 +5598,7 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
       scope: member.scope || (String(member.email || '').includes('@calendarpro.io') ? 'internal' : 'external'),
     });
     setMemberInput('');
+    setSelectedMember(null);
     setShowSuggestions(false);
   };
 
@@ -5561,13 +5610,13 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
             value={memberInput}
             onChange={(event) => {
               setMemberInput(event.target.value);
+              setSelectedMember(null);
               setShowSuggestions(true);
             }}
             onFocus={() => setShowSuggestions(true)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                addMember();
               }
               if (event.key === 'Escape') {
                 setShowSuggestions(false);
@@ -5584,7 +5633,9 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
                   type="button"
                   onMouseDown={(event) => {
                     event.preventDefault();
-                    addMember(contact);
+                    setSelectedMember(contact);
+                    setMemberInput(contact.name);
+                    setShowSuggestions(false);
                   }}
                   className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition hover:bg-slate-50"
                 >
@@ -5604,7 +5655,7 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
         <button
           type="button"
           onClick={() => addMember()}
-          disabled={!memberInput.trim()}
+          disabled={!resolvedMember}
           className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           添加
@@ -5653,8 +5704,16 @@ function CalendarPermissionModal({
               visibleShares.map((share) => (
                 <div key={share.id} className="grid grid-cols-[1fr_220px_96px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-slate-900">{share.name || share.email}</div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="truncate text-sm font-bold text-slate-900">{share.name || share.email}</div>
+                      <ShareStatusBadge status={share.status} />
+                    </div>
                     <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{share.email}</div>
+                    {share.status !== 'accepted' && (
+                      <div className="mt-0.5 truncate text-xs font-medium text-amber-600">
+                        对方接受后按当前权限生效
+                      </div>
+                    )}
                   </div>
                   <PermissionDropdown
                     value={getCalendarPermissionId(share.permission)}
@@ -5838,8 +5897,16 @@ function MailboxPermissionModal({
                     shareRows.map(({ calendar, share }) => (
                       <div key={`${calendar.id}-${share.id}`} className="grid grid-cols-[1fr_190px_72px] items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-b-0">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-bold text-gray-900">{share.name || share.email}</div>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="truncate text-sm font-bold text-gray-900">{share.name || share.email}</div>
+                            <ShareStatusBadge status={share.status} />
+                          </div>
                           <div className="truncate text-xs text-gray-400">{share.email}</div>
+                          {share.status !== 'accepted' && (
+                            <div className="mt-0.5 truncate text-xs font-medium text-amber-600">
+                              对方接受后按当前权限生效
+                            </div>
+                          )}
                         </div>
                         <PermissionDropdown
                           value={getCalendarPermissionId(share.permission)}
@@ -8573,6 +8640,10 @@ function MainApp() {
   };
 
   const updateCalendarShare = (calendarId, shareId, patch) => {
+    const currentShare = calendars
+      .find((calendar) => calendar.id === calendarId)
+      ?.sharing?.find((share) => share.id === shareId);
+
     setCalendars((prev) =>
       prev.map((calendar) => {
         if (calendar.id !== calendarId) return calendar;
@@ -8604,7 +8675,7 @@ function MainApp() {
     const shouldNotify = ['permission', 'scope', 'canViewPrivate', 'meetingResponses'].some((key) => key in patch);
     if (shouldNotify) {
       triggerFeedback('L3', {
-        msg: '日历共享权限已更新',
+        msg: currentShare?.status === 'accepted' ? '日历共享权限已更新' : '已更新待接受权限，对方接受后生效',
         icon: <Check size={16} />,
         color: 'bg-blue-600',
       });
@@ -8676,7 +8747,7 @@ function MainApp() {
       ),
     );
     triggerFeedback('L3', {
-      msg: `已添加 ${nextMember.name || nextMember.email}`,
+      msg: `已发送给 ${nextMember.name || nextMember.email}，待对方接受后生效`,
       icon: <Send size={16} />,
       color: 'bg-blue-600',
     });
