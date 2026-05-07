@@ -5335,14 +5335,56 @@ function CalendarSearchResults({
 
 function PermissionDropdown({ value, onChange, className = '' }) {
   const [open, setOpen] = useState(false);
+  const [menuRect, setMenuRect] = useState(null);
+  const triggerRef = useRef(null);
   const selected = getCalendarPermissionOption(value);
+
+  const syncMenuRect = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = Math.min(240, CALENDAR_PERMISSION_OPTIONS.length * 68);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove = spaceBelow < menuHeight + 16 && rect.top > menuHeight + 16;
+
+    setMenuRect({
+      left: rect.left,
+      top: openAbove ? Math.max(12, rect.top - menuHeight - 6) : rect.bottom + 6,
+      width: rect.width,
+      maxHeight: openAbove ? Math.max(180, rect.top - 20) : Math.max(180, window.innerHeight - rect.bottom - 18),
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+
+    syncMenuRect();
+    const close = (event) => {
+      if (triggerRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onFrameChange = () => syncMenuRect();
+
+    window.addEventListener('mousedown', close);
+    window.addEventListener('resize', onFrameChange);
+    window.addEventListener('scroll', onFrameChange, true);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('resize', onFrameChange);
+      window.removeEventListener('scroll', onFrameChange, true);
+    };
+  }, [open]);
 
   return (
     <div className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onClick={() => {
+          setOpen((prev) => !prev);
+          window.requestAnimationFrame(syncMenuRect);
+        }}
         className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left outline-none transition hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       >
         <span className="min-w-0">
@@ -5350,27 +5392,42 @@ function PermissionDropdown({ value, onChange, className = '' }) {
         </span>
         <ChevronDown size={15} className="shrink-0 text-slate-500" />
       </button>
-      {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-          {CALENDAR_PERMISSION_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                onChange?.(option.id);
-                setOpen(false);
-              }}
-              className={`flex w-full flex-col px-3 py-2.5 text-left transition ${
-                selected.id === option.id ? 'bg-blue-50' : 'hover:bg-slate-50'
-              }`}
-            >
-              <span className="text-sm font-black text-slate-900">{option.label}</span>
-              <span className="mt-0.5 text-xs font-medium leading-snug text-slate-500">{option.desc}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        menuRect &&
+        createPortal(
+          <div
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+            style={{
+              position: 'fixed',
+              left: menuRect.left,
+              top: menuRect.top,
+              width: menuRect.width,
+              maxHeight: menuRect.maxHeight,
+              zIndex: 9999,
+            }}
+          >
+            <div className="overflow-y-auto" style={{ maxHeight: menuRect.maxHeight }}>
+              {CALENDAR_PERMISSION_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onChange?.(option.id);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full flex-col px-3 py-2.5 text-left transition ${
+                    selected.id === option.id ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="text-sm font-black text-slate-900">{option.label}</span>
+                  <span className="mt-0.5 text-xs font-medium leading-snug text-slate-500">{option.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -5750,8 +5807,8 @@ function AddSharedCalendarModal({
                 收到的共享
                 <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">{pendingInvitations.length}</span>
               </div>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="grid grid-cols-[minmax(0,1fr)_220px_120px] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400">
+              <div className="overflow-visible rounded-xl border border-slate-200 bg-white">
+                <div className="grid gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px]">
                   <div>共享方</div>
                   <div>给我的权限</div>
                   <div className="text-right">操作</div>
@@ -5759,7 +5816,7 @@ function AddSharedCalendarModal({
                 {pendingInvitations.map((invite) => {
                   const invitePermission = getCalendarPermissionOption(invite.permissionId);
                   return (
-                  <div key={invite.id} className="grid grid-cols-[minmax(0,1fr)_220px_120px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                  <div key={invite.id} className="grid gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px] lg:items-center">
                     <div className="flex min-w-0 items-center gap-3">
                       <span className={`h-3 w-3 shrink-0 rounded-full ${invite.color}`}></span>
                       <div className="min-w-0">
@@ -5769,9 +5826,11 @@ function AddSharedCalendarModal({
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-black text-slate-900">{invitePermission.label}</div>
-                      <div className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug text-slate-400">{invitePermission.desc}</div>
+                      <div className="mt-0.5 truncate text-xs font-medium text-slate-400" title={invitePermission.desc}>
+                        {invitePermission.desc}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-end gap-1.5">
+                    <div className="flex items-center justify-end gap-1.5 lg:justify-end">
                       <button
                         onClick={() => onIgnoreInvitation(invite.id)}
                         className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
@@ -5794,8 +5853,8 @@ function AddSharedCalendarModal({
 
           <div>
             <div className="mb-3 text-sm font-black text-gray-900">通过账号添加</div>
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px_96px]">
+            <div className="overflow-visible rounded-xl border border-slate-200 bg-white p-3">
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)_96px]">
                 <input
                   value={draft.email}
                   onChange={(event) => onChange({ email: event.target.value, name: event.target.value })}
