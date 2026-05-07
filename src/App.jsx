@@ -141,6 +141,10 @@ const MAIL_CONTACTS = [
   { id: 'mc2', name: '行政助理组', email: 'ea-team@calendarpro.io', scope: 'internal' },
   { id: 'mc3', name: '外部顾问', email: 'advisor@vendor.com', scope: 'external' },
   { id: 'mc4', name: '客户 CFO', email: 'cfo@externalcorp.com', scope: 'external' },
+  { id: 'mc5', name: '张三', email: 'ea@calendarpro.io', scope: 'internal' },
+  { id: 'mc6', name: '李四', email: 'sales@calendarpro.io', scope: 'internal' },
+  { id: 'mc7', name: '陈晨', email: 'pm@calendarpro.io', scope: 'internal' },
+  { id: 'mc8', name: '刘洋', email: 'liuyang@calendarpro.io', scope: 'internal' },
 ];
 const MODULE_COPY = {
   mail: {
@@ -420,6 +424,38 @@ const formatDurationLabel = (durationH) => {
   return parts.length > 0 ? parts.join(' ') : '0分钟';
 };
 const normalizeParticipantIdentity = (value = '') => value.trim().toLowerCase();
+const getShareContactDirectory = (extraContacts = []) => {
+  const directory = [
+    ...extraContacts,
+    ...MOCK_SHARE_INVITATIONS.map((item) => ({
+      id: `share-invite-contact-${item.id}`,
+      name: item.senderName,
+      email: item.senderEmail,
+      scope: String(item.senderEmail || '').includes('@calendarpro.io') ? 'internal' : 'external',
+      permissionId: item.permissionId,
+      color: item.color,
+      sharedGrant: true,
+    })),
+    ...SHARED_ACCOUNT_TEMPLATES.map((item, index) => ({
+      id: `shared-template-${index}`,
+      name: item.name,
+      email: item.email,
+      scope: String(item.email || '').includes('@calendarpro.io') ? 'internal' : 'external',
+      permissionId: item.permissionId,
+      color: item.color,
+      sharedGrant: true,
+    })),
+    ...MAIL_CONTACTS,
+  ];
+  const seen = new Set();
+
+  return directory.filter((contact) => {
+    const key = normalizeParticipantIdentity(contact.email || contact.name);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 const parseShareMemberInput = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -432,7 +468,7 @@ const parseShareMemberInput = (value = '') => {
     };
   }
 
-  const contact = MAIL_CONTACTS.find(
+  const contact = getShareContactDirectory().find(
     (item) => normalizeParticipantIdentity(item.email) === normalizeParticipantIdentity(raw) ||
       normalizeParticipantIdentity(item.name) === normalizeParticipantIdentity(raw),
   );
@@ -447,7 +483,7 @@ const parseShareMemberInput = (value = '') => {
 
   return { name: raw, email: raw };
 };
-const getShareContactSuggestions = (value = '', existingShares = []) => {
+const getShareContactSuggestions = (value = '', existingShares = [], limit = 5, extraContacts = []) => {
   const query = normalizeParticipantIdentity(value);
   if (!query) return [];
 
@@ -455,12 +491,12 @@ const getShareContactSuggestions = (value = '', existingShares = []) => {
     existingShares.flatMap((share) => [share.email, share.name]).filter(Boolean).map((item) => normalizeParticipantIdentity(item)),
   );
 
-  return MAIL_CONTACTS.filter((contact) => {
+  return getShareContactDirectory(extraContacts).filter((contact) => {
     const name = normalizeParticipantIdentity(contact.name);
     const email = normalizeParticipantIdentity(contact.email);
     if (existingKeys.has(name) || existingKeys.has(email)) return false;
     return name.includes(query) || email.includes(query);
-  }).slice(0, 5);
+  }).slice(0, limit);
 };
 const TIME_SELECT_OPTIONS = Array.from({ length: DAY_END_HOUR * 2 }, (_, index) => {
   const value = index * HALF_HOUR_STEP;
@@ -5776,6 +5812,7 @@ function MailboxPermissionModal({
 function AddSharedCalendarModal({
   open,
   draft,
+  accounts = [],
   invitations,
   onClose,
   onChange,
@@ -5784,9 +5821,36 @@ function AddSharedCalendarModal({
   onIgnoreInvitation,
   onSetInvitationPermission,
 }) {
+  const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
+  const pendingInvitations = invitations.filter((item) => item.status === 'pending');
+  const existingSharedTargets = useMemo(
+    () => accounts.map((account) => ({ name: account.displayName || account.name, email: account.email })),
+    [accounts],
+  );
+  const pendingInvitationContacts = useMemo(
+    () =>
+      pendingInvitations.map((item) => ({
+        id: `pending-${item.id}`,
+        name: item.senderName,
+        email: item.senderEmail,
+        scope: String(item.senderEmail || '').includes('@calendarpro.io') ? 'internal' : 'external',
+        permissionId: item.permissionId,
+        color: item.color,
+        sharedGrant: true,
+      })),
+    [pendingInvitations],
+  );
+  const accountSuggestions = useMemo(
+    () => getShareContactSuggestions(draft.email, existingSharedTargets, 5, pendingInvitationContacts),
+    [draft.email, existingSharedTargets, pendingInvitationContacts],
+  );
+
+  useEffect(() => {
+    if (!open) setShowAccountSuggestions(false);
+  }, [open]);
+
   if (!open) return null;
 
-  const pendingInvitations = invitations.filter((item) => item.status === 'pending');
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
       <div
@@ -5855,12 +5919,67 @@ function AddSharedCalendarModal({
             <div className="mb-3 text-sm font-black text-gray-900">通过账号添加</div>
             <div className="overflow-visible rounded-xl border border-slate-200 bg-white p-3">
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(180px,220px)_96px]">
-                <input
-                  value={draft.email}
-                  onChange={(event) => onChange({ email: event.target.value, name: event.target.value })}
-                  placeholder="姓名或邮箱"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <div className="relative min-w-0">
+                  <input
+                    value={draft.email}
+                    onChange={(event) => {
+                      onChange({
+                        email: event.target.value,
+                        name: event.target.value,
+                        lookupState: null,
+                        lookupMessage: '',
+                      });
+                      setShowAccountSuggestions(true);
+                    }}
+                    onFocus={() => setShowAccountSuggestions(true)}
+                    onBlur={() => window.setTimeout(() => setShowAccountSuggestions(false), 120)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') setShowAccountSuggestions(false);
+                    }}
+                    placeholder="姓名或邮箱"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  {showAccountSuggestions && accountSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                      {accountSuggestions.map((contact) => {
+                        const permission = contact.permissionId ? getCalendarPermissionOption(contact.permissionId) : null;
+                        return (
+                          <button
+                            key={contact.id || contact.email}
+                            type="button"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              onChange({
+                                name: contact.name,
+                                email: contact.email,
+                                permissionId: contact.permissionId || draft.permissionId,
+                                color: contact.color || draft.color,
+                                lookupState: contact.permissionId ? 'ready' : null,
+                                lookupMessage: contact.permissionId ? `已检测到对方授权：${permission.label}` : '',
+                              });
+                              setShowAccountSuggestions(false);
+                            }}
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-bold text-slate-900">{contact.name}</span>
+                              <span className="block truncate text-xs font-medium text-slate-400">{contact.email}</span>
+                            </span>
+                            {permission ? (
+                              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                已授权 · {permission.label}
+                              </span>
+                            ) : (
+                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                                联系人
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <PermissionDropdown value={draft.permissionId} onChange={(permissionId) => onChange({ permissionId })} />
                 <button
                   onClick={onSubmit}
@@ -5870,6 +5989,19 @@ function AddSharedCalendarModal({
                   添加
                 </button>
               </div>
+              {draft.lookupMessage && (
+                <div
+                  className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
+                    draft.lookupState === 'ready'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : draft.lookupState === 'blocked'
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-red-50 text-red-600'
+                  }`}
+                >
+                  {draft.lookupMessage}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -6293,6 +6425,8 @@ function MainApp() {
     email: '',
     permissionId: 'all_details',
     color: 'bg-cyan-500',
+    lookupState: null,
+    lookupMessage: '',
   });
   const [shareInvitations, setShareInvitations] = useState(MOCK_SHARE_INVITATIONS);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
@@ -7206,6 +7340,8 @@ function MainApp() {
       email: template?.email || '',
       permissionId: template?.permissionId || 'all_details',
       color: template?.color || 'bg-cyan-500',
+      lookupState: null,
+      lookupMessage: '',
     });
     setContextMenu(null);
   };
@@ -7338,6 +7474,43 @@ function MainApp() {
     );
   };
 
+  const findSharedCalendarGrant = (emailOrName = '') => {
+    const parsedMember = parseShareMemberInput(emailOrName);
+    const emailKey = normalizeParticipantIdentity(parsedMember?.email || emailOrName);
+    const nameKey = normalizeParticipantIdentity(parsedMember?.name || emailOrName);
+    const pendingInvite = shareInvitations.find((item) => {
+      if (item.status !== 'pending') return false;
+      return normalizeParticipantIdentity(item.senderEmail) === emailKey || normalizeParticipantIdentity(item.senderName) === nameKey;
+    });
+
+    if (pendingInvite) {
+      return {
+        type: 'invite',
+        inviteId: pendingInvite.id,
+        name: pendingInvite.senderName,
+        email: pendingInvite.senderEmail,
+        permissionId: pendingInvite.permissionId,
+        color: pendingInvite.color,
+      };
+    }
+
+    const template = SHARED_ACCOUNT_TEMPLATES.find((item) => {
+      return normalizeParticipantIdentity(item.email) === emailKey || normalizeParticipantIdentity(item.name) === nameKey;
+    });
+
+    if (template) {
+      return {
+        type: 'grant',
+        name: template.name,
+        email: template.email,
+        permissionId: template.permissionId,
+        color: template.color,
+      };
+    }
+
+    return null;
+  };
+
   const submitSharedCalendarDialog = () => {
     const draft = sharedCalendarDialog;
     const parsedMember = parseShareMemberInput(draft.email);
@@ -7368,25 +7541,53 @@ function MainApp() {
       icon: <AlertCircle size={16} />,
       color: 'bg-red-600',
     });
+      setSharedCalendarDialog((prev) => ({
+        ...prev,
+        lookupState: 'error',
+        lookupMessage: '该共享日历已在左侧列表中。',
+      }));
+      return;
+    }
+
+    const grant = findSharedCalendarGrant(email);
+    if (!grant) {
+      const message = `${name} 尚未向你共享日历，暂不能添加。`;
+      setSharedCalendarDialog((prev) => ({
+        ...prev,
+        lookupState: 'blocked',
+        lookupMessage: message,
+      }));
+      triggerFeedback('L3', {
+        msg: message,
+        icon: <AlertCircle size={16} />,
+        color: 'bg-amber-600',
+      });
+      return;
+    }
+
+    if (grant.type === 'invite') {
+      acceptShareInvitation(grant.inviteId);
+      setSharedCalendarDialog((prev) => ({ ...prev, open: false, tab: 'inbox', lookupState: null, lookupMessage: '' }));
       return;
     }
 
     const stamp = Date.now();
     const nextAccountId = `acc-${stamp}`;
     const nextCalendarId = `c-${stamp}`;
-    const permissionLabel = getCalendarPermissionLabel(draft.permissionId);
+    const permissionId = grant.permissionId || draft.permissionId;
+    const permissionLabel = getCalendarPermissionLabel(permissionId);
     const currentUser = accounts.find((account) => account.ownership === 'self');
 
     setAccounts((prev) => [
       ...prev,
         {
           id: nextAccountId,
-        name: email,
-        displayName: name,
-        email,
+        name: grant.email,
+        displayName: grant.name,
+        email: grant.email,
         role: '共享日历',
           ownership: 'shared',
-          color: draft.color,
+          color: grant.color || draft.color,
           checked: true,
         mailboxMembers: [
           {
@@ -7399,8 +7600,8 @@ function MainApp() {
           },
           {
             id: `mb-${stamp}-owner`,
-            name,
-            email,
+            name: grant.name,
+            email: grant.email,
             fullAccess: true,
             sendAs: true,
             sendOnBehalf: false,
@@ -7419,16 +7620,16 @@ function MainApp() {
       {
         id: nextCalendarId,
         accountId: nextAccountId,
-        name,
+        name: grant.name,
         type: 'shared',
-        owner: name,
-        color: draft.color,
+        owner: grant.name,
+        color: grant.color || draft.color,
         checked: true,
         permission: permissionLabel,
         isPrimary: true,
-        receivedFrom: email,
-        receivedFromName: name,
-        receivedPermissionId: draft.permissionId,
+        receivedFrom: grant.email,
+        receivedFromName: grant.name,
+        receivedPermissionId: permissionId,
         receivedStatus: 'accepted',
         updatedAt: Date.now(),
         defaultSharing: {
@@ -7447,7 +7648,7 @@ function MainApp() {
             name: currentUser?.name || '我',
             email: currentUser?.email || 'me@calendarpro.io',
             scope: 'internal',
-            permission: draft.permissionId,
+            permission: permissionId,
             canViewPrivate: false,
             meetingResponses: 'delegate_only',
           },
@@ -11600,6 +11801,7 @@ function MainApp() {
       <AddSharedCalendarModal
         open={sharedCalendarDialog.open}
         draft={sharedCalendarDialog}
+        accounts={accounts}
         invitations={shareInvitations}
         onClose={closeSharedCalendarDialog}
         onChange={patchSharedCalendarDialog}
