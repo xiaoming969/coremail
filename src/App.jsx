@@ -5271,7 +5271,7 @@ function CalendarSearchResults({
           <div className="mx-auto w-full max-w-[1180px]">
             {groupedResults.map((group) => (
               <section key={group.key} className="mb-6 last:mb-0">
-                <div className="sticky top-0 z-[1] flex items-center justify-between border-b border-slate-100 bg-white/95 py-2 text-xs font-bold text-slate-400 backdrop-blur">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-white py-2 text-xs font-bold text-slate-400">
                   <span>{group.label}</span>
                   <span>{group.items.length} 条</span>
                 </div>
@@ -5302,28 +5302,24 @@ function CalendarSearchResults({
                             setSelectedResultId(event.id);
                           }
                         }}
-                        className={`group grid w-full grid-cols-[58px_minmax(98px,150px)_minmax(0,1fr)] gap-4 border-b border-slate-100 px-1 py-3 text-left outline-none transition md:grid-cols-[64px_minmax(128px,170px)_10px_minmax(0,1fr)_132px] ${
+                        className={`group grid w-full grid-cols-[52px_minmax(96px,140px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-1 py-3 text-left outline-none transition last:border-b-0 md:grid-cols-[56px_minmax(120px,150px)_10px_minmax(0,1fr)_132px] ${
                           isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50'
                         }`}
                       >
-                        <div className="flex items-center gap-2 md:block">
-                          <div
-                            className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full ${
-                              sameDay(date, TODAY_DATE) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-900'
-                            }`}
-                          >
-                            <span className="text-lg font-black leading-none">{date.getDate()}</span>
+                        <div className="flex min-w-0 flex-col items-center justify-center">
+                          <div className={`text-xl font-black leading-none ${sameDay(date, TODAY_DATE) ? 'text-blue-600' : 'text-slate-900'}`}>
+                            {date.getDate()}
                           </div>
-                          <div className="mt-0 text-[11px] font-bold text-slate-500 md:mt-1 md:text-center">
+                          <div className="mt-1 text-[11px] font-bold text-slate-500">
                             {WEEKDAY_NAMES[dayIndex]}
                           </div>
                         </div>
 
-                        <div className="flex flex-col justify-center">
+                        <div className="flex min-w-0 flex-col justify-center">
                           <div className="text-sm font-black leading-5 text-slate-900">{whenMeta.timeLabel}</div>
-                          <div className="mt-1 text-[12px] font-semibold text-slate-500">{whenMeta.dateLabel}</div>
+                          <div className="mt-0.5 truncate text-[12px] font-semibold text-slate-500">{whenMeta.dateLabel}</div>
                           {timeState && (
-                            <span className={`mt-2 w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${timeState.className}`}>
+                            <span className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${timeState.className}`}>
                               {timeState.label}
                             </span>
                           )}
@@ -5332,12 +5328,32 @@ function CalendarSearchResults({
                         <div className={`mt-2 hidden h-2.5 w-2.5 rounded-full md:block ${calendar?.color || 'bg-slate-400'}`}></div>
 
                         <div className="min-w-0">
-                          <div
-                            className={`truncate text-base font-black leading-6 ${
-                              event.status === '已取消' ? 'text-slate-400 line-through' : 'text-slate-900'
-                            }`}
-                          >
-                            {renderHighlighted(event.title || '无标题')}
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div
+                              className={`truncate text-base font-black leading-6 ${
+                                event.status === '已取消' ? 'text-slate-400 line-through' : 'text-slate-900'
+                              }`}
+                            >
+                              {renderHighlighted(event.title || '无标题')}
+                            </div>
+                            {statusTags.slice(0, 2).map((tag) => (
+                              <span
+                                key={`${event.id}-${tag}`}
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                  tag === '已取消'
+                                    ? 'bg-rose-50 text-rose-600'
+                                    : tag === '未回复'
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : tag === '已拒绝'
+                                        ? 'bg-slate-100 text-slate-500'
+                                        : tag === '我已接受'
+                                          ? 'bg-emerald-50 text-emerald-700'
+                                          : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
                           </div>
 
                           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
@@ -5355,27 +5371,6 @@ function CalendarSearchResults({
                                 <span className="truncate">{renderHighlighted(sourceLabel)}</span>
                               </span>
                             )}
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {statusTags.slice(0, 3).map((tag) => (
-                              <span
-                                key={`${event.id}-${tag}`}
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                  tag === '已取消'
-                                    ? 'bg-rose-50 text-rose-600'
-                                    : tag === '未回复'
-                                      ? 'bg-amber-50 text-amber-700'
-                                      : tag === '已拒绝'
-                                        ? 'bg-slate-100 text-slate-500'
-                                        : tag === '我已接受'
-                                          ? 'bg-emerald-50 text-emerald-700'
-                                          : 'bg-slate-100 text-slate-600'
-                                }`}
-                              >
-                                {tag}
-                              </span>
-                            ))}
                           </div>
                         </div>
 
