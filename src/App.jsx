@@ -5047,6 +5047,55 @@ function CalendarSearchResults({
 }) {
   const trimmedQuery = query.trim();
   const [selectedResultId, setSelectedResultId] = useState(null);
+  const highlightTokens = useMemo(() => tokenizeKeywordQuery(trimmedQuery), [trimmedQuery]);
+
+  const renderHighlighted = (value) => {
+    const text = String(value || '');
+    if (!text || highlightTokens.length === 0) return text;
+
+    const lowerText = text.toLowerCase();
+    const matches = [];
+
+    highlightTokens.forEach((token) => {
+      let searchFrom = 0;
+      while (token && searchFrom < lowerText.length) {
+        const index = lowerText.indexOf(token, searchFrom);
+        if (index === -1) break;
+        matches.push({ start: index, end: index + token.length });
+        searchFrom = index + Math.max(1, token.length);
+      }
+    });
+
+    if (matches.length === 0) return text;
+
+    const merged = matches
+      .sort((left, right) => left.start - right.start || right.end - left.end)
+      .reduce((items, match) => {
+        const last = items[items.length - 1];
+        if (last && match.start <= last.end) {
+          last.end = Math.max(last.end, match.end);
+          return items;
+        }
+        items.push({ ...match });
+        return items;
+      }, []);
+
+    const parts = [];
+    let cursor = 0;
+
+    merged.forEach((match, index) => {
+      if (match.start > cursor) parts.push(text.slice(cursor, match.start));
+      parts.push(
+        <mark key={`${text}-${match.start}-${index}`} className="rounded bg-yellow-200/80 px-0.5 text-inherit">
+          {text.slice(match.start, match.end)}
+        </mark>,
+      );
+      cursor = match.end;
+    });
+
+    if (cursor < text.length) parts.push(text.slice(cursor));
+    return parts;
+  };
 
   useEffect(() => {
     if (results.length === 0) {
@@ -5081,10 +5130,29 @@ function CalendarSearchResults({
     return groups;
   }, [results]);
 
-  const selectedResult = useMemo(
-    () => results.find((result) => result.event.id === selectedResultId) || null,
-    [results, selectedResultId],
-  );
+  const getResultTimeState = (event) => {
+    const date = eventToDate(event);
+    const diffDays = Math.round((stripTime(date).getTime() - stripTime(TODAY_DATE).getTime()) / DAY_MS);
+
+    if (!event.isAllDay) {
+      const startH = event.startH || WORK_START_HOUR;
+      const endH = startH + (event.durationH || 1);
+      const start = new Date(date);
+      const end = new Date(date);
+      start.setHours(Math.floor(startH), Math.round((startH % 1) * 60), 0, 0);
+      end.setHours(Math.floor(endH), Math.round((endH % 1) * 60), 0, 0);
+
+      if (TODAY_DATE >= start && TODAY_DATE <= end) {
+        return { label: '进行中', className: 'border-blue-200 bg-blue-50 text-blue-700' };
+      }
+    }
+
+    if (diffDays === 0) return { label: '今天', className: 'border-blue-200 bg-blue-50 text-blue-700' };
+    if (diffDays === 1) return { label: '明天', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    if (diffDays < 0) return { label: '已过期', className: 'border-slate-200 bg-slate-50 text-slate-500' };
+    if (diffDays <= 7) return { label: `${diffDays} 天后`, className: 'border-slate-200 bg-white text-slate-600' };
+    return null;
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
@@ -5203,253 +5271,158 @@ function CalendarSearchResults({
             </div>
           </div>
         ) : (
-          <div className="grid min-h-[560px] grid-cols-1 overflow-hidden rounded-2xl border border-slate-200 bg-white xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)]">
-            <div className="min-h-0 border-b border-slate-200 xl:border-b-0 xl:border-r">
-              <div className="flex h-full min-h-0 flex-col">
-                <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-4 py-3">
-                  <div className="text-sm font-black text-slate-900">结果</div>
-                  <div className="text-xs font-semibold text-slate-400">{results.length} 条</div>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  {groupedResults.map((group) => (
-                    <section key={group.key} className="border-b border-slate-100 last:border-b-0">
-                      <div className="sticky top-0 z-[1] border-b border-slate-100 bg-white/95 px-4 py-2 text-xs font-black tracking-[0.08em] text-slate-500 backdrop-blur">
-                        {group.label}
-                      </div>
-                      <div>
-                        {group.items.map((result) => {
-                          const { event, calendar, locationLabel } = result;
-                          const isSelected = selectedResultId === event.id;
-                          const whenMeta = getSearchResultWhenMeta(event);
-                          const hitSummary = getSearchMatchSummary(result.match, trimmedQuery);
-                          const statusTags = getSearchResultStatusTags(event, calendar);
+          <div className="mx-auto min-h-[560px] w-full max-w-[1180px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5 py-3">
+              <div className="text-sm font-black text-slate-900">结果</div>
+              <div className="text-xs font-semibold text-slate-400">{results.length} 条</div>
+            </div>
+            <div>
+              {groupedResults.map((group) => (
+                <section key={group.key} className="border-b border-slate-100 last:border-b-0">
+                  <div className="sticky top-0 z-[1] border-b border-slate-100 bg-white/95 px-5 py-2 text-xs font-black tracking-[0.08em] text-slate-500 backdrop-blur">
+                    {group.label}
+                  </div>
+                  <div>
+                    {group.items.map((result) => {
+                      const { event, calendar, locationLabel, relationshipLabel, sourceLabel } = result;
+                      const date = eventToDate(event);
+                      const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+                      const isSelected = selectedResultId === event.id;
+                      const whenMeta = getSearchResultWhenMeta(event);
+                      const timeState = getResultTimeState(event);
+                      const statusTags = getSearchResultStatusTags(event, calendar);
+                      const uniqueAttendees = Array.from(
+                        new Set([event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])]),
+                      ).filter(Boolean);
+                      const attendeeTooltip = uniqueAttendees.join('、');
 
-                          return (
+                      return (
+                        <div
+                          key={event.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedResultId(event.id)}
+                          onDoubleClick={() => onOpenEvent(event.id)}
+                          onKeyDown={(entry) => {
+                            if (entry.key === 'Enter') {
+                              entry.preventDefault();
+                              onOpenEvent(event.id);
+                            }
+                            if (entry.key === ' ') {
+                              entry.preventDefault();
+                              setSelectedResultId(event.id);
+                            }
+                          }}
+                          className={`group grid w-full grid-cols-[72px_minmax(112px,160px)_minmax(0,1fr)] gap-4 border-b border-slate-100 px-5 py-4 text-left outline-none transition last:border-b-0 md:grid-cols-[84px_minmax(128px,170px)_12px_minmax(0,1fr)_auto] ${
+                            isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 md:block">
                             <div
-                              key={event.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => setSelectedResultId(event.id)}
-                              onDoubleClick={() => onOpenEvent(event.id)}
-                              onKeyDown={(entry) => {
-                                if (entry.key === 'Enter') {
-                                  entry.preventDefault();
-                                  onOpenEvent(event.id);
-                                }
-                                if (entry.key === ' ') {
-                                  entry.preventDefault();
-                                  setSelectedResultId(event.id);
-                                }
-                              }}
-                              className={`w-full border-b border-slate-100 px-4 py-4 text-left transition outline-none last:border-b-0 ${
-                                isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
+                              className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-full ${
+                                sameDay(date, TODAY_DATE) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-900'
                               }`}
                             >
-                              <div className="flex gap-4">
-                                <div className="w-40 shrink-0 pt-0.5">
-                                  <div className="text-[12px] font-bold text-slate-500">{whenMeta.dateLabel}</div>
-                                  <div className="mt-1 text-[15px] font-black leading-5 text-slate-900">{whenMeta.timeLabel}</div>
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="text-[15px] font-black leading-6 text-slate-900" style={clampLinesStyle(2)}>
-                                        {event.title || '无标题'}
-                                      </div>
-                                      <div className="mt-1 truncate text-sm font-medium text-slate-600">{result.relationshipLabel}</div>
-                                      <div className="mt-1 truncate text-sm text-slate-500">{locationLabel}</div>
-                                    </div>
-                                    {statusTags.length > 0 && (
-                                      <div className="flex max-w-[180px] flex-wrap justify-end gap-1.5">
-                                        {statusTags.map((tag) => (
-                                          <span
-                                            key={`${event.id}-${tag}`}
-                                            className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                                              tag === '已取消'
-                                                ? getAgendaStatusTone('已取消')
-                                                : tag === '未回复'
-                                                  ? getAgendaStatusTone('待响应')
-                                                  : tag === '已拒绝'
-                                                    ? getAgendaStatusTone('已拒绝')
-                                                    : tag === '我已接受'
-                                                      ? getAgendaStatusTone('已接受')
-                                                      : 'border-slate-200 bg-slate-50 text-slate-600'
-                                            }`}
-                                          >
-                                            {tag}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="mt-3 flex items-center justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="truncate text-[12px] font-semibold text-slate-500">{result.sourceLabel}</div>
-                                      <div className="mt-0.5 truncate text-[12px] text-slate-400">{hitSummary}</div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={(entry) => {
-                                        entry.stopPropagation();
-                                        onLocateEvent(event.id);
-                                      }}
-                                      onDoubleClick={(entry) => entry.stopPropagation()}
-                                      className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:bg-slate-50"
-                                    >
-                                      定位日历
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
+                              <span className="text-xl font-black leading-none">{date.getDate()}</span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="min-h-0 bg-[#fafaf9]">
-              {selectedResult ? (
-                (() => {
-                  const { event, calendar, account, locationLabel, attendeesLabel, dateLabel, match, sourceLabel, relationshipLabel } = selectedResult;
-                  const detailAttendees = Array.from(
-                    new Set([event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])]),
-                  ).filter(Boolean);
-                  const statusTone =
-                    event.status && event.status !== '已接受'
-                      ? getAgendaStatusTone(event.status)
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700';
-
-                  return (
-                    <div className="flex h-full min-h-0 flex-col">
-                      <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5 py-3">
-                        <div className="text-sm font-black text-slate-900">详情</div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onLocateEvent(event.id)}
-                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            定位日历
-                          </button>
-                          <button
-                            onClick={() => onOpenEvent(event.id)}
-                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            打开详情
-                          </button>
-                        </div>
-                      </div>
-                      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-                        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
-                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                              {account?.email || account?.name || '未知账户'}
-                            </span>
-                            {calendar?.name && (
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                                {calendar.name}
-                              </span>
-                            )}
-                            <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusTone}`}>
-                              {event.status || '已接受'}
-                            </span>
-                          </div>
-
-                          <div className="text-2xl font-black leading-tight text-slate-900">{event.title || '无标题'}</div>
-
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">时间</div>
-                              <div className="flex items-start gap-2 text-sm font-semibold text-slate-900">
-                                <Clock size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                                <span>{dateLabel}</span>
-                              </div>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">方式 / 地点</div>
-                              <div className="flex items-start gap-2 text-sm font-semibold text-slate-900">
-                                <MapPin size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                                <span>{locationLabel}</span>
-                              </div>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">来源 / 所属日历</div>
-                              <div className="flex items-start gap-2 text-sm font-semibold text-slate-900">
-                                <Calendar size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                                <span>{sourceLabel || account?.email || account?.name || '未知账户'}</span>
-                              </div>
-                            </div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">组织者 / 参会人</div>
-                              <div className="flex items-start gap-2 text-sm font-semibold text-slate-900">
-                                <Users size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                                <span>{relationshipLabel || attendeesLabel}</span>
-                              </div>
+                            <div className="mt-0 text-[12px] font-bold text-slate-500 md:mt-1 md:text-center">
+                              {WEEKDAY_NAMES[dayIndex]}
                             </div>
                           </div>
 
-                          {match.matchedFields.length > 0 && (
-                            <div>
-                              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">命中字段</div>
-                              <div className="flex flex-wrap gap-2">
-                                {match.matchedFields
-                                  .map((field) => EVENT_SEARCH_FIELD_LABELS[field])
-                                  .filter(Boolean)
-                                  .map((label) => (
+                          <div className="flex flex-col justify-center">
+                            <div className="text-sm font-black leading-5 text-slate-900">{whenMeta.timeLabel}</div>
+                            <div className="mt-1 text-[12px] font-semibold text-slate-500">{whenMeta.dateLabel}</div>
+                          </div>
+
+                          <div className={`mt-2 hidden h-3 w-3 rounded-full md:block ${calendar?.color || 'bg-slate-400'}`}></div>
+
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={`text-base font-black leading-6 ${
+                                    event.status === '已取消' ? 'text-slate-400 line-through' : 'text-slate-900'
+                                  }`}
+                                  style={clampLinesStyle(2)}
+                                >
+                                  {renderHighlighted(event.title || '无标题')}
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
+                                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    <MapPin size={14} className="shrink-0 text-slate-400" />
+                                    <span className="truncate">{renderHighlighted(locationLabel)}</span>
+                                  </span>
+                                  <span className="inline-flex min-w-0 items-center gap-1.5" title={attendeeTooltip}>
+                                    <Users size={14} className="shrink-0 text-slate-400" />
+                                    <span className="truncate">{renderHighlighted(relationshipLabel)}</span>
+                                  </span>
+                                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    <Calendar size={14} className="shrink-0 text-slate-400" />
+                                    <span className="truncate">{renderHighlighted(sourceLabel)}</span>
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  {timeState && (
+                                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${timeState.className}`}>
+                                      {timeState.label}
+                                    </span>
+                                  )}
+                                  {statusTags.map((tag) => (
                                     <span
-                                      key={`${event.id}-detail-${label}`}
-                                      className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700"
+                                      key={`${event.id}-${tag}`}
+                                      className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                                        tag === '已取消'
+                                          ? getAgendaStatusTone('已取消')
+                                          : tag === '未回复'
+                                            ? getAgendaStatusTone('待响应')
+                                            : tag === '已拒绝'
+                                              ? getAgendaStatusTone('已拒绝')
+                                              : tag === '我已接受'
+                                                ? getAgendaStatusTone('已接受')
+                                                : 'border-slate-200 bg-slate-50 text-slate-600'
+                                      }`}
                                     >
-                                      {label}
+                                      {tag}
                                     </span>
                                   ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
-
-                          <div>
-                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">正文</div>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-                              {event.description || '暂无正文内容。'}
                             </div>
                           </div>
 
-                          <div>
-                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">参会人明细</div>
-                            {detailAttendees.length > 0 ? (
-                              <div className="space-y-2">
-                                {detailAttendees.map((person) => (
-                                  <div
-                                    key={`${event.id}-${person}`}
-                                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
-                                  >
-                                    {person}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-400">
-                                当前没有参会人
-                              </div>
-                            )}
+                          <div className="col-span-3 flex items-center justify-end gap-2 opacity-100 transition md:col-span-1 md:opacity-0 md:group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={(entry) => {
+                                entry.stopPropagation();
+                                onLocateEvent(event.id);
+                              }}
+                              onDoubleClick={(entry) => entry.stopPropagation()}
+                              className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              定位
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(entry) => {
+                                entry.stopPropagation();
+                                onOpenEvent(event.id);
+                              }}
+                              onDoubleClick={(entry) => entry.stopPropagation()}
+                              className="inline-flex shrink-0 items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
+                            >
+                              详情
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="flex h-full items-center justify-center p-8 text-center text-slate-400">
-                  <div>
-                    <Search className="mx-auto mb-4 h-10 w-10" />
-                    <div className="text-base font-bold text-slate-700">未选择日程</div>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
+                </section>
+              ))}
             </div>
           </div>
         )}
@@ -7143,13 +7116,20 @@ function MainApp() {
         };
       })
       .filter(Boolean)
-      .sort(
-        (left, right) =>
-          right.match.score - left.match.score ||
-          left.distance - right.distance ||
-          eventToDate(left.event).getTime() - eventToDate(right.event).getTime() ||
-          (left.event.startH || 0) - (right.event.startH || 0),
-      );
+      .sort((left, right) => {
+        const leftDate = eventToDate(left.event);
+        const rightDate = eventToDate(right.event);
+        const todayMs = stripTime(TODAY_DATE).getTime();
+        const leftIsPast = stripTime(leftDate).getTime() < todayMs ? 1 : 0;
+        const rightIsPast = stripTime(rightDate).getTime() < todayMs ? 1 : 0;
+
+        return (
+          leftIsPast - rightIsPast ||
+          leftDate.getTime() - rightDate.getTime() ||
+          (left.event.startH || 0) - (right.event.startH || 0) ||
+          right.match.score - left.match.score
+        );
+      });
   }, [activeEvents, accountMap, calendarMap, normalizedCalendarSearch, calendarSearchFilters]);
 
   useEffect(() => {
