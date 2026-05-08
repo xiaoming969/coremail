@@ -10288,7 +10288,7 @@ function MainApp() {
                 </div>
                   {calendarSearchPopoverOpen && (
                     <div
-                      className="absolute left-0 top-[calc(100%+8px)] z-[80] w-[792px] rounded-xl bg-white"
+                      className="absolute left-0 top-0 z-[80] w-[792px] rounded-xl bg-white"
                       style={{
                         border: '0.5px solid rgba(0, 0, 0, 0.1)',
                         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
