@@ -357,6 +357,10 @@ const isHuaweiMakeupWorkday = (date) => {
   const target = stripTime(date);
   return target.getDay() === 6 && addDays(target, 7).getMonth() !== target.getMonth();
 };
+const isWeekendDate = (date) => {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+};
 const createAllDayCalendarEvent = ({ id, title, date, span = 1, calId, description = '', type = 'normal' }) => {
   const parts = dateToEventParts(date);
 
@@ -384,21 +388,6 @@ const createAllDayCalendarEvent = ({ id, title, date, span = 1, calId, descripti
     allDaySpan: span,
   };
 };
-const buildHuaweiMakeupWorkdayEvents = (year) =>
-  Array.from({ length: 12 }, (_, month) => {
-    const lastDay = new Date(year, month + 1, 0);
-    const offsetToSaturday = (lastDay.getDay() - 6 + 7) % 7;
-    const date = addDays(lastDay, -offsetToSaturday);
-
-    return createAllDayCalendarEvent({
-      id: `huawei-workday-${year}-${String(month + 1).padStart(2, '0')}`,
-      title: '华为小周末',
-      date,
-      calId: HUAWEI_CALENDAR_ID,
-      description: '每月最后一个周六为华为小周末。',
-      type: 'makeup_workday',
-    });
-  });
 const getDraftDurationBetween = (startDate, startH, endDate, endH) => {
   const start = buildDateTimeAtHour(startDate, startH);
   const end = buildDateTimeAtHour(endDate, endH);
@@ -1772,7 +1761,6 @@ const HUAWEI_HOLIDAY_EVENTS = [
 
 const MOCK_EVENTS = [
   ...HUAWEI_HOLIDAY_EVENTS,
-  ...buildHuaweiMakeupWorkdayEvents(2026),
   {
     id: 'e1',
     title: '周度产研对齐会',
@@ -3387,6 +3375,7 @@ function WeekView({
   onHideAccount,
   scrollRef,
   scrollToWorkStartToken,
+  showHuaweiWorkdayBadges = false,
 }) {
   const allDayEvents = sortEvents(events.filter((event) => event.isAllDay));
   const timedEvents = sortEvents(events.filter((event) => !event.isAllDay));
@@ -3504,10 +3493,26 @@ function WeekView({
                 <div className="shrink-0 border-r border-gray-200 bg-white" style={{ width: '64px', height: '82px' }}></div>
                 <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
                   {days.map((day) => (
-                    <div key={day.date.toISOString()} className={`border-r border-gray-200 ${day.isToday ? 'bg-blue-50/70' : 'bg-[#fcfcfb]'}`}>
+                    <div
+                      key={day.date.toISOString()}
+                      className={`border-r border-gray-200 ${
+                        day.isToday
+                          ? 'bg-blue-50/70'
+                          : showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date)
+                            ? 'bg-amber-50/70'
+                            : isWeekendDate(day.date)
+                              ? 'bg-slate-50/70'
+                              : 'bg-[#fcfcfb]'
+                      }`}
+                    >
                       <div className="flex h-12 flex-col items-center justify-center">
                         <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
-                        <span className={`text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-900'}`}>{day.dayNumber}</span>
+                        <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-900'}`}>
+                          {day.dayNumber}
+                          {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date) && (
+                            <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
+                          )}
+                        </span>
                       </div>
                       <div
                         className="grid h-[34px] border-t border-gray-200 bg-white"
@@ -3822,13 +3827,24 @@ function WeekView({
                         <div
                           key={`${pane.account.id}-${day.date.toISOString()}-date-header`}
                           className={`flex-1 border-r border-gray-200 px-2 ${
-                            day.isToday ? 'bg-blue-50/80' : 'bg-[#fcfcfb]'
+                            day.isToday
+                              ? 'bg-blue-50/80'
+                              : showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date)
+                                ? 'bg-amber-50/70'
+                                : isWeekendDate(day.date)
+                                  ? 'bg-slate-50/70'
+                                  : 'bg-[#fcfcfb]'
                           }`}
                           style={{ height: `${weekTimelineHeaderHeight}px` }}
                         >
                           <div className="flex h-full flex-col items-center justify-center">
                             <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
-                            <span className={`text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>{day.dayNumber}</span>
+                            <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>
+                              {day.dayNumber}
+                              {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date) && (
+                                <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
+                              )}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -4156,6 +4172,7 @@ function DayView({
   onHideAccount,
   scrollRef,
   scrollToWorkStartToken,
+  showHuaweiWorkdayBadges = false,
 }) {
   const lanes =
     accountDisplayMode === 'split' && splitAccounts.length > 0
@@ -4230,14 +4247,25 @@ function DayView({
                     className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
                     style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
                   >
-                    <div className="flex h-14 items-center px-4 bg-[#fcfcfb]">
+                    <div
+                      className={`flex h-14 items-center px-4 ${
+                        showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(focusDate)
+                          ? 'bg-amber-50/70'
+                          : isWeekendDate(focusDate)
+                            ? 'bg-slate-50/70'
+                            : 'bg-[#fcfcfb]'
+                      }`}
+                    >
                       <div className="flex min-w-0 items-center justify-between gap-3 w-full">
                         <div className="min-w-0 flex items-center gap-2">
                           {isSplit && <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${lane.color}`}></div>}
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
-                            <div className="text-lg font-black text-gray-900">
+                            <div className="inline-flex items-center gap-1 text-lg font-black text-gray-900">
                               {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                              {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(focusDate) && (
+                                <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4523,6 +4551,7 @@ function MonthView({
   splitAccounts,
   calendarMap,
   accountMap,
+  showHuaweiWorkdayBadges = false,
   onSelectEvent,
   onOpenEvent,
   onSelectDate,
@@ -4562,6 +4591,15 @@ function MonthView({
       {monthCells.map((cell) => {
         const dayEvents = sortEvents(panelEvents.filter((event) => sameDay(eventToDate(event), cell.date)));
         const isSelectedDate = sameDay(cell.date, focusDate);
+        const isHuaweiWorkday = showHuaweiWorkdayBadges && cell.isCurrentMonth && isHuaweiMakeupWorkday(cell.date);
+        const isWeekend = isWeekendDate(cell.date);
+        const cellSurface = !cell.isCurrentMonth
+          ? 'bg-slate-50 text-slate-300'
+          : isHuaweiWorkday
+            ? 'bg-amber-50/70 hover:bg-amber-50'
+            : isWeekend
+              ? 'bg-slate-50/80 hover:bg-blue-50/40'
+              : 'bg-white hover:bg-blue-50/40';
         const showQuickCreate = cell.isCurrentMonth && isSelectedDate;
         const maxVisibleEvents = options.groupBySource ? 4 : 3;
 
@@ -4570,28 +4608,33 @@ function MonthView({
             key={`${paneKey}-${cell.key}`}
             onClick={() => onSelectDate(cell.date)}
             onContextMenu={(event) => onSlotContextMenu(event, { date: cell.date, hour: 10, preferredAccountId })}
-            className={`group relative flex min-h-[164px] cursor-pointer flex-col p-3 transition-colors ${
-              cell.isCurrentMonth ? 'bg-white hover:bg-blue-50/40' : 'bg-slate-50 text-slate-300'
-            }`}
+            className={`group relative flex min-h-[164px] cursor-pointer flex-col p-3 transition-colors ${cellSurface}`}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelectDate(cell.date);
-                }}
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black transition ${
-                  cell.isToday
-                    ? 'bg-blue-600 text-white'
-                    : isSelectedDate
-                      ? 'border border-blue-500 bg-blue-50 text-blue-700'
-                      : cell.isCurrentMonth
-                        ? 'text-slate-800 hover:bg-slate-100'
-                        : 'text-slate-300'
-                }`}
-              >
-                {cell.date.getDate()}
-              </button>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectDate(cell.date);
+                  }}
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black transition ${
+                    cell.isToday
+                      ? 'bg-blue-600 text-white'
+                      : isSelectedDate
+                        ? 'border border-blue-500 bg-blue-50 text-blue-700'
+                        : cell.isCurrentMonth
+                          ? 'text-slate-800 hover:bg-slate-100'
+                          : 'text-slate-300'
+                  }`}
+                >
+                  {cell.date.getDate()}
+                </button>
+                {isHuaweiWorkday && (
+                  <span className="inline-flex h-5 items-center rounded-full border border-red-100 bg-white/80 px-1.5 text-[10px] font-bold leading-none text-red-500">
+                    班
+                  </span>
+                )}
+              </div>
               <button
                 onClick={(event) => {
                   event.stopPropagation();
@@ -10448,6 +10491,7 @@ function MainApp() {
                         splitAccounts={displayAccounts}
                         calendarMap={calendarMap}
                         accountMap={accountMap}
+                        showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
                         onSelectEvent={selectCalendarEvent}
                         onOpenEvent={openEventDetails}
                         onSelectDate={(date) => selectDate(date, 'day')}
@@ -10484,6 +10528,7 @@ function MainApp() {
                         onHideAccount={hideAccountFromCalendarView}
 	                        scrollRef={dayTimelineScrollRef}
 	                        scrollToWorkStartToken={timelineScrollToken}
+                        showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
 	                      />
 		                    ) : (
 	                      <WeekView
@@ -10512,6 +10557,7 @@ function MainApp() {
                           onHideAccount={hideAccountFromCalendarView}
 	                        scrollRef={weekTimelineScrollRef}
 	                        scrollToWorkStartToken={timelineScrollToken}
+                        showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
 	                      />
 	                    )}
                   </div>
