@@ -5941,6 +5941,8 @@ function AddSharedCalendarModal({
   onSetInvitationPermission,
 }) {
   const [showAccountSuggestions, setShowAccountSuggestions] = useState(false);
+  const accountInputRef = useRef(null);
+  const [accountSuggestionRect, setAccountSuggestionRect] = useState(null);
   const pendingInvitations = invitations.filter((item) => item.status === 'pending');
   const existingSharedTargets = useMemo(
     () => accounts.map((account) => ({ name: account.displayName || account.name, email: account.email })),
@@ -5968,170 +5970,228 @@ function AddSharedCalendarModal({
     if (!open) setShowAccountSuggestions(false);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !showAccountSuggestions || accountSuggestions.length === 0) {
+      setAccountSuggestionRect(null);
+      return undefined;
+    }
+
+    const updateRect = () => {
+      const input = accountInputRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      const viewportPadding = 16;
+      const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
+      const left = Math.min(Math.max(viewportPadding, rect.left), window.innerWidth - width - viewportPadding);
+      const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+      const availableAbove = rect.top - viewportPadding;
+      const shouldOpenAbove = availableBelow < 160 && availableAbove > availableBelow;
+      const maxHeight = shouldOpenAbove
+        ? Math.max(120, Math.min(260, availableAbove - 6))
+        : Math.max(120, Math.min(260, availableBelow));
+
+      setAccountSuggestionRect({
+        left,
+        top: shouldOpenAbove ? Math.max(viewportPadding, rect.top - maxHeight - 6) : rect.bottom + 6,
+        width,
+        maxHeight,
+      });
+    };
+
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [open, showAccountSuggestions, accountSuggestions.length, draft.email]);
+
   if (!open) return null;
 
-  return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
-      <div
-        className="w-[820px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
-          <div className="text-lg font-black text-gray-900">添加共享日历</div>
-          <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
-            <X size={18} />
-          </button>
-        </div>
+  const accountSuggestionLayer =
+    showAccountSuggestions && accountSuggestions.length > 0 && accountSuggestionRect
+      ? createPortal(
+          <div
+            className="fixed z-[90] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.18)]"
+            style={{
+              left: accountSuggestionRect.left,
+              top: accountSuggestionRect.top,
+              width: accountSuggestionRect.width,
+              maxHeight: accountSuggestionRect.maxHeight,
+            }}
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {accountSuggestions.map((contact) => {
+              const permission = contact.permissionId ? getCalendarPermissionOption(contact.permissionId) : null;
+              return (
+                <button
+                  key={contact.id || contact.email}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onChange({
+                      name: contact.name,
+                      email: contact.email,
+                      permissionId: contact.permissionId || draft.permissionId,
+                      color: contact.color || draft.color,
+                      lookupState: contact.permissionId ? 'ready' : null,
+                      lookupMessage: contact.permissionId ? `已检测到对方授权：${permission.label}` : '',
+                    });
+                    setShowAccountSuggestions(false);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-900">{contact.name}</span>
+                    <span className="block truncate text-xs font-medium text-slate-400">{contact.email}</span>
+                  </span>
+                  {permission ? (
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                      已授权 · {permission.label}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                      联系人
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )
+      : null;
 
-        <div className="p-6 overflow-y-auto max-h-[72vh] space-y-6">
-          {pendingInvitations.length > 0 && (
-            <div>
-              <div className="mb-3 flex items-center gap-2 text-sm font-black text-gray-900">
-                收到的共享
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">{pendingInvitations.length}</span>
-              </div>
-              <div className="overflow-visible rounded-xl border border-slate-200 bg-white">
-                <div className="grid gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px]">
-                  <div>共享方</div>
-                  <div>给我的权限</div>
-                  <div className="text-right">操作</div>
+  return (
+    <>
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
+        <div
+          className="flex max-h-[88vh] w-[820px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
+            <div className="text-lg font-black text-gray-900">添加共享日历</div>
+            <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-8 space-y-6">
+            {pendingInvitations.length > 0 && (
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-gray-900">
+                  收到的共享
+                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold leading-none text-white">{pendingInvitations.length}</span>
                 </div>
-                {pendingInvitations.map((invite) => {
-                  const invitePermission = getCalendarPermissionOption(invite.permissionId);
-                  return (
-                  <div key={invite.id} className="grid gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px] lg:items-center">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className={`h-3 w-3 shrink-0 rounded-full ${invite.color}`}></span>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-bold text-slate-900">{invite.senderName || invite.senderEmail}</div>
-                        <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{invite.senderEmail}</div>
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900">{invitePermission.label}</div>
-                      <div className="mt-0.5 truncate text-xs font-medium text-slate-400" title={invitePermission.desc}>
-                        {invitePermission.desc}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-end gap-1.5 lg:justify-end">
-                      <button
-                        onClick={() => onIgnoreInvitation(invite.id)}
-                        className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                      >
-                        忽略
-                      </button>
-                      <button
-                        onClick={() => onAcceptInvitation(invite.id)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
-                      >
-                        添加
-                      </button>
-                    </div>
+                <div className="overflow-visible rounded-xl border border-slate-200 bg-white">
+                  <div className="grid gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-400 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px]">
+                    <div>共享方</div>
+                    <div>给我的权限</div>
+                    <div className="text-right">操作</div>
                   </div>
-                  );
-                })}
+                  {pendingInvitations.map((invite) => {
+                    const invitePermission = getCalendarPermissionOption(invite.permissionId);
+                    return (
+                    <div key={invite.id} className="grid gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(170px,0.7fr)_minmax(300px,1fr)_132px] lg:items-center">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={`h-3 w-3 shrink-0 rounded-full ${invite.color}`}></span>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-bold text-slate-900">{invite.senderName || invite.senderEmail}</div>
+                          <div className="mt-0.5 truncate text-xs font-medium text-slate-400">{invite.senderEmail}</div>
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-black text-slate-900">{invitePermission.label}</div>
+                        <div className="mt-0.5 truncate text-xs font-medium text-slate-400" title={invitePermission.desc}>
+                          {invitePermission.desc}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-1.5 lg:justify-end">
+                        <button
+                          onClick={() => onIgnoreInvitation(invite.id)}
+                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          忽略
+                        </button>
+                        <button
+                          onClick={() => onAcceptInvitation(invite.id)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+                        >
+                          添加
+                        </button>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div className="mb-3 text-sm font-black text-gray-900">通过账号添加</div>
+              <div className="overflow-visible rounded-xl border border-slate-200 bg-white p-3">
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(240px,280px)_96px]">
+                  <div className="min-w-0">
+                    <input
+                      ref={accountInputRef}
+                      value={draft.email}
+                      onChange={(event) => {
+                        onChange({
+                          email: event.target.value,
+                          name: event.target.value,
+                          lookupState: null,
+                          lookupMessage: '',
+                        });
+                        setShowAccountSuggestions(true);
+                      }}
+                      onFocus={() => setShowAccountSuggestions(true)}
+                      onBlur={() => window.setTimeout(() => setShowAccountSuggestions(false), 120)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') setShowAccountSuggestions(false);
+                      }}
+                      placeholder="姓名或邮箱"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <PermissionDropdown value={draft.permissionId} onChange={(permissionId) => onChange({ permissionId })} />
+                  <button
+                    onClick={onSubmit}
+                    disabled={!draft.email.trim()}
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    添加
+                  </button>
+                </div>
+                {draft.lookupMessage && (
+                  <div
+                    className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
+                      draft.lookupState === 'ready'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : draft.lookupState === 'blocked'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-red-50 text-red-600'
+                    }`}
+                  >
+                    {draft.lookupMessage}
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </div>
 
-          <div>
-            <div className="mb-3 text-sm font-black text-gray-900">通过账号添加</div>
-            <div className="overflow-visible rounded-xl border border-slate-200 bg-white p-3">
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(240px,280px)_96px]">
-                <div className="relative min-w-0">
-                  <input
-                    value={draft.email}
-                    onChange={(event) => {
-                      onChange({
-                        email: event.target.value,
-                        name: event.target.value,
-                        lookupState: null,
-                        lookupMessage: '',
-                      });
-                      setShowAccountSuggestions(true);
-                    }}
-                    onFocus={() => setShowAccountSuggestions(true)}
-                    onBlur={() => window.setTimeout(() => setShowAccountSuggestions(false), 120)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') setShowAccountSuggestions(false);
-                    }}
-                    placeholder="姓名或邮箱"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                  {showAccountSuggestions && accountSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                      {accountSuggestions.map((contact) => {
-                        const permission = contact.permissionId ? getCalendarPermissionOption(contact.permissionId) : null;
-                        return (
-                          <button
-                            key={contact.id || contact.email}
-                            type="button"
-                            onMouseDown={(event) => {
-                              event.preventDefault();
-                              onChange({
-                                name: contact.name,
-                                email: contact.email,
-                                permissionId: contact.permissionId || draft.permissionId,
-                                color: contact.color || draft.color,
-                                lookupState: contact.permissionId ? 'ready' : null,
-                                lookupMessage: contact.permissionId ? `已检测到对方授权：${permission.label}` : '',
-                              });
-                              setShowAccountSuggestions(false);
-                            }}
-                            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-bold text-slate-900">{contact.name}</span>
-                              <span className="block truncate text-xs font-medium text-slate-400">{contact.email}</span>
-                            </span>
-                            {permission ? (
-                              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                                已授权 · {permission.label}
-                              </span>
-                            ) : (
-                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
-                                联系人
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <PermissionDropdown value={draft.permissionId} onChange={(permissionId) => onChange({ permissionId })} />
-                <button
-                  onClick={onSubmit}
-                  disabled={!draft.email.trim()}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  添加
-                </button>
-              </div>
-              {draft.lookupMessage && (
-                <div
-                  className={`mt-2 rounded-lg px-3 py-2 text-xs font-semibold ${
-                    draft.lookupState === 'ready'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : draft.lookupState === 'blocked'
-                        ? 'bg-amber-50 text-amber-700'
-                        : 'bg-red-50 text-red-600'
-                  }`}
-                >
-                  {draft.lookupMessage}
-                </div>
-              )}
+          <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-6 py-4">
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-bold text-gray-700 hover:bg-white">
+                取消
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-bold text-gray-700">
-            取消
-          </button>
-        </div>
       </div>
-    </div>
+      {accountSuggestionLayer}
+    </>
   );
 }
 
