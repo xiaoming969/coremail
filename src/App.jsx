@@ -5102,7 +5102,24 @@ function CalendarSearchResults({
 }) {
   const trimmedQuery = query.trim();
   const [selectedResultId, setSelectedResultId] = useState(null);
+  const searchResultsScrollRef = useRef(null);
   const highlightTokens = useMemo(() => tokenizeKeywordQuery(trimmedQuery), [trimmedQuery]);
+
+  const getResultStartValue = (result) => {
+    const date = eventToDate(result.event);
+    const startH = result.event.isAllDay ? 0 : result.event.startH || WORK_START_HOUR;
+    return stripTime(date).getTime() + startH * 60 * 60 * 1000;
+  };
+
+  const getResultEndValue = (result) => {
+    const date = eventToDate(result.event);
+    const end = new Date(date);
+    const endH = result.event.isAllDay
+      ? 23.99
+      : (result.event.startH || WORK_START_HOUR) + (result.event.durationH || 1);
+    end.setHours(Math.floor(endH), Math.round((endH % 1) * 60), 0, 0);
+    return end.getTime();
+  };
 
   const renderHighlighted = (value) => {
     const text = String(value || '');
@@ -5152,64 +5169,79 @@ function CalendarSearchResults({
     return parts;
   };
 
+  const timelineResults = useMemo(
+    () =>
+      [...results].sort(
+        (left, right) =>
+          getResultStartValue(left) - getResultStartValue(right) ||
+          getResultEndValue(left) - getResultEndValue(right) ||
+          right.match.score - left.match.score,
+      ),
+    [results],
+  );
+
+  const firstCurrentResultId = useMemo(() => {
+    if (timelineResults.length === 0) return null;
+    const currentResult = timelineResults.find((result) => getResultEndValue(result) >= TODAY_DATE.getTime());
+    return (currentResult || timelineResults[0]).event.id;
+  }, [timelineResults]);
+
   useEffect(() => {
     if (results.length === 0) {
       setSelectedResultId(null);
       return;
     }
 
-    setSelectedResultId((prev) => (results.some((result) => result.event.id === prev) ? prev : results[0].event.id));
-  }, [results]);
+    setSelectedResultId((prev) =>
+      results.some((result) => result.event.id === prev) ? prev : firstCurrentResultId,
+    );
+  }, [firstCurrentResultId, results]);
+
+  useLayoutEffect(() => {
+    if (!firstCurrentResultId || !searchResultsScrollRef.current) return undefined;
+
+    const timer = window.setTimeout(() => {
+      const target = searchResultsScrollRef.current?.querySelector(
+        `[data-search-result-id="${firstCurrentResultId}"]`,
+      );
+
+      if (target) {
+        target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    firstCurrentResultId,
+    filters.accountId,
+    filters.field,
+    filters.status,
+    filters.timeframe,
+    trimmedQuery,
+  ]);
 
   const groupedResults = useMemo(() => {
-    const upcoming = [];
-    const past = [];
-    const buildMonthGroups = (items, sectionLabel, keyPrefix) => {
-      const groups = [];
+    const groups = [];
 
-      items.forEach((result) => {
-        const date = eventToDate(result.event);
-        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-        const key = `${keyPrefix}-${monthKey}`;
-        let group = groups.find((item) => item.key === key);
-
-        if (!group) {
-          group = {
-            key,
-            sectionLabel,
-            label: formatMonthGroupLabel(date),
-            items: [],
-          };
-          groups.push(group);
-        }
-
-        group.items.push(result);
-      });
-
-      return groups;
-    };
-
-    results.forEach((result) => {
+    timelineResults.forEach((result) => {
       const date = eventToDate(result.event);
-      const end = new Date(date);
-      const endH = result.event.isAllDay
-        ? 23.99
-        : (result.event.startH || WORK_START_HOUR) + (result.event.durationH || 1);
-      end.setHours(Math.floor(endH), Math.round((endH % 1) * 60), 0, 0);
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+      let group = groups.find((item) => item.key === monthKey);
 
-      if (end.getTime() >= TODAY_DATE.getTime()) {
-        upcoming.push(result);
-      } else {
-        past.push(result);
+      if (!group) {
+        group = {
+          key: monthKey,
+          label: formatMonthGroupLabel(date),
+          items: [],
+        };
+        groups.push(group);
       }
+
+      group.items.push(result);
     });
 
-    if (upcoming.length === 0) {
-      return past.length > 0 ? buildMonthGroups(past, '历史日程', 'past') : [];
-    }
-
-    return [...buildMonthGroups(upcoming, '当前与未来日程', 'upcoming'), ...buildMonthGroups(past, '历史日程', 'past')];
-  }, [results]);
+    return groups;
+  }, [timelineResults]);
 
   const getResultTimeState = (event) => {
     const date = eventToDate(event);
@@ -5298,7 +5330,7 @@ function CalendarSearchResults({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 sm:px-8">
+      <div ref={searchResultsScrollRef} className="min-h-0 flex-1 overflow-y-auto bg-white px-4 py-4 sm:px-8">
         {!trimmedQuery ? (
           <div className="flex min-h-[320px] items-center justify-center px-6 text-center text-slate-400">
             <div>
@@ -5318,11 +5350,7 @@ function CalendarSearchResults({
             {groupedResults.map((group) => (
               <section key={group.key} className="mb-6 last:mb-0">
                 <div className="flex items-center justify-between border-b border-slate-100 bg-white py-2 text-xs font-bold text-slate-400">
-                  <span>
-                    {group.sectionLabel}
-                    <span className="mx-2 text-slate-300">/</span>
-                    <span className="text-slate-500">{group.label}</span>
-                  </span>
+                  <span className="text-slate-500">{group.label}</span>
                   <span>{group.items.length} 条</span>
                 </div>
                 <div>
@@ -5352,6 +5380,7 @@ function CalendarSearchResults({
                             setSelectedResultId(event.id);
                           }
                         }}
+                        data-search-result-id={event.id}
                         className={`group grid w-full grid-cols-[52px_minmax(96px,140px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-1 py-3 text-left outline-none transition last:border-b-0 md:grid-cols-[56px_minmax(120px,150px)_10px_minmax(0,1fr)_132px] ${
                           isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50'
                         }`}
@@ -5402,10 +5431,12 @@ function CalendarSearchResults({
                                 <span className="truncate">{renderHighlighted(locationLabel)}</span>
                               </span>
                             )}
-                            <span className="inline-flex min-w-0 items-center gap-1.5" title={attendeesTooltip || relationshipLabel}>
-                              <Users size={14} className="shrink-0 text-slate-400" />
-                              <span className="truncate">{renderHighlighted(relationshipLabel)}</span>
-                            </span>
+                            {relationshipLabel && (
+                              <span className="inline-flex min-w-0 items-center gap-1.5" title={attendeesTooltip || relationshipLabel}>
+                                <Users size={14} className="shrink-0 text-slate-400" />
+                                <span className="truncate">{renderHighlighted(relationshipLabel)}</span>
+                              </span>
+                            )}
                             {sourceLabel && (
                               <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
                                 <Calendar size={14} className="shrink-0 text-slate-400" />
@@ -7174,7 +7205,10 @@ function MainApp() {
         const match = getEventSearchMatchMeta(event, calendar, account, normalizedCalendarSearch, calendarSearchFilters.field);
         if (!match) return null;
 
-        const uniqueAttendees = Array.from(new Set([...(event.attendees || []), ...(event.optionalAttendees || [])])).filter(Boolean);
+        const isSystemCalendarEvent = event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID;
+        const uniqueAttendees = isSystemCalendarEvent
+          ? []
+          : Array.from(new Set([...(event.attendees || []), ...(event.optionalAttendees || [])])).filter(Boolean);
         const attendeeCount = uniqueAttendees.length;
         const date = eventToDate(event);
         const distance = Math.abs(stripTime(date).getTime() - stripTime(TODAY_DATE).getTime()) / DAY_MS;
@@ -7184,15 +7218,19 @@ function MainApp() {
             : attendeeCount <= 2
               ? uniqueAttendees.join('、')
               : `${uniqueAttendees.slice(0, 2).join('、')} +${attendeeCount - 2} 人`;
-        const relationshipLabel = match.matchedFields.includes('organizer')
-          ? `组织者：${event.organizer || '未填写'}`
-          : match.matchedFields.includes('attendees')
-            ? `参与人：${participantPreview || '未填写'}`
-            : event.organizer
-              ? `组织者：${event.organizer}${participantPreview ? ` · ${participantPreview}` : ''}`
-              : participantPreview
+        const hasOrganizer = Boolean(event.organizer) && !isSystemCalendarEvent;
+        const relationshipLabel =
+          isSystemCalendarEvent
+            ? ''
+            : match.matchedFields.includes('organizer') && hasOrganizer
+              ? `组织者：${event.organizer}`
+              : match.matchedFields.includes('attendees') && participantPreview
                 ? `参与人：${participantPreview}`
-                : '未填写组织者和参与人';
+                : hasOrganizer
+                  ? `组织者：${event.organizer}${participantPreview ? ` · ${participantPreview}` : ''}`
+                  : participantPreview
+                    ? `参与人：${participantPreview}`
+                    : '';
         const sourceLabel =
           account?.ownership === 'shared'
             ? `共享日历 · ${getAccountDisplayLabel(account)}`
@@ -7211,7 +7249,9 @@ function MainApp() {
           dateLabel: formatAgendaEventLabel(event),
           locationLabel: locationParts.join(' · '),
           attendeesLabel:
-            attendeeCount > 0
+            isSystemCalendarEvent
+              ? ''
+              : attendeeCount > 0
               ? `${event.organizer || '组织者'}，另有 ${attendeeCount} 位参会人`
               : `${event.organizer || '组织者'} 组织`,
           attendeesTooltip: uniqueAttendees.join('、'),
