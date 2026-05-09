@@ -335,6 +335,7 @@ const formatTimeRange = (startH, durationH) => `${formatHour(startH)} - ${format
 
 const formatDateLabel = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const formatMonthGroupLabel = (date) => `${date.getFullYear()}年${date.getMonth() + 1}月`;
 
 const formatDraftTime = (date, startH, durationH) => `${formatDateLabel(date)} ${formatTimeRange(startH, durationH)}`;
 const formatTimeSelectLabel = (value) => {
@@ -3366,6 +3367,7 @@ function WeekView({
   scrollRef,
   scrollToWorkStartToken,
   showHuaweiWorkdayBadges = false,
+  flashingEventId = null,
 }) {
   const allDayEvents = sortEvents(events.filter((event) => event.isAllDay));
   const timedEvents = sortEvents(events.filter((event) => !event.isAllDay));
@@ -3552,9 +3554,10 @@ function WeekView({
                                   const spans = Math.max(1, event.allDaySpan || 1);
 
                                   return (
-                                    <button
-                                      key={`${dayIndex}-${account.id}-${event.id}`}
-                                      onClick={(entry) => {
+	                                    <button
+	                                      key={`${dayIndex}-${account.id}-${event.id}`}
+	                                      data-event-card-id={event.id}
+	                                      onClick={(entry) => {
                                         entry.stopPropagation();
                                         onSelectEvent(event.id);
                                       }}
@@ -3566,7 +3569,9 @@ function WeekView({
                                       onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                       onMouseLeave={() => onHidePreview(event.id)}
                                       title={title}
-                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:bg-white ${tones.container}`}
+                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:bg-white ${tones.container} ${
+                                        flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                                      }`}
                                     >
                                       <span className={event.status === '已取消' ? 'line-through' : ''}>{title}</span>
                                       {spans > 1 && <span className="ml-1 text-[10px] text-gray-400">跨{spans}天</span>}
@@ -3674,9 +3679,10 @@ function WeekView({
                               const showSecondary = density === 'regular' && safeDuration >= 1.25;
 
                               return (
-                                <div
-                                  key={event.id}
-                                  onMouseDown={(entry) => {
+	                                <div
+	                                  key={event.id}
+	                                  data-event-card-id={event.id}
+	                                  onMouseDown={(entry) => {
                                     if (!editable || entry.button !== 0) return;
                                     onStartEventMove(entry, event);
                                   }}
@@ -3695,7 +3701,9 @@ function WeekView({
                                   title={`${title} · ${formatTimeRange(safeStartH, safeDuration)}`}
                                   className={`group absolute overflow-hidden rounded-lg border px-2 py-1.5 shadow-none ${tones.container} ${statusSurface.cardClass} ${
                                     editable ? 'cursor-grab select-none hover:ring-2 hover:ring-blue-200/80 active:cursor-grabbing' : 'cursor-pointer'
-                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none z-20 ring-2 ring-blue-300 shadow-lg' : 'hover:z-10'}`}
+                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none z-20 ring-2 ring-blue-300 shadow-lg' : 'hover:z-10'} ${
+                                    flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                                  }`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width }}
                                 >
                                   {!isBusyOnlyEvent(event, calendar) && <div className={`absolute bottom-0 left-0 top-0 w-1 ${tones.stripe}`}></div>}
@@ -3879,9 +3887,10 @@ function WeekView({
                           const width = `calc(${(spanDays * 100) / days.length}% - 8px)`;
 
                           return (
-                            <button
-                              key={`${pane.account.id}-${event.id}-span`}
-                              onClick={(entry) => {
+	                            <button
+	                              key={`${pane.account.id}-${event.id}-span`}
+	                              data-event-card-id={event.id}
+	                              onClick={(entry) => {
                                 entry.stopPropagation();
                                 onSelectEvent(event.id);
                               }}
@@ -3893,7 +3902,9 @@ function WeekView({
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
                               title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
-                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container}`}
+                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container} ${
+                                flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                              }`}
                               style={{ left, width, top }}
                             >
                               <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${tones.stripe}`}></div>
@@ -4021,9 +4032,10 @@ function WeekView({
                               const statusSurface = getTimedEventStatusSurface(event.status);
 
                               return (
-                                <div
-                                  key={event.id}
-                                  onMouseDown={(entry) => {
+	                                <div
+	                                  key={event.id}
+	                                  data-event-card-id={event.id}
+	                                  onMouseDown={(entry) => {
                                     if (!editable || entry.button !== 0) return;
                                     onStartEventMove(entry, event);
                                   }}
@@ -4042,7 +4054,9 @@ function WeekView({
                                   title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
                                   className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                                     editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
-                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'}`}
+                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'} ${
+                                    flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                                  }`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width, padding: useCompactCard ? '6px' : '8px' }}
                                 >
                                   {!hiddenDetails && <div className={`absolute left-0 top-0 bottom-0 w-1 ${tones.stripe}`}></div>}
@@ -4163,6 +4177,7 @@ function DayView({
   scrollRef,
   scrollToWorkStartToken,
   showHuaweiWorkdayBadges = false,
+  flashingEventId = null,
 }) {
   const lanes =
     accountDisplayMode === 'split' && splitAccounts.length > 0
@@ -4294,9 +4309,10 @@ function DayView({
                           const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                           const account = accountMap[calendar.accountId];
                           return (
-                            <button
-                              key={event.id}
-                              onClick={(entry) => {
+	                            <button
+	                              key={event.id}
+	                              data-event-card-id={event.id}
+	                              onClick={(entry) => {
                                 entry.stopPropagation();
                                 onSelectEvent(event.id);
                               }}
@@ -4308,7 +4324,9 @@ function DayView({
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
                               title={`${event.title}${account ? ` · ${account.name}` : ''}`}
-                              className="w-full text-left rounded-xl border px-3 py-2 bg-gray-50 hover:bg-white"
+                              className={`w-full text-left rounded-xl border px-3 py-2 bg-gray-50 hover:bg-white ${
+                                flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                              }`}
                             >
                               <div className="flex items-start">
                                 <div className={`w-2 h-2 rounded-full mr-2 ${calendar.color}`}></div>
@@ -4420,9 +4438,10 @@ function DayView({
                         const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
                         const statusSurface = getTimedEventStatusSurface(event.status);
                               return (
-                          <div
-                            key={event.id}
-                            onMouseDown={(entry) => {
+	                          <div
+	                            key={event.id}
+	                            data-event-card-id={event.id}
+	                            onMouseDown={(entry) => {
                               if (!editable || entry.button !== 0) return;
                               onStartEventMove(entry, event);
                             }}
@@ -4441,7 +4460,9 @@ function DayView({
                             title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${event.location && !hiddenDetails ? ` · ${event.location}` : ''}`}
                             className={`group absolute border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                               editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
-                            } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'}`}
+                            } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'} ${
+                              flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                            }`}
                             style={{ top: `${top}px`, height: `${height}px`, left, width }}
                           >
                             {!hiddenDetails && <div className={`absolute left-0 top-0 bottom-0 w-1 ${useCompactCard ? '' : 'rounded-l-xl'} ${tones.stripe}`}></div>}
@@ -4551,6 +4572,7 @@ function MonthView({
   onPreviewEvent,
   onHidePreview,
   onHideAccount,
+  flashingEventId = null,
 }) {
   const monthCells = buildMiniMonthCells(focusDate);
   const monthWeekdayStickyTop = 0;
@@ -4655,9 +4677,10 @@ function MonthView({
                 const sourceLabel = options.groupBySource ? getCompactSourceLabel(account, calendar) : '';
 
                 return (
-                  <button
-                    key={event.id}
-                    onClick={(entry) => {
+	                  <button
+	                    key={event.id}
+	                    data-event-card-id={event.id}
+	                    onClick={(entry) => {
                       entry.stopPropagation();
                       onSelectEvent(event.id);
                     }}
@@ -4669,7 +4692,9 @@ function MonthView({
                     onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseLeave={() => onHidePreview(event.id)}
                     title={`${visibleTitle}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
-                    className={`w-full rounded border px-1.5 py-1 text-left text-[11px] leading-tight ${tones.container}`}
+                    className={`w-full rounded border px-1.5 py-1 text-left text-[11px] leading-tight ${tones.container} ${
+                      flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
+                    }`}
                   >
                     <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                       <div className={`shrink-0 rounded-sm ${tones.stripe}`} style={{ width: '3px', height: '3px' }}></div>
@@ -5139,6 +5164,30 @@ function CalendarSearchResults({
   const groupedResults = useMemo(() => {
     const upcoming = [];
     const past = [];
+    const buildMonthGroups = (items, sectionLabel, keyPrefix) => {
+      const groups = [];
+
+      items.forEach((result) => {
+        const date = eventToDate(result.event);
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+        const key = `${keyPrefix}-${monthKey}`;
+        let group = groups.find((item) => item.key === key);
+
+        if (!group) {
+          group = {
+            key,
+            sectionLabel,
+            label: formatMonthGroupLabel(date),
+            items: [],
+          };
+          groups.push(group);
+        }
+
+        group.items.push(result);
+      });
+
+      return groups;
+    };
 
     results.forEach((result) => {
       const date = eventToDate(result.event);
@@ -5156,13 +5205,10 @@ function CalendarSearchResults({
     });
 
     if (upcoming.length === 0) {
-      return past.length > 0 ? [{ key: 'past', label: '历史日程', items: past }] : [];
+      return past.length > 0 ? buildMonthGroups(past, '历史日程', 'past') : [];
     }
 
-    return [
-      { key: 'upcoming', label: '当前与未来日程', items: upcoming },
-      ...(past.length > 0 ? [{ key: 'past', label: '历史日程', items: past }] : []),
-    ];
+    return [...buildMonthGroups(upcoming, '当前与未来日程', 'upcoming'), ...buildMonthGroups(past, '历史日程', 'past')];
   }, [results]);
 
   const getResultTimeState = (event) => {
@@ -5272,7 +5318,11 @@ function CalendarSearchResults({
             {groupedResults.map((group) => (
               <section key={group.key} className="mb-6 last:mb-0">
                 <div className="flex items-center justify-between border-b border-slate-100 bg-white py-2 text-xs font-bold text-slate-400">
-                  <span>{group.label}</span>
+                  <span>
+                    {group.sectionLabel}
+                    <span className="mx-2 text-slate-300">/</span>
+                    <span className="text-slate-500">{group.label}</span>
+                  </span>
                   <span>{group.items.length} 条</span>
                 </div>
                 <div>
@@ -5283,7 +5333,7 @@ function CalendarSearchResults({
                     const isSelected = selectedResultId === event.id;
                     const whenMeta = getSearchResultWhenMeta(event);
                     const timeState = getResultTimeState(event);
-                    const statusTags = getSearchResultStatusTags(event, calendar).filter((tag) => tag !== '正文' && tag !== '地点');
+                    const criticalStatusTag = event.status === '已取消' ? '已取消' : '';
 
                     return (
                       <div
@@ -5336,31 +5386,22 @@ function CalendarSearchResults({
                             >
                               {renderHighlighted(event.title || '无标题')}
                             </div>
-                            {statusTags.slice(0, 2).map((tag) => (
+                            {criticalStatusTag && (
                               <span
-                                key={`${event.id}-${tag}`}
-                                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                  tag === '已取消'
-                                    ? 'bg-rose-50 text-rose-600'
-                                    : tag === '未回复'
-                                      ? 'bg-amber-50 text-amber-700'
-                                      : tag === '已拒绝'
-                                        ? 'bg-slate-100 text-slate-500'
-                                        : tag === '我已接受'
-                                          ? 'bg-emerald-50 text-emerald-700'
-                                          : 'bg-slate-100 text-slate-600'
-                                }`}
+                                className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-600"
                               >
-                                {tag}
+                                {criticalStatusTag}
                               </span>
-                            ))}
+                            )}
                           </div>
 
                           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
-                            <span className="inline-flex min-w-0 items-center gap-1.5">
-                              <MapPin size={14} className="shrink-0 text-slate-400" />
-                              <span className="truncate">{renderHighlighted(locationLabel)}</span>
-                            </span>
+                            {locationLabel && (
+                              <span className="inline-flex min-w-0 items-center gap-1.5">
+                                <MapPin size={14} className="shrink-0 text-slate-400" />
+                                <span className="truncate">{renderHighlighted(locationLabel)}</span>
+                              </span>
+                            )}
                             <span className="inline-flex min-w-0 items-center gap-1.5" title={attendeesTooltip || relationshipLabel}>
                               <Users size={14} className="shrink-0 text-slate-400" />
                               <span className="truncate">{renderHighlighted(relationshipLabel)}</span>
@@ -6466,6 +6507,7 @@ function MainApp() {
   const [calendarLayout, setCalendarLayout] = useState('week');
   const [accountDisplayMode, setAccountDisplayMode] = useState('overlay');
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [flashingEventId, setFlashingEventId] = useState(null);
   const [accounts, setAccounts] = useState(MOCK_ACCOUNTS);
   const [calendars, setCalendars] = useState(MOCK_CALENDARS);
   const [events, setEvents] = useState(MOCK_EVENTS);
@@ -6568,6 +6610,7 @@ function MainApp() {
   const dayTimelineScrollRef = useRef(null);
   const weekTimelineScrollRef = useRef(null);
   const navToRef = useRef(null);
+  const locateFlashTimerRef = useRef(null);
 
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((account) => [account.id, account])), [accounts]);
   const calendarMap = useMemo(() => Object.fromEntries(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
@@ -6587,6 +6630,12 @@ function MainApp() {
     window.addEventListener('mousedown', handlePointerDown);
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, [calendarSearchPopoverOpen]);
+
+  useEffect(() => () => {
+    if (locateFlashTimerRef.current) {
+      window.clearTimeout(locateFlashTimerRef.current);
+    }
+  }, []);
 
   const activeCalIds = useMemo(
     () =>
@@ -7100,7 +7149,7 @@ function MainApp() {
           match,
           distance,
           dateLabel: formatAgendaEventLabel(event),
-          locationLabel: locationParts.length > 0 ? locationParts.join(' · ') : '未填写地点或方式',
+          locationLabel: locationParts.join(' · '),
           attendeesLabel:
             attendeeCount > 0
               ? `${event.organizer || '组织者'}，另有 ${attendeeCount} 位参会人`
@@ -7118,8 +7167,17 @@ function MainApp() {
         const leftIsPast = stripTime(leftDate).getTime() < todayMs ? 1 : 0;
         const rightIsPast = stripTime(rightDate).getTime() < todayMs ? 1 : 0;
 
+        if (leftIsPast !== rightIsPast) return leftIsPast - rightIsPast;
+
+        if (leftIsPast) {
+          return (
+            rightDate.getTime() - leftDate.getTime() ||
+            (right.event.startH || 0) - (left.event.startH || 0) ||
+            right.match.score - left.match.score
+          );
+        }
+
         return (
-          leftIsPast - rightIsPast ||
           leftDate.getTime() - rightDate.getTime() ||
           (left.event.startH || 0) - (right.event.startH || 0) ||
           right.match.score - left.match.score
@@ -8117,15 +8175,29 @@ function MainApp() {
     const targetEvent = events.find((event) => event.id === eventId);
     if (!targetEvent) return;
 
+    if (locateFlashTimerRef.current) {
+      window.clearTimeout(locateFlashTimerRef.current);
+    }
+    setFlashingEventId(null);
     setFocusDate(stripTime(eventToDate(targetEvent)));
     setSelectedEventId(eventId);
     setShowRightSidebar(false);
     setCurrentScreen('calendar');
     setCalendarReturnScreen('calendar');
 
-    if (calendarLayout === 'day' || calendarLayout === 'week') {
-      queueTimelineScrollToWorkStart(calendarLayout);
-    }
+    const scrollToLocatedEvent = () => {
+      const target = document.querySelector(`[data-event-card-id="${eventId}"]`);
+      if (target) {
+        target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      }
+    };
+
+    [80, 220, 420].forEach((delay) => window.setTimeout(scrollToLocatedEvent, delay));
+    window.setTimeout(() => {
+      scrollToLocatedEvent();
+      setFlashingEventId(eventId);
+      locateFlashTimerRef.current = window.setTimeout(() => setFlashingEventId(null), 2600);
+    }, 120);
   };
   const executeCalendarSearch = (query = calendarSearchQuery) => {
     const nextQuery = query.trim();
@@ -10189,6 +10261,22 @@ function MainApp() {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-[#f7f7f5] text-gray-900 antialiased">
+      <style>{`
+        @keyframes coremail-event-locate-pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+            transform: scale(1);
+          }
+          20%, 70% {
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.28), 0 0 0 8px rgba(37, 99, 235, 0.12);
+            transform: scale(1.01);
+          }
+        }
+        .coremail-event-locate-pulse {
+          animation: coremail-event-locate-pulse 1.1s ease-in-out 2;
+          z-index: 30 !important;
+        }
+      `}</style>
       {activeProduct === 'calendar' ? (
         <CalendarSidebar
           accounts={accounts}
@@ -10339,20 +10427,24 @@ function MainApp() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={handleCalendarSync}
-                  className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
-                >
-                  <RefreshCw size={14} className="mr-1.5" />
-                  同步日历
-                </button>
-                <button
-                  onClick={handleOpenReminders}
-                  className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
-                >
-                  <Bell size={14} className="mr-1.5" />
-                  提醒
-                </button>
+                {currentScreen !== 'search' && (
+                  <>
+                    <button
+                      onClick={handleCalendarSync}
+                      className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
+                    >
+                      <RefreshCw size={14} className="mr-1.5" />
+                      同步日历
+                    </button>
+                    <button
+                      onClick={handleOpenReminders}
+                      className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
+                    >
+                      <Bell size={14} className="mr-1.5" />
+                      提醒
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="hidden sm:flex items-center text-xs text-slate-700 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 select-none shrink-0">
@@ -10520,6 +10612,7 @@ function MainApp() {
                         onPreviewEvent={showEventPreview}
                         onHidePreview={hideEventPreview}
                         onHideAccount={hideAccountFromCalendarView}
+                        flashingEventId={flashingEventId}
 	                      />
 	                    ) : calendarLayout === 'day' ? (
 		                      <DayView
@@ -10548,6 +10641,7 @@ function MainApp() {
 	                        scrollRef={dayTimelineScrollRef}
 	                        scrollToWorkStartToken={timelineScrollToken}
                         showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
+                        flashingEventId={flashingEventId}
 	                      />
 		                    ) : (
 	                      <WeekView
@@ -10577,6 +10671,7 @@ function MainApp() {
 	                        scrollRef={weekTimelineScrollRef}
 	                        scrollToWorkStartToken={timelineScrollToken}
                         showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
+                        flashingEventId={flashingEventId}
 	                      />
 	                    )}
                   </div>
