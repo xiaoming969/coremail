@@ -562,11 +562,6 @@ const getSearchResultWhenMeta = (event) => {
     timeLabel: event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1),
   };
 };
-const getSearchMatchSummary = (match, query) => {
-  const labels = (match?.matchedFields || []).map((field) => EVENT_SEARCH_FIELD_LABELS[field]).filter(Boolean);
-  if (labels.length === 0) return query ? `命中：${query}` : '命中当前关键词';
-  return `命中：${labels.join('、')}${query ? ` · "${query}"` : ''}`;
-};
 const getSearchResultStatusTags = (event, calendar) => {
   const tags = [];
 
@@ -759,16 +754,6 @@ const tokenizeKeywordQuery = (query = '') => {
 
   return Array.from(new Set(tokens.length > 0 ? tokens : [normalized]));
 };
-const EVENT_SEARCH_FIELD_LABELS = {
-  title: '标题',
-  description: '正文',
-  attendees: '参会人',
-  organizer: '组织者',
-  time: '时间',
-  location: '地点',
-  calendar: '账户/日历',
-  attachments: '附件',
-};
 const EVENT_SEARCH_FIELD_WEIGHTS = {
   title: 8,
   attendees: 7,
@@ -779,23 +764,6 @@ const EVENT_SEARCH_FIELD_WEIGHTS = {
   description: 3,
   calendar: 2,
 };
-const SEARCH_SCOPE_OPTIONS = [
-  { id: 'all', label: '全部字段' },
-  { id: 'title', label: '主题' },
-  { id: 'description', label: '正文' },
-  { id: 'attendees', label: '参会人' },
-  { id: 'organizer', label: '组织者' },
-  { id: 'time', label: '时间' },
-  { id: 'location', label: '地点' },
-  { id: 'calendar', label: '账户/日历' },
-];
-const SEARCH_STATUS_OPTIONS = [
-  { id: 'all', label: '我的响应：全部' },
-  { id: 'accepted', label: '我已接受' },
-  { id: 'tentative', label: '我暂定' },
-  { id: 'declined', label: '我已拒绝' },
-  { id: 'unanswered', label: '未响应' },
-];
 const SEARCH_TIMEFRAME_OPTIONS = [
   { id: 'all', label: '时间：全部时间' },
   { id: 'today', label: '今天' },
@@ -803,7 +771,7 @@ const SEARCH_TIMEFRAME_OPTIONS = [
   { id: 'this_week', label: '本周' },
   { id: 'last_week', label: '上周' },
   { id: 'this_month', label: '本月' },
-  { id: 'next_30_days', label: '未来 30 天' },
+  { id: 'custom', label: '自定义时间范围' },
 ];
 const SEARCH_ACCOUNT_SCOPE_OPTIONS = [
   { id: 'all', label: '搜索范围：全部日历' },
@@ -811,6 +779,15 @@ const SEARCH_ACCOUNT_SCOPE_OPTIONS = [
   { id: 'shared', label: '共享日历' },
   { id: 'group', label: '群组日历' },
   { id: 'room', label: '会议室日历' },
+];
+const SEARCH_COLOR_CATEGORY_OPTIONS = [
+  { id: 'all', label: '颜色分类：全部', shortLabel: '全部', colorClass: 'bg-slate-400' },
+  { id: 'none', label: '无分类', shortLabel: '无分类', colorClass: 'bg-slate-300' },
+  { id: 'project', label: '项目', shortLabel: '项目', colorClass: 'bg-blue-500' },
+  { id: 'customer', label: '客户', shortLabel: '客户', colorClass: 'bg-emerald-500' },
+  { id: 'important', label: '重要', shortLabel: '重要', colorClass: 'bg-rose-500' },
+  { id: 'todo', label: '待处理', shortLabel: '待处理', colorClass: 'bg-amber-500' },
+  { id: 'personal', label: '个人', shortLabel: '个人', colorClass: 'bg-violet-500' },
 ];
 const SEARCH_MEETING_TYPE_OPTIONS = [
   { id: 'all', label: '会议类型：全部' },
@@ -826,18 +803,9 @@ const SEARCH_ATTACHMENT_OPTIONS = [
   { id: 'none', label: '无附件' },
 ];
 const SEARCH_SORT_OPTIONS = [
-  { id: 'default', label: '排序：默认排序' },
-  { id: 'relevance', label: '相关性优先' },
+  { id: 'relevance', label: '排序：相关性优先' },
   { id: 'time_asc', label: '时间从近到远' },
   { id: 'time_desc', label: '时间从远到近' },
-];
-const SEARCH_RESULT_COLUMN_OPTIONS = [
-  { id: 'time', label: '时间' },
-  { id: 'people', label: '组织者 / 参会人' },
-  { id: 'location', label: '地点' },
-  { id: 'calendar', label: '账户 / 日历' },
-  { id: 'status', label: '状态' },
-  { id: 'matchedFields', label: '命中字段' },
 ];
 const getEventStatusBadgeMeta = (status) => {
   if (status === '待响应') {
@@ -1039,6 +1007,47 @@ const eventMatchesAttachmentFilter = (event, attachmentFilter) => {
 
   return true;
 };
+const normalizeColorCategoryId = (value = '') => String(value || '').trim().toLowerCase();
+const getColorCategoryMeta = (value) => {
+  const normalized = normalizeColorCategoryId(value);
+  return (
+    SEARCH_COLOR_CATEGORY_OPTIONS.find((option) => option.id === normalized || normalizeColorCategoryId(option.shortLabel) === normalized) ||
+    null
+  );
+};
+const getEventColorCategories = (event = {}) => {
+  const rawCategories = Array.isArray(event.colorCategories)
+    ? event.colorCategories
+    : Array.isArray(event.colorCategory)
+      ? event.colorCategory
+      : [event.colorCategory].filter(Boolean);
+
+  return rawCategories
+    .map((item) => {
+      if (typeof item === 'object' && item) {
+        const meta = getColorCategoryMeta(item.id || item.label);
+        return {
+          id: normalizeColorCategoryId(item.id || meta?.id || item.label),
+          label: item.label || meta?.shortLabel || item.id,
+          colorClass: item.colorClass || meta?.colorClass || 'bg-slate-400',
+        };
+      }
+
+      const meta = getColorCategoryMeta(item);
+      return {
+        id: meta?.id || normalizeColorCategoryId(item),
+        label: meta?.shortLabel || String(item || ''),
+        colorClass: meta?.colorClass || 'bg-slate-400',
+      };
+    })
+    .filter((item) => item.id && item.label);
+};
+const eventMatchesColorCategory = (event, colorCategory) => {
+  if (!colorCategory || colorCategory === 'all') return true;
+  const categories = getEventColorCategories(event);
+  if (colorCategory === 'none') return categories.length === 0;
+  return categories.some((category) => category.id === colorCategory);
+};
 const eventMatchesSearchTimeframe = (event, timeframe) => {
   if (!timeframe || timeframe === 'all') return true;
 
@@ -1075,6 +1084,59 @@ const eventMatchesSearchTimeframe = (event, timeframe) => {
   }
 
   return true;
+};
+const getEventStartTimestamp = (event) => {
+  const date = eventToDate(event);
+  const startH = event.isAllDay ? 0 : event.startH || WORK_START_HOUR;
+  return stripTime(date).getTime() + startH * 60 * 60 * 1000;
+};
+const getEventEndTimestamp = (event) => {
+  const date = eventToDate(event);
+  if (event.isAllDay) return stripTime(date).getTime() + DAY_MS * (event.allDaySpan || 1);
+
+  const startH = event.startH || WORK_START_HOUR;
+  const endH = startH + (event.durationH || 1);
+  return stripTime(date).getTime() + endH * 60 * 60 * 1000;
+};
+const canJoinCalendarEvent = (event, referenceDate = TODAY_DATE) => {
+  if (!event?.meetingLink || !event.meetingProvider || event.meetingProvider === 'none') return false;
+  if (event.status === '已取消' || event.type === 'cancelled') return false;
+
+  const startValue = getEventStartTimestamp(event);
+  const endValue = getEventEndTimestamp(event);
+  return startValue - referenceDate.getTime() <= 15 * 60 * 1000 && endValue >= referenceDate.getTime();
+};
+const getPrimarySearchAccountId = (accountOptions = []) => accountOptions[0]?.id || 'all';
+const getSearchSelectedAccountIds = (filters = {}, accountOptions = []) => {
+  if (accountOptions.length === 0) return [];
+  if (accountOptions.length === 1) return [accountOptions[0].id];
+
+  if (filters.accountId === 'all') return accountOptions.map((account) => account.id);
+  if (filters.accountId === 'custom') {
+    const allowedIds = new Set(accountOptions.map((account) => account.id));
+    const selected = (filters.accountIds || []).filter((id) => allowedIds.has(id));
+    return selected.length > 0 ? selected : [getPrimarySearchAccountId(accountOptions)];
+  }
+  if (filters.accountId && filters.accountId !== 'current') return [filters.accountId];
+
+  return [getPrimarySearchAccountId(accountOptions)];
+};
+const getSearchAccountLabel = (filters = {}, accountOptions = []) => {
+  if (accountOptions.length <= 1) return '';
+  if (filters.accountId === 'all') return '账号：全部账号';
+
+  const selectedIds = getSearchSelectedAccountIds(filters, accountOptions);
+  if (filters.accountId === 'current') return '账号：当前账号';
+  if (selectedIds.length > 1) return `账号：${selectedIds.length} 个账号`;
+
+  const account = accountOptions.find((item) => item.id === selectedIds[0]);
+  return `账号：${getAccountDisplayLabel(account) || account?.email || '指定账号'}`;
+};
+const getSearchSourceAccountLabel = (account) => {
+  if (!account) return '';
+  const name = getAccountDisplayLabel(account) || account.name || '账号';
+  const email = account.email || account.name || '';
+  return email && email !== name ? `来源：${name}｜${email}` : `来源：${name}`;
 };
 const joinRecipients = (items = []) => items.filter(Boolean).join('; ');
 const parseRecipients = (value) =>
@@ -1886,6 +1948,7 @@ const MOCK_EVENTS = [
     visibility: 'default',
     kind: 'event',
     attachments: ['项目周报.pdf', '评审备注.md'],
+    colorCategory: 'project',
   },
   {
     id: 'e2',
@@ -1908,6 +1971,7 @@ const MOCK_EVENTS = [
     availability: 'busy',
     visibility: 'default',
     kind: 'event',
+    colorCategory: 'todo',
   },
   {
     id: 'e3',
@@ -1930,6 +1994,7 @@ const MOCK_EVENTS = [
     availability: 'busy',
     visibility: 'default',
     kind: 'event',
+    colorCategory: 'customer',
   },
   {
     id: 'e4',
@@ -1967,6 +2032,7 @@ const MOCK_EVENTS = [
     availability: 'busy',
     visibility: 'default',
     kind: 'event',
+    colorCategory: 'project',
   },
   {
     id: 'e6',
@@ -1990,6 +2056,7 @@ const MOCK_EVENTS = [
     visibility: 'default',
     kind: 'event',
     attachments: ['立项材料.pdf'],
+    colorCategory: 'important',
   },
   {
     id: 'e7',
@@ -2029,6 +2096,7 @@ const MOCK_EVENTS = [
     type: 'normal',
     weekOffset: 0,
     attendees: ['销售团队', '我'],
+    colorCategory: 'customer',
   },
   {
     id: 'e9',
@@ -2044,6 +2112,7 @@ const MOCK_EVENTS = [
     type: 'normal',
     weekOffset: 0,
     attendees: ['销售团队', '客户代表'],
+    colorCategory: 'customer',
   },
   {
     id: 'e10',
@@ -2081,6 +2150,7 @@ const MOCK_EVENTS = [
     availability: 'busy',
     visibility: 'default',
     kind: 'event',
+    colorCategory: 'customer',
   },
   {
     id: 'e12',
@@ -2096,6 +2166,7 @@ const MOCK_EVENTS = [
     type: 'normal',
     weekOffset: -1,
     attendees: ['我', '市场负责人'],
+    colorCategory: 'project',
   },
   {
     id: 'e13',
@@ -5208,22 +5279,12 @@ function CalendarSearchResults({
   const [selectedResultId, setSelectedResultId] = useState(null);
   const searchResultsScrollRef = useRef(null);
   const highlightTokens = useMemo(() => tokenizeKeywordQuery(trimmedQuery), [trimmedQuery]);
-
-  const getResultStartValue = (result) => {
-    const date = eventToDate(result.event);
-    const startH = result.event.isAllDay ? 0 : result.event.startH || WORK_START_HOUR;
-    return stripTime(date).getTime() + startH * 60 * 60 * 1000;
-  };
-
-  const getResultEndValue = (result) => {
-    const date = eventToDate(result.event);
-    const end = new Date(date);
-    const endH = result.event.isAllDay
-      ? 23.99
-      : (result.event.startH || WORK_START_HOUR) + (result.event.durationH || 1);
-    end.setHours(Math.floor(endH), Math.round((endH % 1) * 60), 0, 0);
-    return end.getTime();
-  };
+  const isMultiAccount = accountOptions.length > 1;
+  const selectedAccountIds = useMemo(
+    () => getSearchSelectedAccountIds(filters, accountOptions),
+    [accountOptions, filters.accountId, filters.accountIds],
+  );
+  const isCrossAccountSearch = isMultiAccount && selectedAccountIds.length > 1;
 
   const renderHighlighted = (value) => {
     const text = String(value || '');
@@ -5273,46 +5334,58 @@ function CalendarSearchResults({
     return parts;
   };
 
-  const timelineResults = useMemo(
-    () =>
-      [...results].sort(
-        (left, right) =>
-          getResultStartValue(left) - getResultStartValue(right) ||
-          getResultEndValue(left) - getResultEndValue(right) ||
-          right.match.score - left.match.score,
-      ),
-    [results],
-  );
+  const sortResults = (items, direction = 'future') =>
+    [...items].sort((left, right) => {
+      const leftStart = getEventStartTimestamp(left.event);
+      const rightStart = getEventStartTimestamp(right.event);
 
-  const monthSections = useMemo(() => {
-    const sections = [];
-    const sectionMap = new Map();
-
-    timelineResults.forEach((result) => {
-      const date = eventToDate(result.event);
-      const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
-
-      if (!sectionMap.has(key)) {
-        const section = {
-          id: key,
-          title: `${date.getFullYear()}年${date.getMonth() + 1}月`,
-          items: [],
-        };
-        sectionMap.set(key, section);
-        sections.push(section);
+      if (filters.sort === 'relevance') {
+        return right.match.score - left.match.score || leftStart - rightStart;
       }
-
-      sectionMap.get(key).items.push(result);
+      if (filters.sort === 'time_desc') return rightStart - leftStart || right.match.score - left.match.score;
+      if (direction === 'past') return rightStart - leftStart || right.match.score - left.match.score;
+      return leftStart - rightStart || right.match.score - left.match.score;
     });
 
-    return sections;
-  }, [timelineResults]);
+  const groupedResults = useMemo(() => {
+    const now = TODAY_DATE.getTime();
+    const futureResults = results.filter((result) => getEventEndTimestamp(result.event) >= now);
+    const pastResults = results.filter((result) => getEventEndTimestamp(result.event) < now);
+    const soonCandidates = futureResults
+      .filter((result) => {
+        const startValue = getEventStartTimestamp(result.event);
+        const withinPriorityWindow = startValue - now <= 24 * 60 * 60 * 1000;
+        return (
+          withinPriorityWindow &&
+          result.event.status !== '已取消' &&
+          result.event.type !== 'cancelled' &&
+          !isBusyOnlyEvent(result.event, result.calendar)
+        );
+      })
+      .sort((left, right) => {
+        if (filters.sort === 'relevance') return right.match.score - left.match.score || getEventStartTimestamp(left.event) - getEventStartTimestamp(right.event);
+        const leftJoinBias = canJoinCalendarEvent(left.event) ? -1 : 0;
+        const rightJoinBias = canJoinCalendarEvent(right.event) ? -1 : 0;
+        return (
+          leftJoinBias - rightJoinBias ||
+          Math.abs(getEventStartTimestamp(left.event) - now) - Math.abs(getEventStartTimestamp(right.event) - now) ||
+          right.match.score - left.match.score
+        );
+      })
+      .slice(0, 3);
+    const soonIds = new Set(soonCandidates.map((result) => result.event.id));
+
+    return {
+      soon: soonCandidates,
+      upcoming: sortResults(futureResults.filter((result) => !soonIds.has(result.event.id)), 'future'),
+      past: sortResults(pastResults, 'past'),
+    };
+  }, [results, filters.sort]);
 
   const firstCurrentResultId = useMemo(() => {
-    if (timelineResults.length === 0) return null;
-    const currentResult = timelineResults.find((result) => getResultEndValue(result) >= TODAY_DATE.getTime());
-    return (currentResult || timelineResults[0]).event.id;
-  }, [timelineResults]);
+    const ordered = [...groupedResults.soon, ...groupedResults.upcoming, ...groupedResults.past];
+    return ordered[0]?.event.id || null;
+  }, [groupedResults]);
 
   useEffect(() => {
     if (results.length === 0) {
@@ -5342,8 +5415,11 @@ function CalendarSearchResults({
   }, [
     firstCurrentResultId,
     filters.accountId,
-    filters.field,
-    filters.status,
+    filters.accountIds,
+    filters.calendarScope,
+    filters.colorCategory,
+    filters.person,
+    filters.sort,
     filters.timeframe,
     trimmedQuery,
   ]);
@@ -5378,7 +5454,7 @@ function CalendarSearchResults({
     return {
       day: date.getDate(),
       weekday: WEEKDAY_NAMES[dayIndex],
-      dateLabel: `${date.getMonth() + 1}月${date.getDate()}日 · ${WEEKDAY_NAMES[dayIndex]}`,
+      dateLabel: `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAY_NAMES[dayIndex]}`,
       timeLabel: event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1),
     };
   };
@@ -5402,33 +5478,39 @@ function CalendarSearchResults({
 
   const getMatchedSnippet = (event, match) => {
     if (match?.matchedFields?.includes('description') && event.description) {
-      return event.description;
+      return {
+        type: 'description',
+        icon: FileText,
+        text: `正文：${String(event.description).slice(0, 90)}${String(event.description).length > 90 ? '……' : ''}`,
+      };
     }
 
     if (match?.matchedFields?.includes('attachments') && event.attachments?.length) {
-      const [firstAttachment] = event.attachments;
-      return event.attachments.length > 1 ? `${firstAttachment} 等 ${event.attachments.length} 个` : firstAttachment;
+      const attachmentNames = (event.attachments || [])
+        .map((attachment) => (typeof attachment === 'string' ? attachment : attachment?.name))
+        .filter(Boolean);
+      const matchedNames = attachmentNames.filter((name) =>
+        highlightTokens.some((token) => String(name).toLowerCase().includes(token)),
+      );
+      const names = matchedNames.length > 0 ? matchedNames : attachmentNames;
+      if (names.length === 0) return null;
+      return {
+        type: 'attachments',
+        icon: Paperclip,
+        text: names.length > 1 ? `附件：${names[0]} 等 ${names.length} 个` : `附件：${names[0]}`,
+      };
     }
 
-    return '';
+    return null;
   };
 
   const getMeetingMeta = (event) => {
     const items = [];
-    if (event.location) items.push({ icon: MapPin, label: event.location });
-    if (event.meetingProvider && event.meetingProvider !== 'none') {
-      items.push({ icon: Calendar, label: MEETING_PROVIDER_LABELS[event.meetingProvider] });
+    if (event.location) items.push({ icon: MapPin, label: `地点：${event.location}` });
+    if (event.meetingLink && event.meetingProvider && event.meetingProvider !== 'none') {
+      items.push({ icon: Calendar, label: `线上：${MEETING_PROVIDER_LABELS[event.meetingProvider] || '在线会议'}` });
     }
     return items;
-  };
-
-  const canJoinEvent = (event) => {
-    if (!event.meetingLink || !event.meetingProvider || event.meetingProvider === 'none') return false;
-    if (event.status === '已取消' || event.status === '已拒绝') return false;
-
-    const startValue = getResultStartValue({ event });
-    const endValue = getResultEndValue({ event });
-    return startValue - TODAY_DATE.getTime() <= 15 * 60 * 1000 && endValue >= TODAY_DATE.getTime();
   };
 
   const openMeetingLink = (event) => {
@@ -5436,25 +5518,62 @@ function CalendarSearchResults({
     window.open(event.meetingLink, '_blank', 'noopener,noreferrer');
   };
 
-  const hasActiveFilters = filters.accountId !== 'all' || filters.status !== 'all' || filters.timeframe !== 'all';
-  const resetFilters = () => onChangeFilters({ accountId: 'all', status: 'all', timeframe: 'all', field: 'all' });
+  const isDefaultAccountFilter =
+    !isMultiAccount ||
+    filters.accountId === 'current' ||
+    (!filters.accountId && selectedAccountIds.length === 1 && selectedAccountIds[0] === getPrimarySearchAccountId(accountOptions));
+  const hasActiveFilters =
+    !isDefaultAccountFilter ||
+    (filters.calendarScope || 'all') !== 'all' ||
+    (filters.timeframe || 'all') !== 'all' ||
+    (filters.person || 'all') !== 'all' ||
+    (filters.colorCategory || 'all') !== 'all' ||
+    (filters.meetingType || 'all') !== 'all' ||
+    (filters.attachment || 'all') !== 'all' ||
+    (filters.sort || 'relevance') !== 'relevance';
+  const resetFilters = () =>
+    onChangeFilters({
+      accountId: 'current',
+      accountIds: [],
+      calendarScope: 'all',
+      timeframe: 'all',
+      person: 'all',
+      colorCategory: 'all',
+      meetingType: 'all',
+      attachment: 'all',
+      sort: 'relevance',
+    });
+
+  const getOptionLabel = (options, value) => options.find((option) => option.id === value)?.label || '';
+  const filterSummary = [
+    isMultiAccount && !isDefaultAccountFilter ? getSearchAccountLabel(filters, accountOptions) : '',
+    (filters.calendarScope || 'all') !== 'all' ? `搜索范围：${getOptionLabel(SEARCH_ACCOUNT_SCOPE_OPTIONS, filters.calendarScope)}` : '',
+    (filters.timeframe || 'all') !== 'all' ? getOptionLabel(SEARCH_TIMEFRAME_OPTIONS, filters.timeframe) : '',
+    (filters.person || 'all') !== 'all' ? peopleOptions.find((option) => option.id === filters.person)?.label : '',
+    (filters.colorCategory || 'all') !== 'all' ? `颜色分类：${getColorCategoryMeta(filters.colorCategory)?.shortLabel || '无分类'}` : '',
+    (filters.meetingType || 'all') !== 'all' ? getOptionLabel(SEARCH_MEETING_TYPE_OPTIONS, filters.meetingType) : '',
+    (filters.attachment || 'all') !== 'all' ? getOptionLabel(SEARCH_ATTACHMENT_OPTIONS, filters.attachment) : '',
+    (filters.sort || 'relevance') !== 'relevance' ? getOptionLabel(SEARCH_SORT_OPTIONS, filters.sort) : '',
+  ].filter(Boolean);
+
+  const setAccountSelection = (nextAccountIds) => {
+    const normalized = Array.from(new Set(nextAccountIds)).filter(Boolean);
+    if (normalized.length === 0) {
+      onChangeFilters({ accountId: 'current', accountIds: [] });
+      return;
+    }
+    if (normalized.length === accountOptions.length) {
+      onChangeFilters({ accountId: 'all', accountIds: [] });
+      return;
+    }
+    onChangeFilters({ accountId: 'custom', accountIds: normalized });
+  };
 
   const renderResultActions = (event, isCard = false) => {
-    const joinable = canJoinEvent(event);
+    const joinable = canJoinCalendarEvent(event);
 
     return (
-      <div className={`flex shrink-0 items-center gap-2 ${isCard ? '' : 'opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
-        <button
-          type="button"
-          onClick={(entry) => {
-            entry.stopPropagation();
-            onLocateEvent(event.id);
-          }}
-          onDoubleClick={(entry) => entry.stopPropagation()}
-          className="inline-flex h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-        >
-          定位
-        </button>
+      <div className={`flex shrink-0 items-center gap-2 ${isCard ? '' : 'justify-end'}`}>
         <button
           type="button"
           onClick={(entry) => {
@@ -5493,8 +5612,12 @@ function CalendarSearchResults({
     const participantLabel = formatParticipants(event);
     const meetingMeta = getMeetingMeta(event);
     const snippet = getMatchedSnippet(event, result.match);
-    const sourceText = sourceLabel || '';
+    const sourceText = isCrossAccountSearch ? sourceLabel : '';
     const isCancelled = event.status === '已取消';
+    const colorCategories = getEventColorCategories(event);
+    const primaryCategory = colorCategories[0];
+    const extraCategoryCount = Math.max(0, colorCategories.length - 1);
+    const repeatLabel = event.repeat && event.repeat !== 'does_not_repeat' ? REPEAT_LABELS[event.repeat] || '循环' : '';
 
     if (variant === 'cards') {
       return (
@@ -5515,11 +5638,26 @@ function CalendarSearchResults({
             isSelected ? 'border-blue-200 bg-blue-50/70' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
           }`}
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="text-sm font-bold text-slate-500">{dateMeta.dateLabel} · {dateMeta.timeLabel}</div>
-              <div className={`mt-2 truncate text-xl font-black ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
-                {renderHighlighted(event.title || '无标题')}
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+                <h3 className={`truncate text-xl font-black ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                  {renderHighlighted(event.title || '无标题')}
+                </h3>
+                {primaryCategory && (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                    <span className={`mr-1.5 h-2 w-2 rounded-full ${primaryCategory.colorClass}`}></span>
+                    {primaryCategory.label}{extraCategoryCount > 0 ? ` +${extraCategoryCount}` : ''}
+                  </span>
+                )}
+                {repeatLabel && (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
+                    <RefreshCw size={12} className="mr-1" />
+                    循环{repeatLabel !== '不重复' ? ` · ${repeatLabel}` : ''}
+                  </span>
+                )}
+                {isCancelled && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700">会议已取消</span>}
               </div>
             </div>
             {renderResultActions(event, true)}
@@ -5545,11 +5683,15 @@ function CalendarSearchResults({
             {sourceText && <div>{renderHighlighted(sourceText)}</div>}
           </div>
 
-          {snippet && (
-            <div className="mt-3 truncate rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-slate-600">
-              {renderHighlighted(snippet)}
-            </div>
-          )}
+          {snippet && (() => {
+            const SnippetIcon = snippet.icon;
+            return (
+              <div className="mt-3 inline-flex max-w-full items-start gap-2 rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-slate-600">
+                <SnippetIcon size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
+              </div>
+            );
+          })()}
         </article>
       );
     }
@@ -5572,7 +5714,7 @@ function CalendarSearchResults({
             setSelectedResultId(event.id);
           }
         }}
-        className={`group grid w-full grid-cols-[72px_minmax(104px,150px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-2 py-4 text-left outline-none transition last:border-b-0 md:grid-cols-[72px_minmax(116px,160px)_10px_minmax(0,1fr)_180px] ${
+        className={`group grid w-full grid-cols-[72px_minmax(104px,150px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-2 py-4 text-left outline-none transition last:border-b-0 md:grid-cols-[72px_minmax(116px,160px)_minmax(0,1fr)_168px] ${
           isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50'
         }`}
       >
@@ -5593,13 +5735,19 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className={`hidden h-2.5 w-2.5 rounded-full md:block ${calendar?.color || 'bg-slate-400'}`} />
-
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <div className={`truncate text-base font-black leading-6 ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
               {renderHighlighted(event.title || '无标题')}
             </div>
+            {primaryCategory && (
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                <span className={`mr-1.5 h-2 w-2 rounded-full ${primaryCategory.colorClass}`}></span>
+                {primaryCategory.label}{extraCategoryCount > 0 ? ` +${extraCategoryCount}` : ''}
+              </span>
+            )}
+            {repeatLabel && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">循环</span>}
+            {isCancelled && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">会议已取消</span>}
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
@@ -5621,16 +5769,19 @@ function CalendarSearchResults({
             )}
             {sourceText && (
               <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
-                <Calendar size={14} className="shrink-0 text-slate-400" />
+                <Mail size={14} className="shrink-0 text-slate-400" />
                 <span className="truncate">{renderHighlighted(sourceText)}</span>
               </span>
             )}
-            {snippet && (
-              <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
-                {snippet.startsWith('附件') ? <Paperclip size={14} className="shrink-0 text-slate-400" /> : <FileText size={14} className="shrink-0 text-slate-400" />}
-                <span className="truncate">{renderHighlighted(snippet)}</span>
-              </span>
-            )}
+            {snippet && (() => {
+              const SnippetIcon = snippet.icon;
+              return (
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
+                  <SnippetIcon size={14} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{renderHighlighted(snippet.text)}</span>
+                </span>
+              );
+            })()}
           </div>
         </div>
 
@@ -5641,64 +5792,159 @@ function CalendarSearchResults({
     );
   };
 
+  const renderSection = ({ id, title, subtitle, items, variant = 'list' }) => {
+    if (items.length === 0) return null;
+
+    return (
+      <section key={id} className="mb-8 last:mb-0">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-2">
+          <div>
+            <h3 className="text-sm font-black text-slate-900">{title}</h3>
+            {subtitle && <div className="mt-1 text-xs font-semibold text-slate-400">{subtitle}</div>}
+          </div>
+          <span className="text-xs font-bold text-slate-400">{items.length} 条</span>
+        </div>
+        <div className={variant === 'cards' ? 'grid gap-3' : ''}>
+          {items.map((result) => renderSearchResult(result, variant))}
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
       <div className="border-b border-slate-200 bg-white px-6 py-4 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-base font-black text-slate-900">搜索结果</div>
-            {trimmedQuery && (
-              <div className="mt-1 text-sm text-slate-500">
-                共找到 {results.length} 条结果
+        <div className="flex flex-wrap items-center gap-2">
+          {isMultiAccount && (
+            <details className="group/filter relative">
+              <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                <Mail size={14} className="text-slate-400" />
+                {getSearchAccountLabel(filters, accountOptions)}
+                <ChevronDown size={14} className="text-slate-400" />
+              </summary>
+              <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => onChangeFilters({ accountId: 'current', accountIds: [] })}
+                  className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  账号：当前账号
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeFilters({ accountId: 'all', accountIds: [] })}
+                  className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  账号：全部账号
+                </button>
+                <div className="my-1 h-px bg-slate-100" />
+                {accountOptions.map((account) => {
+                  const checked = selectedAccountIds.includes(account.id);
+                  return (
+                    <label key={account.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => {
+                          const nextIds = event.target.checked
+                            ? [...selectedAccountIds, account.id]
+                            : selectedAccountIds.filter((id) => id !== account.id);
+                          setAccountSelection(nextIds);
+                        }}
+                        className="mt-1"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-bold text-slate-800">{getAccountDisplayLabel(account)}</span>
+                        <span className="block truncate text-xs font-medium text-slate-400">{account.email || account.name}</span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </details>
+          )}
+          <select
+            value={filters.calendarScope || 'all'}
+            onChange={(event) => onChangeFilters({ calendarScope: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_ACCOUNT_SCOPE_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.timeframe || 'all'}
+            onChange={(event) => onChangeFilters({ timeframe: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_TIMEFRAME_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.person || 'all'}
+            onChange={(event) => onChangeFilters({ person: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {peopleOptions.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.colorCategory || 'all'}
+            onChange={(event) => onChangeFilters({ colorCategory: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_COLOR_CATEGORY_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.meetingType || 'all'}
+            onChange={(event) => onChangeFilters({ meetingType: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_MEETING_TYPE_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.attachment || 'all'}
+            onChange={(event) => onChangeFilters({ attachment: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_ATTACHMENT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={filters.sort || 'relevance'}
+            onChange={(event) => onChangeFilters({ sort: event.target.value })}
+            className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+          >
+            {SEARCH_SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={filters.accountId}
-              onChange={(event) => onChangeFilters({ accountId: event.target.value, field: 'all' })}
-              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
-            >
-              <option value="all">搜索范围：全部日历</option>
-              {accountOptions.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.ownership === 'shared' ? '共享日历' : '我的日历'}：{getAccountDisplayLabel(account)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.timeframe}
-              onChange={(event) => onChangeFilters({ timeframe: event.target.value })}
-              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
-            >
-              {SEARCH_TIMEFRAME_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.status}
-              onChange={(event) => onChangeFilters({ status: event.target.value })}
-              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
-            >
-              {SEARCH_STATUS_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="h-9 rounded-lg px-3 text-sm font-bold text-blue-600 transition hover:bg-blue-50"
-              >
-                清除筛选
-              </button>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-black text-slate-900">共找到 {results.length} 条结果</span>
+            {groupedResults.soon.length > 0 && <span className="font-semibold text-blue-600">即将开始 {groupedResults.soon.length} 条</span>}
+            {filterSummary.length > 0 && (
+              <span className="text-slate-500">已筛选：{filterSummary.join(' / ')}</span>
             )}
           </div>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className={`h-9 rounded-lg px-3 text-sm font-bold transition ${
+              hasActiveFilters ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-50'
+            }`}
+          >
+            清除筛选
+          </button>
         </div>
       </div>
 
@@ -5711,29 +5957,41 @@ function CalendarSearchResults({
             </div>
           </div>
         ) : results.length === 0 ? (
-          <div className="flex min-h-[320px] items-center justify-center px-6 text-center text-slate-400">
-            <div>
+          <div className="flex min-h-[360px] items-center justify-center px-6 text-center text-slate-500">
+            <div className="max-w-md">
               <Search className="mx-auto mb-4 h-10 w-10" />
-              <div className="text-base font-bold text-slate-700">没有找到相关日程</div>
+              <div className="text-base font-black text-slate-800">没有找到与“{trimmedQuery}”相关的日程</div>
+              <div className="mt-4 text-left text-sm font-medium leading-7 text-slate-500">
+                <div>你可以尝试：</div>
+                <div>1. 扩大时间范围</div>
+                <div>2. 调整搜索范围，例如加入共享日历或群组日历</div>
+                <div>3. 换用组织者、参与人、地点或附件名称搜索</div>
+                {isMultiAccount && <div>4. 检查是否选择了正确账号</div>}
+                <div>{isMultiAccount ? '5' : '4'}. 清除筛选条件</div>
+              </div>
             </div>
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1180px]">
-            {monthSections.map((section) => (
-              section.items.length > 0 && (
-                <section key={section.id} className="mb-8 last:mb-0">
-                  <div className="mb-3 flex items-end justify-between border-b border-slate-100 pb-2">
-                    <div>
-                      <h3 className="text-sm font-black text-slate-900">{section.title}</h3>
-                    </div>
-                    <span className="text-xs font-bold text-slate-400">{section.items.length} 条</span>
-                  </div>
-                  <div>
-                    {section.items.map((result) => renderSearchResult(result))}
-                  </div>
-                </section>
-              )
-            ))}
+            {renderSection({
+              id: 'soon',
+              title: '即将开始（推荐查看）',
+              subtitle: '优先展示即将开始和高相关日程',
+              items: groupedResults.soon,
+              variant: 'cards',
+            })}
+            {renderSection({
+              id: 'upcoming',
+              title: '即将到来',
+              subtitle: '按开始时间升序',
+              items: groupedResults.upcoming,
+            })}
+            {renderSection({
+              id: 'past',
+              title: '以前',
+              subtitle: '按最近发生时间倒序',
+              items: groupedResults.past,
+            })}
           </div>
         )}
       </div>
@@ -6152,7 +6410,7 @@ function MailboxPermissionModal({
                     className="inline-flex h-10 items-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 transition hover:bg-red-100"
                   >
                     <X size={15} className="mr-2" />
-                    删除共享日历
+                    从列表移除
                   </button>
                 )}
               </div>
@@ -6883,14 +7141,15 @@ function MainApp() {
   const [calendarSearchPopoverOpen, setCalendarSearchPopoverOpen] = useState(false);
   const [calendarRecentSearches, setCalendarRecentSearches] = useState(['会议', '周会', '产品评审', '客户沟通', '需求评审']);
   const [calendarSearchFilters, setCalendarSearchFilters] = useState({
-    field: 'all',
-    status: 'all',
+    accountId: 'current',
+    accountIds: [],
+    calendarScope: 'all',
     timeframe: 'all',
-    accountId: 'all',
     person: 'all',
+    colorCategory: 'all',
     meetingType: 'all',
     attachment: 'all',
-    sort: 'default',
+    sort: 'relevance',
   });
   const [permissionPanel, setPermissionPanel] = useState({ type: null, targetId: null });
   const [sharedCalendarDialog, setSharedCalendarDialog] = useState({
@@ -6970,7 +7229,7 @@ function MainApp() {
   const activeAccountIds = useMemo(() => accounts.filter((account) => account.checked).map((account) => account.id), [accounts]);
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
   const normalizedCalendarSearch = calendarSearchQuery.trim().toLowerCase();
-  const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ id: account.id, label: account.email || account.name })), [activeAccounts]);
+  const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ ...account, label: account.email || account.name })), [activeAccounts]);
   const calendarSearchPeopleOptions = useMemo(() => {
     const names = new Set();
 
@@ -6983,7 +7242,7 @@ function MainApp() {
 
     const primaryNames = Array.from(names).slice(0, 10);
     return [
-      { id: 'all', label: '人员：全部' },
+      { id: 'all', label: '人员：选择人员或团队' },
       ...primaryNames.flatMap((name) => [
         { id: `any::${name}`, label: `相关人员：${name}` },
         { id: `organizer::${name}`, label: `组织者：${name}` },
@@ -7096,6 +7355,8 @@ function MainApp() {
     selectedEvent && selectedEvent.meetingProvider && selectedEvent.meetingProvider !== 'none'
       ? MEETING_PROVIDER_LABELS[selectedEvent.meetingProvider] || '在线会议'
       : '';
+  const selectedEventCanJoin = selectedEvent ? canJoinCalendarEvent(selectedEvent) : false;
+  const selectedEventColorCategories = selectedEvent ? getEventColorCategories(selectedEvent) : [];
   const draftAccountInfo = accountMap[calendarMap[draftForm.calId]?.accountId] || null;
   const draftParticipantAccountLookup = useMemo(() => {
     const nextMap = new Map();
@@ -7476,15 +7737,23 @@ function MainApp() {
   const calendarSearchResults = useMemo(() => {
     if (!normalizedCalendarSearch) return [];
 
+    const selectedSearchAccountIds = getSearchSelectedAccountIds(calendarSearchFilters, activeAccounts);
+    const selectedSearchAccountIdSet = new Set(selectedSearchAccountIds);
+    const showSourceAccount = activeAccounts.length > 1 && selectedSearchAccountIds.length > 1;
+
     return activeEvents
       .map((event) => {
         const calendar = calendarMap[event.calId];
         const account = calendar ? accountMap[calendar.accountId] : null;
-        if (calendarSearchFilters.accountId !== 'all' && account?.id !== calendarSearchFilters.accountId) return null;
-        if (calendarSearchFilters.status !== 'all' && getNormalizedSearchStatus(event) !== calendarSearchFilters.status) return null;
+        if (selectedSearchAccountIdSet.size > 0 && !selectedSearchAccountIdSet.has(account?.id)) return null;
+        if (!accountMatchesSearchScope(account, calendarSearchFilters.calendarScope)) return null;
+        if (!eventMatchesSearchPerson(event, calendarSearchFilters.person)) return null;
+        if (!eventMatchesColorCategory(event, calendarSearchFilters.colorCategory)) return null;
+        if (!eventMatchesMeetingType(event, calendarSearchFilters.meetingType)) return null;
+        if (!eventMatchesAttachmentFilter(event, calendarSearchFilters.attachment)) return null;
         if (!eventMatchesSearchTimeframe(event, calendarSearchFilters.timeframe)) return null;
 
-        const match = getEventSearchMatchMeta(event, calendar, account, normalizedCalendarSearch, calendarSearchFilters.field);
+        const match = getEventSearchMatchMeta(event, calendar, account, normalizedCalendarSearch, 'all');
         if (!match) return null;
 
         const isSystemCalendarEvent = event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID;
@@ -7513,10 +7782,7 @@ function MainApp() {
                   : participantPreview
                     ? `参与人：${participantPreview}`
                     : '';
-        const sourceLabel =
-          account?.ownership === 'shared'
-            ? `共享日历 · ${getAccountDisplayLabel(account)}`
-            : '';
+        const sourceLabel = showSourceAccount ? getSearchSourceAccountLabel(account) : '';
         const locationParts = [
           event.location,
           event.meetingProvider && event.meetingProvider !== 'none' ? MEETING_PROVIDER_LABELS[event.meetingProvider] : '',
@@ -7542,17 +7808,8 @@ function MainApp() {
         };
       })
       .filter(Boolean)
-      .sort((left, right) => {
-        const leftDate = eventToDate(left.event);
-        const rightDate = eventToDate(right.event);
-
-        return (
-          leftDate.getTime() - rightDate.getTime() ||
-          (left.event.startH || 0) - (right.event.startH || 0) ||
-          right.match.score - left.match.score
-        );
-      });
-  }, [activeEvents, accountMap, calendarMap, normalizedCalendarSearch, calendarSearchFilters]);
+      .sort((left, right) => right.match.score - left.match.score || getEventStartTimestamp(left.event) - getEventStartTimestamp(right.event));
+  }, [activeAccounts, activeEvents, accountMap, calendarMap, normalizedCalendarSearch, calendarSearchFilters]);
 
   useEffect(() => {
     const nextActiveIds = activeAccounts.map((account) => account.id);
@@ -7665,10 +7922,10 @@ function MainApp() {
     setFeedback({
       type: 'L4',
       payload: {
-        title: '删除共享日历',
-        desc: `移除后，${getAccountDisplayLabel(account)} 将不再显示在左侧共享日历和当前日历视图中。`,
+        title: '从列表移除该共享日历？',
+        desc: `这只会把 ${getAccountDisplayLabel(account)} 从你的共享日历列表和当前视图中移除，不会影响共享方的日历或权限设置。`,
         cancelText: '取消',
-        confirmText: '删除',
+        confirmText: '从列表移除',
         onConfirm: () => {
           setFeedback({ type: null, payload: null });
           removeSharedAccount(account.id);
@@ -8590,12 +8847,6 @@ function MainApp() {
   const clearCalendarSearch = () => {
     setCalendarSearchQuery('');
     setCalendarSearchPopoverOpen(false);
-    setCalendarSearchFilters({
-      field: 'all',
-      status: 'all',
-      timeframe: 'all',
-      accountId: 'all',
-    });
     setCurrentScreen('calendar');
     setCalendarReturnScreen('calendar');
   };
@@ -11051,6 +11302,7 @@ function MainApp() {
                     query={calendarSearchQuery}
                     filters={calendarSearchFilters}
                     accountOptions={calendarSearchAccountOptions}
+                    peopleOptions={calendarSearchPeopleOptions}
                     onChangeFilters={(patch) => setCalendarSearchFilters((prev) => ({ ...prev, ...patch }))}
                     results={calendarSearchResults}
                     onBack={() => navTo('calendar')}
@@ -11160,6 +11412,12 @@ function MainApp() {
                                     {REPEAT_LABELS[selectedEvent.repeat]}
                                   </span>
                                 )}
+                                {selectedEventColorCategories.map((category) => (
+                                  <span key={category.id} className="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
+                                    <span className={`mr-1.5 h-2 w-2 rounded-full ${category.colorClass}`}></span>
+                                    {category.label}
+                                  </span>
+                                ))}
                                 {selectedEvent.reminder && selectedEvent.reminder !== 'none' && (
                                   <span className="bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
                                     {REMINDER_LABELS[selectedEvent.reminder]}
@@ -11210,13 +11468,15 @@ function MainApp() {
                               </div>
                               {selectedEvent.meetingLink && (
                                 <div className="mt-4 flex flex-wrap gap-2">
-                                  <button
-                                    onClick={() => openExternalLink(selectedEvent.meetingLink, '已打开会议链接')}
-                                    className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
-                                  >
-                                    <ArrowRight size={14} className="mr-2" />
-                                    加入会议
-                                  </button>
+                                  {selectedEventCanJoin && (
+                                    <button
+                                      onClick={() => openExternalLink(selectedEvent.meetingLink, '已打开会议链接')}
+                                      className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+                                    >
+                                      <ArrowRight size={14} className="mr-2" />
+                                      一键入会
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => copyTextToClipboard(selectedEvent.meetingLink, '会议链接已复制')}
                                     className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700"
@@ -12673,11 +12933,11 @@ function MainApp() {
           ) : (
             <>
               <button
-                onClick={() => { openMailboxPermissions(contextMenu.account.id, 'settings'); setContextMenu(null); }}
+                onClick={() => openColorPicker(contextMenu.account.id, 'account')}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
               >
-                <Settings size={14} className="mr-2 text-gray-400" />
-                设置
+                <Palette size={14} className="mr-2 text-gray-400" />
+                颜色
               </button>
               <button
                 onClick={() => { openSharedCalendarAccess(contextMenu.account.id); setContextMenu(null); }}
@@ -12685,6 +12945,13 @@ function MainApp() {
               >
                 <Eye size={14} className="mr-2 text-gray-400" />
                 查看权限
+              </button>
+              <button
+                onClick={() => requestRemoveSharedAccount(contextMenu.account)}
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
+              >
+                <X size={14} className="mr-2" />
+                从列表移除
               </button>
             </>
           )}
@@ -12724,13 +12991,26 @@ function MainApp() {
             ) : (
               <>
                 <button
-                  onClick={() => { openMailboxPermissions(accountMenuAnchor.account.id, 'settings'); closeAccountMenu(); }}
+                  onClick={() => openColorPicker(accountMenuAnchor.account.id, 'account')}
                   className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
                 >
-                  <Settings size={14} className="mr-2 text-gray-400" />
-                  设置
+                  <Palette size={14} className="mr-2 text-gray-400" />
+                  颜色
                 </button>
-                <button onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }} className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"><Eye size={14} className="mr-2 text-gray-400" />查看权限</button>
+                <button
+                  onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+                >
+                  <Eye size={14} className="mr-2 text-gray-400" />
+                  查看权限
+                </button>
+                <button
+                  onClick={() => requestRemoveSharedAccount(accountMenuAnchor.account)}
+                  className="flex w-full items-center px-3 py-2 text-left text-sm font-bold text-red-600 transition hover:bg-red-50/90"
+                >
+                  <X size={14} className="mr-2" />
+                  从列表移除
+                </button>
               </>
             )}
           </div>
