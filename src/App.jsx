@@ -7230,27 +7230,6 @@ function MainApp() {
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
   const normalizedCalendarSearch = calendarSearchQuery.trim().toLowerCase();
   const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ ...account, label: account.email || account.name })), [activeAccounts]);
-  const calendarSearchPeopleOptions = useMemo(() => {
-    const names = new Set();
-
-    activeEvents.forEach((event) => {
-      if (event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID) return;
-      [event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])]
-        .filter(Boolean)
-        .forEach((name) => names.add(name));
-    });
-
-    const primaryNames = Array.from(names).slice(0, 10);
-    return [
-      { id: 'all', label: '人员：选择人员或团队' },
-      ...primaryNames.flatMap((name) => [
-        { id: `any::${name}`, label: `相关人员：${name}` },
-        { id: `organizer::${name}`, label: `组织者：${name}` },
-        { id: `participant::${name}`, label: `参与人：${name}` },
-      ]),
-    ];
-  }, [activeEvents]);
-
   useEffect(() => {
     if (!calendarSearchPopoverOpen) return undefined;
 
@@ -7281,6 +7260,26 @@ function MainApp() {
     () => sortEvents(events.filter((event) => activeCalIds.includes(event.calId))),
     [activeCalIds, events],
   );
+  const calendarSearchPeopleOptions = useMemo(() => {
+    const names = new Set();
+
+    activeEvents.forEach((event) => {
+      if (event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID) return;
+      [event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])]
+        .filter(Boolean)
+        .forEach((name) => names.add(name));
+    });
+
+    const primaryNames = Array.from(names).slice(0, 10);
+    return [
+      { id: 'all', label: '人员：选择人员或团队' },
+      ...primaryNames.flatMap((name) => [
+        { id: `any::${name}`, label: `相关人员：${name}` },
+        { id: `organizer::${name}`, label: `组织者：${name}` },
+        { id: `participant::${name}`, label: `参与人：${name}` },
+      ]),
+    ];
+  }, [activeEvents]);
   const filteredMails = useMemo(
     () =>
       [...mails]
