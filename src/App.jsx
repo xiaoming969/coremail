@@ -1637,6 +1637,46 @@ const MOCK_ACCOUNTS = [
       mobileAccess: true,
     },
   },
+  {
+    id: 'acc4',
+    name: 'product-group@calendarpro.io',
+    displayName: '产品项目组',
+    email: 'product-group@calendarpro.io',
+    role: '群组账户',
+    ownership: 'group',
+    color: 'bg-cyan-500',
+    checked: true,
+    mailboxMembers: [
+      { id: 'mb7', name: '产品项目组', email: 'product-group@calendarpro.io', fullAccess: true, sendAs: false, sendOnBehalf: true },
+      { id: 'mb8', name: '我', email: 'me@calendarpro.io', fullAccess: true, sendAs: false, sendOnBehalf: true },
+    ],
+    mailboxSettings: {
+      showInAddressList: true,
+      saveSentItems: true,
+      automap: true,
+      mobileAccess: true,
+    },
+  },
+  {
+    id: 'acc5',
+    name: 'rooms@calendarpro.io',
+    displayName: '会议室资源',
+    email: 'rooms@calendarpro.io',
+    role: '资源账户',
+    ownership: 'room',
+    color: 'bg-amber-500',
+    checked: true,
+    mailboxMembers: [
+      { id: 'mb9', name: '会议室管理员', email: 'rooms-admin@calendarpro.io', fullAccess: true, sendAs: true, sendOnBehalf: false },
+      { id: 'mb10', name: '我', email: 'me@calendarpro.io', fullAccess: false, sendAs: false, sendOnBehalf: true },
+    ],
+    mailboxSettings: {
+      showInAddressList: true,
+      saveSentItems: false,
+      automap: false,
+      mobileAccess: true,
+    },
+  },
 ];
 
 const MOCK_CALENDARS = [
@@ -1869,6 +1909,74 @@ const MOCK_CALENDARS = [
       },
     ],
   },
+  {
+    id: 'c6',
+    accountId: 'acc4',
+    name: '产品项目组',
+    type: 'group',
+    owner: '产品项目组',
+    color: 'bg-cyan-500',
+    checked: true,
+    permission: '可编辑',
+    isPrimary: true,
+    defaultSharing: {
+      organization: 'titles_locations',
+      external: 'busy_only',
+    },
+    publishing: {
+      enabled: true,
+      permission: 'titles_locations',
+      htmlLink: 'https://calendarpro.io/publish/c6/html',
+      icsLink: 'https://calendarpro.io/publish/c6/ics',
+    },
+    sharing: [
+      {
+        id: 'share8',
+        name: '我',
+        email: 'me@calendarpro.io',
+        scope: 'internal',
+        permission: 'edit',
+        status: 'accepted',
+        updatedAt: new Date(2026, 0, 8, 14, 10).getTime(),
+        canViewPrivate: false,
+        meetingResponses: 'delegate_copy',
+      },
+    ],
+  },
+  {
+    id: 'c7',
+    accountId: 'acc5',
+    name: '会议室资源',
+    type: 'room',
+    owner: '会议室资源',
+    color: 'bg-amber-500',
+    checked: true,
+    permission: '仅查看详情',
+    isPrimary: true,
+    defaultSharing: {
+      organization: 'titles_locations',
+      external: 'none',
+    },
+    publishing: {
+      enabled: false,
+      permission: 'titles_locations',
+      htmlLink: 'https://calendarpro.io/publish/c7/html',
+      icsLink: 'https://calendarpro.io/publish/c7/ics',
+    },
+    sharing: [
+      {
+        id: 'share9',
+        name: '我',
+        email: 'me@calendarpro.io',
+        scope: 'internal',
+        permission: 'titles_locations',
+        status: 'accepted',
+        updatedAt: new Date(2026, 0, 8, 15, 25).getTime(),
+        canViewPrivate: false,
+        meetingResponses: 'delegate_only',
+      },
+    ],
+  },
 ];
 
 const HUAWEI_HOLIDAY_EVENTS = [
@@ -1926,8 +2034,251 @@ const HUAWEI_HOLIDAY_EVENTS = [
   }),
 ];
 
+const DEMO_EVENT_TEMPLATES = [
+  {
+    title: 'Q4 预算滚动复盘',
+    location: '会议室 301',
+    organizer: '王芳（财务部）',
+    attendees: ['李强', '陈晨', '我', '财务预算组'],
+    description: '复盘 Q4 预算 使用进度，确认下周需要调整的预算项。',
+    meetingProvider: 'teams',
+    attachments: ['Q4预算滚动表.xlsx', '预算口径说明.pdf'],
+    colorCategory: 'project',
+  },
+  {
+    title: '客户方案评审',
+    location: '线上会议',
+    organizer: '张伟（客户成功部）',
+    attendees: ['林茜', '王璐', '我', '客户代表'],
+    optionalAttendees: ['外部顾问'],
+    description: '评审重点客户方案，确认报价、交付边界和风险项。',
+    meetingProvider: 'zoom',
+    attachments: ['客户方案_v3.pptx'],
+    colorCategory: 'customer',
+  },
+  {
+    title: '产品路线图同步',
+    location: '产品区讨论室',
+    organizer: '产品经理',
+    attendees: ['设计负责人', '研发负责人', '我', '产品项目组'],
+    description: '同步产品路线图、发布节奏和跨团队依赖。',
+    meetingProvider: 'meet',
+    attachments: ['路线图草案.pdf'],
+    colorCategory: 'project',
+  },
+  {
+    title: '渠道复盘与线索分配',
+    location: '销售区 2F',
+    organizer: '销售团队',
+    attendees: ['运营经理', '销售团队', '我', '区域负责人'],
+    description: '复盘渠道线索转化表现，并分配下周重点跟进客户。',
+    meetingProvider: 'none',
+    attachments: ['渠道线索清单.xlsx'],
+    colorCategory: 'customer',
+  },
+  {
+    title: '招聘面试校准会',
+    location: '5号会议室',
+    organizer: 'HRBP（人力资源部）',
+    attendees: ['研发负责人', '产品经理', '我'],
+    description: '校准候选人反馈，确认后续面试安排。',
+    meetingProvider: 'none',
+    attachments: [],
+    colorCategory: 'todo',
+  },
+  {
+    title: '供应商合同评审',
+    location: '法务会议室',
+    organizer: '法务专员',
+    attendees: ['采购经理', '陈晨', '我', '财务分析师'],
+    description: '评审供应商合同条款、付款节点和审批附件。',
+    meetingProvider: 'teams',
+    attachments: ['合同评审清单.docx'],
+    colorCategory: 'important',
+  },
+  {
+    title: '培训资料准备会',
+    location: '培训教室',
+    organizer: '培训负责人',
+    attendees: ['运营经理', '客服主管', '我'],
+    description: '确认培训资料、讲师安排和签到方式。',
+    meetingProvider: 'none',
+    attachments: ['培训资料目录.xlsx'],
+    colorCategory: 'todo',
+  },
+  {
+    title: '会议室设备巡检',
+    location: '会议室 502',
+    organizer: '会议室管理员',
+    attendees: ['行政助理组', 'IT 支持', '我'],
+    description: '检查会议室投屏、麦克风和白板设备。',
+    meetingProvider: 'none',
+    attachments: [],
+    colorCategory: 'important',
+  },
+  {
+    title: '数据看板验收',
+    location: '线上会议',
+    organizer: '数据分析师',
+    attendees: ['运营经理', '产品经理', '我', '研发负责人'],
+    description: '验收经营数据看板，确认指标口径和权限范围。',
+    meetingProvider: 'meet',
+    attachments: ['看板验收记录.xlsx'],
+    colorCategory: 'project',
+  },
+  {
+    title: '运营活动排期会',
+    location: '运营作战室',
+    organizer: '运营经理',
+    attendees: ['市场负责人', '销售团队', '我'],
+    description: '排期下月运营活动，确认内容、预算和投放渠道。',
+    meetingProvider: 'teams',
+    attachments: ['活动排期表.xlsx'],
+    colorCategory: 'customer',
+  },
+  {
+    title: '安全合规检查',
+    location: '安全会议室',
+    organizer: '安全负责人',
+    attendees: ['IT 支持', '法务专员', '我'],
+    description: '检查账号权限、共享范围和外部访问记录。',
+    meetingProvider: 'none',
+    attachments: ['合规检查项.pdf'],
+    colorCategory: 'important',
+  },
+  {
+    title: '项目里程碑评审',
+    location: '大圆桌会议室',
+    organizer: '项目经理',
+    attendees: ['产品项目组', '研发负责人', '设计负责人', '我'],
+    description: '评审项目里程碑、资源缺口和延期风险。',
+    meetingProvider: 'teams',
+    attachments: ['里程碑计划.mpp'],
+    colorCategory: 'project',
+  },
+];
+
+const DEMO_EVENT_CALENDAR_IDS = ['c1', 'c2', 'c3', 'c5', 'c6', 'c7'];
+const DEMO_EVENT_TIME_SLOTS = [8.5, 9, 9.5, 10, 10.5, 11, 13, 13.5, 14, 14.5, 15, 15.5, 16, 16.5, 17];
+const DEMO_EVENT_DURATIONS = [0.5, 1, 1, 1.5, 2];
+const DEMO_ROOM_NAMES = ['会议室 301', '会议室 502', '大圆桌会议室', '培训教室', '法务会议室', '运营作战室'];
+const DEMO_REPEAT_OPTIONS = ['does_not_repeat', 'does_not_repeat', 'does_not_repeat', 'every_week', 'every_month'];
+const DEMO_MEETING_PROVIDERS = ['teams', 'meet', 'zoom', 'none'];
+
+const createDemoTimedEvents = (count = 168) =>
+  Array.from({ length: count }, (_, index) => {
+    const template = DEMO_EVENT_TEMPLATES[index % DEMO_EVENT_TEMPLATES.length];
+    const weekIndex = Math.floor(index / 12) - 6;
+    const dayIndex = (index * 2 + Math.floor(index / 12)) % 5;
+    const date = addDays(getWeekStart(TODAY_DATE), weekIndex * 7 + dayIndex);
+    const calId = DEMO_EVENT_CALENDAR_IDS[(index * 5 + Math.floor(index / 7)) % DEMO_EVENT_CALENDAR_IDS.length];
+    const startH = DEMO_EVENT_TIME_SLOTS[(index * 7) % DEMO_EVENT_TIME_SLOTS.length];
+    const durationH = DEMO_EVENT_DURATIONS[index % DEMO_EVENT_DURATIONS.length];
+    const status = index % 37 === 0 ? '已取消' : index % 23 === 0 ? '已拒绝' : index % 19 === 0 ? '待响应' : '已接受';
+    const roomEvent = calId === 'c7';
+    const meetingProvider = roomEvent
+      ? 'none'
+      : template.meetingProvider === 'none'
+        ? DEMO_MEETING_PROVIDERS[index % DEMO_MEETING_PROVIDERS.length]
+        : template.meetingProvider;
+    const title = roomEvent ? `会议室预订 · ${template.title}` : template.title;
+    const location = roomEvent ? DEMO_ROOM_NAMES[index % DEMO_ROOM_NAMES.length] : template.location;
+    const attachments = index % 3 === 0 ? template.attachments : index % 7 === 0 ? [`${template.title}材料.pdf`] : [];
+
+    return {
+      id: `demo-event-${String(index + 1).padStart(3, '0')}`,
+      title,
+      ...dateToEventParts(date),
+      startH,
+      durationH,
+      calId,
+      location,
+      organizer: roomEvent ? '会议室管理员' : template.organizer,
+      status,
+      description: `${template.description} 本条为演示数据 ${index + 1}。`,
+      type: status === '已取消' ? 'cancelled' : 'normal',
+      attendees: template.attendees,
+      optionalAttendees: index % 4 === 0 ? [...(template.optionalAttendees || []), '外部顾问'] : template.optionalAttendees || [],
+      meetingProvider,
+      meetingLink: meetingProvider === 'none' ? '' : `https://calendarpro.io/demo-meeting/${index + 1}`,
+      repeat: DEMO_REPEAT_OPTIONS[index % DEMO_REPEAT_OPTIONS.length],
+      reminder: index % 5 === 0 ? '10m' : '30m',
+      availability: 'busy',
+      visibility: index % 41 === 0 ? 'private' : 'default',
+      kind: 'event',
+      attachments,
+      colorCategory: template.colorCategory,
+    };
+  });
+
+const createDemoAllDayEvents = (count = 18) =>
+  Array.from({ length: count }, (_, index) => {
+    const template = DEMO_EVENT_TEMPLATES[(index * 3) % DEMO_EVENT_TEMPLATES.length];
+    const date = addDays(getWeekStart(TODAY_DATE), (Math.floor(index / 3) - 3) * 7 + (index % 5));
+
+    return {
+      id: `demo-all-day-${String(index + 1).padStart(2, '0')}`,
+      title: `${template.title}准备周`,
+      ...dateToEventParts(date),
+      startH: 0,
+      durationH: 24,
+      calId: DEMO_EVENT_CALENDAR_IDS[(index * 2) % DEMO_EVENT_CALENDAR_IDS.length],
+      location: '',
+      organizer: template.organizer,
+      status: '已接受',
+      description: `${template.title}相关材料集中准备与跨天占用。`,
+      type: 'normal',
+      attendees: template.attendees,
+      meetingProvider: 'none',
+      meetingLink: '',
+      repeat: 'does_not_repeat',
+      reminder: '1d',
+      availability: 'busy',
+      visibility: 'default',
+      kind: 'event',
+      isAllDay: true,
+      allDaySpan: (index % 3) + 1,
+      attachments: index % 2 === 0 ? [`${template.title}准备清单.xlsx`] : [],
+      colorCategory: template.colorCategory,
+    };
+  });
+
+const createDemoBusyBlocks = (count = 18) =>
+  Array.from({ length: count }, (_, index) => {
+    const date = addDays(getWeekStart(TODAY_DATE), (Math.floor(index / 3) - 3) * 7 + ((index * 2) % 5));
+
+    return {
+      id: `demo-busy-only-${String(index + 1).padStart(2, '0')}`,
+      title: '共享日历忙碌占用',
+      ...dateToEventParts(date),
+      startH: DEMO_EVENT_TIME_SLOTS[(index * 4) % DEMO_EVENT_TIME_SLOTS.length],
+      durationH: DEMO_EVENT_DURATIONS[index % DEMO_EVENT_DURATIONS.length],
+      calId: 'c4',
+      location: '',
+      organizer: '张三',
+      status: '已接受',
+      description: '',
+      type: 'busy_only',
+      attendees: ['张三'],
+      meetingProvider: 'none',
+      meetingLink: '',
+      repeat: 'does_not_repeat',
+      reminder: 'none',
+      availability: 'busy',
+      visibility: 'private',
+      kind: 'event',
+    };
+  });
+
+const BULK_DEMO_EVENTS = [
+  ...createDemoTimedEvents(),
+  ...createDemoAllDayEvents(),
+  ...createDemoBusyBlocks(),
+];
+
 const MOCK_EVENTS = [
   ...HUAWEI_HOLIDAY_EVENTS,
+  ...BULK_DEMO_EVENTS,
   {
     id: 'q4-budget-review',
     title: 'Q4 预算评审会',
@@ -5799,6 +6150,7 @@ function CalendarSearchResults({
 
   const isDefaultAccountFilter =
     !isMultiAccount ||
+    filters.accountId === 'all' ||
     filters.accountId === 'current' ||
     (!filters.accountId && selectedAccountIds.length === 1 && selectedAccountIds[0] === getPrimarySearchAccountId(accountOptions));
   const hasActiveFilters =
@@ -5812,7 +6164,7 @@ function CalendarSearchResults({
     (filters.sort || 'relevance') !== 'relevance';
   const resetFilters = () =>
     onChangeFilters({
-      accountId: 'current',
+      accountId: 'all',
       accountIds: [],
       calendarScope: 'all',
       timeframe: 'all',
@@ -7416,7 +7768,7 @@ function MainApp() {
   const [calendarSearchPopoverOpen, setCalendarSearchPopoverOpen] = useState(false);
   const [calendarRecentSearches, setCalendarRecentSearches] = useState(['Q4 预算', '会议', '周会', '产品评审', '客户沟通']);
   const [calendarSearchFilters, setCalendarSearchFilters] = useState({
-    accountId: 'current',
+    accountId: 'all',
     accountIds: [],
     calendarScope: 'all',
     timeframe: 'all',
