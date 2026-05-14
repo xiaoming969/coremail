@@ -5853,19 +5853,6 @@ function CalendarSearchResults({
     </div>
   );
 
-  const setAccountSelection = (nextAccountIds) => {
-    const normalized = Array.from(new Set(nextAccountIds)).filter(Boolean);
-    if (normalized.length === 0) {
-      onChangeFilters({ accountId: 'current', accountIds: [] });
-      return;
-    }
-    if (normalized.length === accountOptions.length) {
-      onChangeFilters({ accountId: 'all', accountIds: [] });
-      return;
-    }
-    onChangeFilters({ accountId: 'custom', accountIds: normalized });
-  };
-
   const renderResultActions = (event, isCard = false) => {
     const joinable = canJoinCalendarEvent(event);
 
@@ -6171,54 +6158,6 @@ function CalendarSearchResults({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-4">
-          {isMultiAccount && (
-            <details className="group/filter relative shrink-0">
-              <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
-                <Mail size={15} className="text-slate-400" />
-                {getSearchAccountLabel(filters, accountOptions)}
-                <ChevronDown size={15} className="text-slate-500" />
-              </summary>
-              <div className="absolute left-0 top-[calc(100%+6px)] z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => onChangeFilters({ accountId: 'current', accountIds: [] })}
-                  className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  账号：当前账号
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChangeFilters({ accountId: 'all', accountIds: [] })}
-                  className="flex w-full items-center rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  账号：全部账号
-                </button>
-                <div className="my-1 h-px bg-slate-100" />
-                {accountOptions.map((account) => {
-                  const checked = selectedAccountIds.includes(account.id);
-                  return (
-                    <label key={account.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm hover:bg-slate-50">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(event) => {
-                          const nextIds = event.target.checked
-                            ? [...selectedAccountIds, account.id]
-                            : selectedAccountIds.filter((id) => id !== account.id);
-                          setAccountSelection(nextIds);
-                        }}
-                        className="mt-1"
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate font-bold text-slate-800">{getAccountDisplayLabel(account)}</span>
-                        <span className="block truncate text-xs font-medium text-slate-400">{account.email || account.name}</span>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </details>
-          )}
           {renderFilterSelect({
             value: filters.calendarScope || 'all',
             onChange: (value) => onChangeFilters({ calendarScope: value }),
