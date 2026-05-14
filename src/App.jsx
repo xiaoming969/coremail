@@ -767,6 +767,7 @@ const EVENT_SEARCH_FIELD_LABELS = {
   time: '时间',
   location: '地点',
   calendar: '账户/日历',
+  attachments: '附件',
 };
 const EVENT_SEARCH_FIELD_WEIGHTS = {
   title: 8,
@@ -774,6 +775,7 @@ const EVENT_SEARCH_FIELD_WEIGHTS = {
   organizer: 7,
   location: 5,
   time: 4,
+  attachments: 4,
   description: 3,
   calendar: 2,
 };
@@ -788,18 +790,46 @@ const SEARCH_SCOPE_OPTIONS = [
   { id: 'calendar', label: '账户/日历' },
 ];
 const SEARCH_STATUS_OPTIONS = [
-  { id: 'all', label: '全部状态' },
-  { id: 'accepted', label: '已接受/正常' },
-  { id: '待响应', label: '待响应' },
-  { id: '已拒绝', label: '已拒绝' },
-  { id: '已取消', label: '已取消' },
-  { id: '草稿', label: '草稿' },
+  { id: 'all', label: '我的响应：全部' },
+  { id: 'accepted', label: '我已接受' },
+  { id: 'tentative', label: '我暂定' },
+  { id: 'declined', label: '我已拒绝' },
+  { id: 'unanswered', label: '未响应' },
 ];
 const SEARCH_TIMEFRAME_OPTIONS = [
-  { id: 'all', label: '全部时间' },
+  { id: 'all', label: '时间：全部时间' },
+  { id: 'today', label: '今天' },
+  { id: 'tomorrow', label: '明天' },
   { id: 'this_week', label: '本周' },
+  { id: 'last_week', label: '上周' },
   { id: 'this_month', label: '本月' },
   { id: 'next_30_days', label: '未来 30 天' },
+];
+const SEARCH_ACCOUNT_SCOPE_OPTIONS = [
+  { id: 'all', label: '搜索范围：全部日历' },
+  { id: 'mine', label: '我的日历' },
+  { id: 'shared', label: '共享日历' },
+  { id: 'group', label: '群组日历' },
+  { id: 'room', label: '会议室日历' },
+];
+const SEARCH_MEETING_TYPE_OPTIONS = [
+  { id: 'all', label: '会议类型：全部' },
+  { id: 'online', label: '线上会议' },
+  { id: 'room', label: '会议室会议' },
+  { id: 'no_location', label: '无地点会议' },
+  { id: 'recurring', label: '循环会议' },
+  { id: 'cancelled', label: '已取消会议' },
+];
+const SEARCH_ATTACHMENT_OPTIONS = [
+  { id: 'all', label: '有附件：全部' },
+  { id: 'has', label: '有附件' },
+  { id: 'none', label: '无附件' },
+];
+const SEARCH_SORT_OPTIONS = [
+  { id: 'default', label: '排序：默认排序' },
+  { id: 'relevance', label: '相关性优先' },
+  { id: 'time_asc', label: '时间从近到远' },
+  { id: 'time_desc', label: '时间从远到近' },
 ];
 const SEARCH_RESULT_COLUMN_OPTIONS = [
   { id: 'time', label: '时间' },
@@ -884,6 +914,9 @@ const getEventSearchFields = (event, calendar, account) => {
   const durationH = event.durationH || 1;
   const endH = startH + durationH;
   const attendeeValues = [...(event.attendees || []), ...(event.optionalAttendees || [])];
+  const attachmentNames = (event.attachments || [])
+    .map((attachment) => (typeof attachment === 'string' ? attachment : attachment?.name))
+    .filter(Boolean);
 
   return {
     title: [event.title, event.status === '已取消' ? '已取消' : ''],
@@ -904,6 +937,7 @@ const getEventSearchFields = (event, calendar, account) => {
     ],
     location: [event.location, MEETING_PROVIDER_LABELS[event.meetingProvider || 'none'], event.meetingLink],
     calendar: [calendar?.name, calendar?.owner, account?.name, account?.email],
+    attachments: attachmentNames,
   };
 };
 const getEventSearchMatchMeta = (event, calendar, account, query, fieldScope = 'all') => {
@@ -949,15 +983,84 @@ const getEventSearchMatchMeta = (event, calendar, account, query, fieldScope = '
     matchedFields: Array.from(matchedFields),
   };
 };
-const getNormalizedSearchStatus = (event) => event.status || 'accepted';
+const getNormalizedSearchStatus = (event) => {
+  if (event.status === '已接受' || event.status === 'accepted') return 'accepted';
+  if (event.status === '暂定' || event.status === 'tentative') return 'tentative';
+  if (event.status === '已拒绝' || event.status === 'declined') return 'declined';
+  if (event.status === '待响应' || event.status === 'pending' || event.status === 'unanswered') return 'unanswered';
+  if (event.status === '已取消' || event.status === 'cancelled') return 'cancelled';
+  return 'accepted';
+};
+const accountMatchesSearchScope = (account, scope) => {
+  if (!scope || scope === 'all') return true;
+  if (!account) return false;
+  if (scope === 'mine') return account.ownership !== 'shared';
+  if (scope === 'shared') return account.ownership === 'shared';
+  if (scope === 'huawei') return account.id === HUAWEI_ACCOUNT_ID;
+  if (scope === 'group') return account.ownership === 'group' || account.type === 'group';
+  if (scope === 'room') return account.ownership === 'room' || account.type === 'room';
+  return account.id === scope;
+};
+const eventMatchesSearchPerson = (event, personFilter) => {
+  if (!personFilter || personFilter === 'all') return true;
+
+  const [role, ...nameParts] = personFilter.split('::');
+  const name = nameParts.join('::');
+  if (!name) return true;
+
+  const participants = [...(event.attendees || []), ...(event.optionalAttendees || [])].filter(Boolean);
+  if (role === 'organizer') return event.organizer === name;
+  if (role === 'participant') return participants.includes(name);
+
+  return event.organizer === name || participants.includes(name);
+};
+const eventMatchesMeetingType = (event, meetingType) => {
+  if (!meetingType || meetingType === 'all') return true;
+
+  const hasOnline = Boolean(event.meetingLink || (event.meetingProvider && event.meetingProvider !== 'none'));
+  const hasLocation = Boolean(event.location);
+  const isRecurring = Boolean(event.repeat && event.repeat !== 'does_not_repeat');
+  const isCancelled = getNormalizedSearchStatus(event) === 'cancelled' || event.type === 'cancelled';
+
+  if (meetingType === 'online') return hasOnline;
+  if (meetingType === 'room') return hasLocation && !hasOnline;
+  if (meetingType === 'no_location') return !hasLocation && !hasOnline;
+  if (meetingType === 'recurring') return isRecurring;
+  if (meetingType === 'cancelled') return isCancelled;
+
+  return true;
+};
+const eventMatchesAttachmentFilter = (event, attachmentFilter) => {
+  if (!attachmentFilter || attachmentFilter === 'all') return true;
+
+  const hasAttachments = (event.attachments || []).length > 0;
+  if (attachmentFilter === 'has') return hasAttachments;
+  if (attachmentFilter === 'none') return !hasAttachments;
+
+  return true;
+};
 const eventMatchesSearchTimeframe = (event, timeframe) => {
   if (!timeframe || timeframe === 'all') return true;
 
   const eventDate = stripTime(eventToDate(event));
   const today = stripTime(TODAY_DATE);
 
+  if (timeframe === 'today') {
+    return sameDay(eventDate, today);
+  }
+
+  if (timeframe === 'tomorrow') {
+    return sameDay(eventDate, addDays(today, 1));
+  }
+
   if (timeframe === 'this_week') {
     const start = getWeekStart(today);
+    const end = addDays(start, 7);
+    return eventDate >= start && eventDate < end;
+  }
+
+  if (timeframe === 'last_week') {
+    const start = addDays(getWeekStart(today), -7);
     const end = addDays(start, 7);
     return eventDate >= start && eventDate < end;
   }
@@ -5094,6 +5197,7 @@ function CalendarSearchResults({
   query,
   filters,
   accountOptions,
+  peopleOptions,
   onChangeFilters,
   results,
   onBack,
@@ -5180,6 +5284,30 @@ function CalendarSearchResults({
     [results],
   );
 
+  const monthSections = useMemo(() => {
+    const sections = [];
+    const sectionMap = new Map();
+
+    timelineResults.forEach((result) => {
+      const date = eventToDate(result.event);
+      const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+      if (!sectionMap.has(key)) {
+        const section = {
+          id: key,
+          title: `${date.getFullYear()}年${date.getMonth() + 1}月`,
+          items: [],
+        };
+        sectionMap.set(key, section);
+        sections.push(section);
+      }
+
+      sectionMap.get(key).items.push(result);
+    });
+
+    return sections;
+  }, [timelineResults]);
+
   const firstCurrentResultId = useMemo(() => {
     if (timelineResults.length === 0) return null;
     const currentResult = timelineResults.find((result) => getResultEndValue(result) >= TODAY_DATE.getTime());
@@ -5220,29 +5348,6 @@ function CalendarSearchResults({
     trimmedQuery,
   ]);
 
-  const groupedResults = useMemo(() => {
-    const groups = [];
-
-    timelineResults.forEach((result) => {
-      const date = eventToDate(result.event);
-      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-      let group = groups.find((item) => item.key === monthKey);
-
-      if (!group) {
-        group = {
-          key: monthKey,
-          label: formatMonthGroupLabel(date),
-          items: [],
-        };
-        groups.push(group);
-      }
-
-      group.items.push(result);
-    });
-
-    return groups;
-  }, [timelineResults]);
-
   const getResultTimeState = (event) => {
     const date = eventToDate(event);
     const diffDays = Math.round((stripTime(date).getTime() - stripTime(TODAY_DATE).getTime()) / DAY_MS);
@@ -5260,33 +5365,314 @@ function CalendarSearchResults({
       }
     }
 
+    if (diffDays < 0) return null;
     if (diffDays === 0) return { label: '今天', className: 'border-blue-200 bg-blue-50 text-blue-700' };
     if (diffDays === 1) return { label: '明天', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
-    if (diffDays < 0) return { label: '历史', className: 'bg-slate-100 text-slate-500' };
     if (diffDays <= 7) return { label: `${diffDays} 天后`, className: 'bg-slate-100 text-slate-600' };
     return null;
+  };
+
+  const getEventDateMeta = (event) => {
+    const date = eventToDate(event);
+    const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+    return {
+      day: date.getDate(),
+      weekday: WEEKDAY_NAMES[dayIndex],
+      dateLabel: `${date.getMonth() + 1}月${date.getDate()}日 · ${WEEKDAY_NAMES[dayIndex]}`,
+      timeLabel: event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1),
+    };
+  };
+
+  const formatParticipants = (event) => {
+    if (event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID) return '';
+
+    const names = Array.from(new Set([...(event.attendees || []), ...(event.optionalAttendees || [])]))
+      .filter(Boolean)
+      .filter((name) => name !== event.organizer);
+
+    if (names.length === 0) return '';
+    if (names.length <= 3) return `参与人：${names.join('、')}`;
+    return `参与人：${names.slice(0, 2).join('、')} 等 ${names.length} 人`;
+  };
+
+  const getOrganizerLabel = (event) => {
+    if (event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID || !event.organizer) return '';
+    return `组织者：${event.organizer}`;
+  };
+
+  const getMatchedSnippet = (event, match) => {
+    if (match?.matchedFields?.includes('description') && event.description) {
+      return event.description;
+    }
+
+    if (match?.matchedFields?.includes('attachments') && event.attachments?.length) {
+      const [firstAttachment] = event.attachments;
+      return event.attachments.length > 1 ? `${firstAttachment} 等 ${event.attachments.length} 个` : firstAttachment;
+    }
+
+    return '';
+  };
+
+  const getMeetingMeta = (event) => {
+    const items = [];
+    if (event.location) items.push({ icon: MapPin, label: event.location });
+    if (event.meetingProvider && event.meetingProvider !== 'none') {
+      items.push({ icon: Calendar, label: MEETING_PROVIDER_LABELS[event.meetingProvider] });
+    }
+    return items;
+  };
+
+  const canJoinEvent = (event) => {
+    if (!event.meetingLink || !event.meetingProvider || event.meetingProvider === 'none') return false;
+    if (event.status === '已取消' || event.status === '已拒绝') return false;
+
+    const startValue = getResultStartValue({ event });
+    const endValue = getResultEndValue({ event });
+    return startValue - TODAY_DATE.getTime() <= 15 * 60 * 1000 && endValue >= TODAY_DATE.getTime();
+  };
+
+  const openMeetingLink = (event) => {
+    if (!event.meetingLink) return;
+    window.open(event.meetingLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const hasActiveFilters = filters.accountId !== 'all' || filters.status !== 'all' || filters.timeframe !== 'all';
+  const resetFilters = () => onChangeFilters({ accountId: 'all', status: 'all', timeframe: 'all', field: 'all' });
+
+  const renderResultActions = (event, isCard = false) => {
+    const joinable = canJoinEvent(event);
+
+    return (
+      <div className={`flex shrink-0 items-center gap-2 ${isCard ? '' : 'opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
+        <button
+          type="button"
+          onClick={(entry) => {
+            entry.stopPropagation();
+            onLocateEvent(event.id);
+          }}
+          onDoubleClick={(entry) => entry.stopPropagation()}
+          className="inline-flex h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+        >
+          定位
+        </button>
+        <button
+          type="button"
+          onClick={(entry) => {
+            entry.stopPropagation();
+            onOpenEvent(event.id);
+          }}
+          onDoubleClick={(entry) => entry.stopPropagation()}
+          className="inline-flex h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+        >
+          查看详情
+        </button>
+        {joinable && (
+          <button
+            type="button"
+            onClick={(entry) => {
+              entry.stopPropagation();
+              openMeetingLink(event);
+            }}
+            onDoubleClick={(entry) => entry.stopPropagation()}
+            className="inline-flex h-9 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700"
+          >
+            <ArrowRight size={14} className="mr-1" />
+            一键入会
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderSearchResult = (result, variant = 'list') => {
+    const { event, calendar, sourceLabel } = result;
+    const isSelected = selectedResultId === event.id;
+    const dateMeta = getEventDateMeta(event);
+    const timeState = getResultTimeState(event);
+    const organizerLabel = getOrganizerLabel(event);
+    const participantLabel = formatParticipants(event);
+    const meetingMeta = getMeetingMeta(event);
+    const snippet = getMatchedSnippet(event, result.match);
+    const sourceText = sourceLabel || '';
+    const isCancelled = event.status === '已取消';
+
+    if (variant === 'cards') {
+      return (
+        <article
+          key={event.id}
+          role="button"
+          tabIndex={0}
+          data-search-result-id={event.id}
+          onClick={() => setSelectedResultId(event.id)}
+          onDoubleClick={() => onOpenEvent(event.id)}
+          onKeyDown={(entry) => {
+            if (entry.key === 'Enter') {
+              entry.preventDefault();
+              onOpenEvent(event.id);
+            }
+          }}
+          className={`group rounded-xl border px-5 py-4 outline-none transition ${
+            isSelected ? 'border-blue-200 bg-blue-50/70' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-slate-500">{dateMeta.dateLabel} · {dateMeta.timeLabel}</div>
+              <div className={`mt-2 truncate text-xl font-black ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+                {renderHighlighted(event.title || '无标题')}
+              </div>
+            </div>
+            {renderResultActions(event, true)}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-slate-600">
+            <span className={`h-2.5 w-2.5 rounded-full ${calendar?.color || 'bg-slate-400'}`} />
+            {timeState && <span className={`rounded-full border px-2 py-0.5 text-xs ${timeState.className}`}>{timeState.label}</span>}
+          </div>
+
+          <div className="mt-3 grid gap-2 text-sm font-medium text-slate-600 md:grid-cols-2">
+            {organizerLabel && <div>{renderHighlighted(organizerLabel)}</div>}
+            {participantLabel && <div>{renderHighlighted(participantLabel)}</div>}
+            {meetingMeta.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="inline-flex min-w-0 items-center gap-1.5">
+                  <Icon size={15} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{renderHighlighted(item.label)}</span>
+                </div>
+              );
+            })}
+            {sourceText && <div>{renderHighlighted(sourceText)}</div>}
+          </div>
+
+          {snippet && (
+            <div className="mt-3 truncate rounded-lg bg-white/70 px-3 py-2 text-sm font-medium text-slate-600">
+              {renderHighlighted(snippet)}
+            </div>
+          )}
+        </article>
+      );
+    }
+
+    return (
+      <div
+        key={event.id}
+        role="button"
+        tabIndex={0}
+        data-search-result-id={event.id}
+        onClick={() => setSelectedResultId(event.id)}
+        onDoubleClick={() => onOpenEvent(event.id)}
+        onKeyDown={(entry) => {
+          if (entry.key === 'Enter') {
+            entry.preventDefault();
+            onOpenEvent(event.id);
+          }
+          if (entry.key === ' ') {
+            entry.preventDefault();
+            setSelectedResultId(event.id);
+          }
+        }}
+        className={`group grid w-full grid-cols-[72px_minmax(104px,150px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-2 py-4 text-left outline-none transition last:border-b-0 md:grid-cols-[72px_minmax(116px,160px)_10px_minmax(0,1fr)_180px] ${
+          isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex min-w-0 flex-col items-center justify-center">
+          <div className={`text-2xl font-black leading-none ${sameDay(eventToDate(event), TODAY_DATE) ? 'text-blue-600' : 'text-slate-950'}`}>
+            {dateMeta.day}
+          </div>
+          <div className="mt-1 text-[12px] font-bold text-slate-500">{dateMeta.weekday}</div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="text-sm font-black text-slate-950">{dateMeta.timeLabel}</div>
+          <div className="mt-0.5 text-xs font-semibold text-slate-500">{dateMeta.dateLabel}</div>
+          {timeState && (
+            <span className={`mt-1 inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-semibold ${timeState.className}`}>
+              {timeState.label}
+            </span>
+          )}
+        </div>
+
+        <div className={`hidden h-2.5 w-2.5 rounded-full md:block ${calendar?.color || 'bg-slate-400'}`} />
+
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className={`truncate text-base font-black leading-6 ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+              {renderHighlighted(event.title || '无标题')}
+            </div>
+          </div>
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
+            {organizerLabel && <span>{renderHighlighted(organizerLabel)}</span>}
+            {meetingMeta.map((item) => {
+              const Icon = item.icon;
+              return (
+                <span key={item.label} className="inline-flex min-w-0 items-center gap-1.5">
+                  <Icon size={14} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{renderHighlighted(item.label)}</span>
+                </span>
+              );
+            })}
+            {participantLabel && (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <Users size={14} className="shrink-0 text-slate-400" />
+                <span className="truncate">{renderHighlighted(participantLabel)}</span>
+              </span>
+            )}
+            {sourceText && (
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
+                <Calendar size={14} className="shrink-0 text-slate-400" />
+                <span className="truncate">{renderHighlighted(sourceText)}</span>
+              </span>
+            )}
+            {snippet && (
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
+                {snippet.startsWith('附件') ? <Paperclip size={14} className="shrink-0 text-slate-400" /> : <FileText size={14} className="shrink-0 text-slate-400" />}
+                <span className="truncate">{renderHighlighted(snippet)}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="col-span-3 flex items-center justify-end gap-2 md:col-span-1">
+          {renderResultActions(event)}
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
       <div className="border-b border-slate-200 bg-white px-6 py-4 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-base font-black text-slate-900">搜索结果</div>
             {trimmedQuery && (
               <div className="mt-1 text-sm text-slate-500">
-                关键词 "{trimmedQuery}" · {results.length} 场日程
+                共找到 {results.length} 条结果
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <select
-              value={filters.field}
-              onChange={(event) => onChangeFilters({ field: event.target.value })}
+              value={filters.accountId}
+              onChange={(event) => onChangeFilters({ accountId: event.target.value, field: 'all' })}
               className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
             >
-              {SEARCH_SCOPE_OPTIONS.map((option) => (
+              <option value="all">搜索范围：全部日历</option>
+              {accountOptions.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.ownership === 'shared' ? '共享日历' : '我的日历'}：{getAccountDisplayLabel(account)}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filters.timeframe}
+              onChange={(event) => onChangeFilters({ timeframe: event.target.value })}
+              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
+            >
+              {SEARCH_TIMEFRAME_OPTIONS.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
                 </option>
@@ -5303,29 +5689,15 @@ function CalendarSearchResults({
                 </option>
               ))}
             </select>
-            <select
-              value={filters.timeframe}
-              onChange={(event) => onChangeFilters({ timeframe: event.target.value })}
-              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
-            >
-              {SEARCH_TIMEFRAME_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filters.accountId}
-              onChange={(event) => onChangeFilters({ accountId: event.target.value })}
-              className="h-9 appearance-none rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 focus:outline-none"
-            >
-              <option value="all">全部账户</option>
-              {accountOptions.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.email || account.name}
-                </option>
-              ))}
-            </select>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="h-9 rounded-lg px-3 text-sm font-bold text-blue-600 transition hover:bg-blue-50"
+              >
+                清除筛选
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -5347,134 +5719,20 @@ function CalendarSearchResults({
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[1180px]">
-            {groupedResults.map((group) => (
-              <section key={group.key} className="mb-6 last:mb-0">
-                <div className="flex items-center justify-between border-b border-slate-100 bg-white py-2 text-xs font-bold text-slate-400">
-                  <span className="text-slate-500">{group.label}</span>
-                  <span>{group.items.length} 条</span>
-                </div>
-                <div>
-                  {group.items.map((result) => {
-                    const { event, calendar, locationLabel, relationshipLabel, sourceLabel, attendeesTooltip } = result;
-                    const date = eventToDate(event);
-                    const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
-                    const isSelected = selectedResultId === event.id;
-                    const whenMeta = getSearchResultWhenMeta(event);
-                    const timeState = getResultTimeState(event);
-                    const criticalStatusTag = event.status === '已取消' ? '已取消' : '';
-
-                    return (
-                      <div
-                        key={event.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedResultId(event.id)}
-                        onDoubleClick={() => onOpenEvent(event.id)}
-                        onKeyDown={(entry) => {
-                          if (entry.key === 'Enter') {
-                            entry.preventDefault();
-                            onOpenEvent(event.id);
-                          }
-                          if (entry.key === ' ') {
-                            entry.preventDefault();
-                            setSelectedResultId(event.id);
-                          }
-                        }}
-                        data-search-result-id={event.id}
-                        className={`group grid w-full grid-cols-[52px_minmax(96px,140px)_minmax(0,1fr)] items-center gap-4 border-b border-slate-100 px-1 py-3 text-left outline-none transition last:border-b-0 md:grid-cols-[56px_minmax(120px,150px)_10px_minmax(0,1fr)_132px] ${
-                          isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex min-w-0 flex-col items-center justify-center">
-                          <div className={`text-xl font-black leading-none ${sameDay(date, TODAY_DATE) ? 'text-blue-600' : 'text-slate-900'}`}>
-                            {date.getDate()}
-                          </div>
-                          <div className="mt-1 text-[11px] font-bold text-slate-500">
-                            {WEEKDAY_NAMES[dayIndex]}
-                          </div>
-                        </div>
-
-                        <div className="flex min-w-0 flex-col justify-center">
-                          <div className="text-sm font-black leading-5 text-slate-900">{whenMeta.timeLabel}</div>
-                          <div className="mt-0.5 truncate text-[12px] font-semibold text-slate-500">{whenMeta.dateLabel}</div>
-                          {timeState && (
-                            <span className={`mt-1 w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${timeState.className}`}>
-                              {timeState.label}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className={`mt-2 hidden h-2.5 w-2.5 rounded-full md:block ${calendar?.color || 'bg-slate-400'}`}></div>
-
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <div
-                              className={`truncate text-base font-black leading-6 ${
-                                event.status === '已取消' ? 'text-slate-400 line-through' : 'text-slate-900'
-                              }`}
-                            >
-                              {renderHighlighted(event.title || '无标题')}
-                            </div>
-                            {criticalStatusTag && (
-                              <span
-                                className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-600"
-                              >
-                                {criticalStatusTag}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-slate-600">
-                            {locationLabel && (
-                              <span className="inline-flex min-w-0 items-center gap-1.5">
-                                <MapPin size={14} className="shrink-0 text-slate-400" />
-                                <span className="truncate">{renderHighlighted(locationLabel)}</span>
-                              </span>
-                            )}
-                            {relationshipLabel && (
-                              <span className="inline-flex min-w-0 items-center gap-1.5" title={attendeesTooltip || relationshipLabel}>
-                                <Users size={14} className="shrink-0 text-slate-400" />
-                                <span className="truncate">{renderHighlighted(relationshipLabel)}</span>
-                              </span>
-                            )}
-                            {sourceLabel && (
-                              <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500">
-                                <Calendar size={14} className="shrink-0 text-slate-400" />
-                                <span className="truncate">{renderHighlighted(sourceLabel)}</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="col-span-3 flex items-center justify-end gap-2 opacity-100 transition md:col-span-1 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                          <button
-                            type="button"
-                            onClick={(entry) => {
-                              entry.stopPropagation();
-                              onLocateEvent(event.id);
-                            }}
-                            onDoubleClick={(entry) => entry.stopPropagation()}
-                            className="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            定位
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(entry) => {
-                              entry.stopPropagation();
-                              onOpenEvent(event.id);
-                            }}
-                            onDoubleClick={(entry) => entry.stopPropagation()}
-                            className="inline-flex shrink-0 items-center rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800"
-                          >
-                            详情
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
+            {monthSections.map((section) => (
+              section.items.length > 0 && (
+                <section key={section.id} className="mb-8 last:mb-0">
+                  <div className="mb-3 flex items-end justify-between border-b border-slate-100 pb-2">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900">{section.title}</h3>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400">{section.items.length} 条</span>
+                  </div>
+                  <div>
+                    {section.items.map((result) => renderSearchResult(result))}
+                  </div>
+                </section>
+              )
             ))}
           </div>
         )}
@@ -6629,6 +6887,10 @@ function MainApp() {
     status: 'all',
     timeframe: 'all',
     accountId: 'all',
+    person: 'all',
+    meetingType: 'all',
+    attachment: 'all',
+    sort: 'default',
   });
   const [permissionPanel, setPermissionPanel] = useState({ type: null, targetId: null });
   const [sharedCalendarDialog, setSharedCalendarDialog] = useState({
@@ -6709,6 +6971,26 @@ function MainApp() {
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
   const normalizedCalendarSearch = calendarSearchQuery.trim().toLowerCase();
   const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ id: account.id, label: account.email || account.name })), [activeAccounts]);
+  const calendarSearchPeopleOptions = useMemo(() => {
+    const names = new Set();
+
+    activeEvents.forEach((event) => {
+      if (event.type === 'holiday' || event.calId === HUAWEI_CALENDAR_ID) return;
+      [event.organizer, ...(event.attendees || []), ...(event.optionalAttendees || [])]
+        .filter(Boolean)
+        .forEach((name) => names.add(name));
+    });
+
+    const primaryNames = Array.from(names).slice(0, 10);
+    return [
+      { id: 'all', label: '人员：全部' },
+      ...primaryNames.flatMap((name) => [
+        { id: `any::${name}`, label: `相关人员：${name}` },
+        { id: `organizer::${name}`, label: `组织者：${name}` },
+        { id: `participant::${name}`, label: `参与人：${name}` },
+      ]),
+    ];
+  }, [activeEvents]);
 
   useEffect(() => {
     if (!calendarSearchPopoverOpen) return undefined;
@@ -7263,19 +7545,6 @@ function MainApp() {
       .sort((left, right) => {
         const leftDate = eventToDate(left.event);
         const rightDate = eventToDate(right.event);
-        const todayMs = stripTime(TODAY_DATE).getTime();
-        const leftIsPast = stripTime(leftDate).getTime() < todayMs ? 1 : 0;
-        const rightIsPast = stripTime(rightDate).getTime() < todayMs ? 1 : 0;
-
-        if (leftIsPast !== rightIsPast) return leftIsPast - rightIsPast;
-
-        if (leftIsPast) {
-          return (
-            rightDate.getTime() - leftDate.getTime() ||
-            (right.event.startH || 0) - (left.event.startH || 0) ||
-            right.match.score - left.match.score
-          );
-        }
 
         return (
           leftDate.getTime() - rightDate.getTime() ||
