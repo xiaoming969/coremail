@@ -5970,39 +5970,15 @@ function CalendarSearchResults({
     const now = TODAY_DATE.getTime();
     const futureResults = results.filter((result) => getEventEndTimestamp(result.event) >= now);
     const pastResults = results.filter((result) => getEventEndTimestamp(result.event) < now);
-    const soonCandidates = futureResults
-      .filter((result) => {
-        const startValue = getEventStartTimestamp(result.event);
-        const withinPriorityWindow = startValue - now <= 24 * 60 * 60 * 1000;
-        return (
-          withinPriorityWindow &&
-          result.event.status !== '已取消' &&
-          result.event.type !== 'cancelled' &&
-          !isBusyOnlyEvent(result.event, result.calendar)
-        );
-      })
-      .sort((left, right) => {
-        if (filters.sort === 'relevance') return right.match.score - left.match.score || getEventStartTimestamp(left.event) - getEventStartTimestamp(right.event);
-        const leftJoinBias = canJoinCalendarEvent(left.event) ? -1 : 0;
-        const rightJoinBias = canJoinCalendarEvent(right.event) ? -1 : 0;
-        return (
-          leftJoinBias - rightJoinBias ||
-          Math.abs(getEventStartTimestamp(left.event) - now) - Math.abs(getEventStartTimestamp(right.event) - now) ||
-          right.match.score - left.match.score
-        );
-      })
-      .slice(0, 3);
-    const soonIds = new Set(soonCandidates.map((result) => result.event.id));
 
     return {
-      soon: soonCandidates,
-      upcoming: sortResults(futureResults.filter((result) => !soonIds.has(result.event.id)), 'future'),
+      upcoming: sortResults(futureResults, 'future'),
       past: sortResults(pastResults, 'past'),
     };
   }, [results, filters.sort]);
 
   const firstCurrentResultId = useMemo(() => {
-    const ordered = [...groupedResults.soon, ...groupedResults.upcoming, ...groupedResults.past];
+    const ordered = [...groupedResults.upcoming, ...groupedResults.past];
     return ordered[0]?.event.id || null;
   }, [groupedResults]);
 
@@ -6196,7 +6172,6 @@ function CalendarSearchResults({
     (filters.attachment || 'all') !== 'all',
   ].filter(Boolean).length;
   const groupSummaries = [
-    { label: '即将开始', count: groupedResults.soon.length },
     { label: '即将到来', count: groupedResults.upcoming.length },
     { label: '以前', count: groupedResults.past.length },
   ];
@@ -6710,15 +6685,9 @@ function CalendarSearchResults({
         ) : (
           <div className="mx-auto w-full max-w-[1280px]">
             {renderSection({
-              id: 'soon',
-              title: '即将开始',
-              subtitle: '临近开始的相关日程',
-              items: groupedResults.soon,
-            })}
-            {renderSection({
               id: 'upcoming',
               title: '即将到来',
-              subtitle: '按开始时间升序',
+              subtitle: '按开始时间升序，临近会议用时间标签提示',
               items: groupedResults.upcoming,
             })}
             {renderSection({
@@ -11683,9 +11652,7 @@ function MainApp() {
         <header className="relative flex min-h-16 shrink-0 flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6" style={{ zIndex: 40 }}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
-              <div className={`flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap ${
-                currentScreen === 'search' ? 'flex-1' : ''
-              }`}>
+              <div className="flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap">
                 {currentScreen === 'search' && (
                   <button
                     onClick={() => navTo('calendar')}
@@ -11697,11 +11664,9 @@ function MainApp() {
                 )}
                 <div
                   ref={calendarSearchBoxRef}
-                  className={`relative min-w-0 ${currentScreen === 'search' ? 'flex-1' : 'shrink-0'}`}
+                  className="relative min-w-0 shrink-0"
                 >
-                  <div className={`flex h-10 items-center rounded-xl bg-black/5 px-3 ${
-                    currentScreen === 'search' ? 'w-full min-w-[260px] max-w-[640px]' : 'w-[324px]'
-                  }`}>
+                  <div className="flex h-10 w-[324px] items-center rounded-xl bg-black/5 px-3">
                     <button
                       onClick={() => executeCalendarSearch()}
                       className="shrink-0 text-gray-400 transition hover:text-gray-600"
