@@ -5896,6 +5896,7 @@ function CalendarSearchResults({
   const trimmedQuery = query.trim();
   const [selectedResultId, setSelectedResultId] = useState(null);
   const [editingColorCategory, setEditingColorCategory] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({});
   const searchResultsScrollRef = useRef(null);
   const highlightTokens = useMemo(() => tokenizeKeywordQuery(trimmedQuery), [trimmedQuery]);
   const isMultiAccount = accountOptions.length > 1;
@@ -5968,17 +5969,21 @@ function CalendarSearchResults({
 
   const groupedResults = useMemo(() => {
     const now = TODAY_DATE.getTime();
+    const nearFutureCutoff = now + 30 * DAY_MS;
     const futureResults = results.filter((result) => getEventEndTimestamp(result.event) >= now);
+    const nearFutureResults = futureResults.filter((result) => getEventStartTimestamp(result.event) <= nearFutureCutoff);
+    const laterFutureResults = futureResults.filter((result) => getEventStartTimestamp(result.event) > nearFutureCutoff);
     const pastResults = results.filter((result) => getEventEndTimestamp(result.event) < now);
 
     return {
-      upcoming: sortResults(futureResults, 'future'),
+      nearFuture: sortResults(nearFutureResults, 'future'),
+      laterFuture: sortResults(laterFutureResults, 'future'),
       past: sortResults(pastResults, 'past'),
     };
   }, [results, filters.sort]);
 
   const firstCurrentResultId = useMemo(() => {
-    const ordered = [...groupedResults.upcoming, ...groupedResults.past];
+    const ordered = [...groupedResults.nearFuture, ...groupedResults.laterFuture, ...groupedResults.past];
     return ordered[0]?.event.id || null;
   }, [groupedResults]);
 
@@ -6016,6 +6021,21 @@ function CalendarSearchResults({
     filters.person,
     filters.sort,
     filters.timeframe,
+    trimmedQuery,
+  ]);
+
+  useEffect(() => {
+    setExpandedSections({});
+  }, [
+    filters.accountId,
+    filters.accountIds,
+    filters.calendarScope,
+    filters.colorCategory,
+    filters.meetingType,
+    filters.person,
+    filters.sort,
+    filters.timeframe,
+    filters.attachment,
     trimmedQuery,
   ]);
 
@@ -6172,7 +6192,8 @@ function CalendarSearchResults({
     (filters.attachment || 'all') !== 'all',
   ].filter(Boolean).length;
   const groupSummaries = [
-    { label: '即将到来', count: groupedResults.upcoming.length },
+    { label: '近期相关', count: groupedResults.nearFuture.length },
+    { label: '更远未来', count: groupedResults.laterFuture.length },
     { label: '以前', count: groupedResults.past.length },
   ];
 
@@ -6477,9 +6498,15 @@ function CalendarSearchResults({
                 </span>
               );
             })()}
+            {sourceText && (
+              <span className="flex min-w-0 items-center gap-1 truncate">
+                <Mail size={13} className="shrink-0 text-slate-400" />
+                <span className="truncate">{renderHighlighted(sourceText)}</span>
+              </span>
+            )}
           </div>
           {sourceText && (
-            <div className="mt-1 truncate text-xs font-semibold text-slate-400">{renderHighlighted(sourceText)}</div>
+            <div className="mt-1 hidden truncate text-xs font-semibold text-slate-400 xl:block">{renderHighlighted(sourceText)}</div>
           )}
           {snippet && (() => {
             const SnippetIcon = snippet.icon;
@@ -6539,8 +6566,36 @@ function CalendarSearchResults({
     );
   };
 
-  const renderSection = ({ id, title, subtitle, items, variant = 'list' }) => {
+  const getSectionTimeRange = (items) => {
+    if (!items.length) return '';
+
+    const ordered = [...items].sort((left, right) => getEventStartTimestamp(left.event) - getEventStartTimestamp(right.event));
+    const first = getEventDateMeta(ordered[0].event).dateLabel;
+    const last = getEventDateMeta(ordered[ordered.length - 1].event).dateLabel;
+    return first === last ? first : `${first} - ${last}`;
+  };
+
+  const renderSection = ({
+    id,
+    title,
+    subtitle,
+    items,
+    variant = 'list',
+    collapsedByDefault = false,
+    limit = 10,
+  }) => {
     if (items.length === 0) return null;
+
+    const mode = expandedSections[id] || (collapsedByDefault ? 'collapsed' : 'preview');
+    const visibleItems =
+      mode === 'collapsed'
+        ? []
+        : mode === 'all'
+          ? items
+          : items.slice(0, limit);
+    const visibleCount = visibleItems.length;
+    const remainingCount = Math.max(0, items.length - visibleCount);
+    const timeRange = getSectionTimeRange(items);
 
     return (
       <section key={id} className="mb-6 last:mb-0">
@@ -6549,8 +6604,25 @@ function CalendarSearchResults({
             <h3 className="text-sm font-black text-slate-900">{title}</h3>
             {subtitle && <div className="mt-1 text-xs font-semibold text-slate-400">{subtitle}</div>}
           </div>
-          <span className="text-xs font-bold text-slate-400">{items.length} 条</span>
+          <span className="text-xs font-bold text-slate-400">
+            {mode === 'collapsed' ? `${items.length} 条` : `显示 ${visibleCount}/${items.length}`}
+          </span>
         </div>
+        {mode === 'collapsed' ? (
+          <button
+            type="button"
+            onClick={() => setExpandedSections((prev) => ({ ...prev, [id]: 'preview' }))}
+            className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-100/70"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-black text-slate-700">{items.length} 条更远未来结果已收起</span>
+              <span className="mt-1 block truncate text-xs font-semibold text-slate-400">
+                {timeRange ? `${timeRange} · ` : ''}先收起远期循环会和共享日历结果，避免干扰当前判断
+              </span>
+            </span>
+            <span className="shrink-0 text-xs font-black text-blue-600">展开前 {Math.min(limit, items.length)} 条</span>
+          </button>
+        ) : (
         <div className={variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
           {variant !== 'cards' && (
             <div className="hidden grid-cols-[190px_minmax(220px,1.35fr)_140px_minmax(150px,0.9fr)_140px_minmax(150px,1fr)_max-content] border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-black text-slate-400 xl:grid">
@@ -6563,8 +6635,45 @@ function CalendarSearchResults({
               <span className="text-right">操作</span>
             </div>
           )}
-          {items.map((result) => renderSearchResult(result, variant))}
+          {visibleItems.map((result) => renderSearchResult(result, variant))}
+          {(items.length > limit || collapsedByDefault) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+              <span className="text-xs font-semibold text-slate-400">
+                {remainingCount > 0 ? `还有 ${remainingCount} 条未显示` : '已显示全部结果'}
+              </span>
+              <div className="flex items-center gap-2">
+                {items.length > limit && mode !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSections((prev) => ({ ...prev, [id]: 'all' }))}
+                    className="text-xs font-black text-blue-600 transition hover:text-blue-700"
+                  >
+                    显示全部 {items.length} 条
+                  </button>
+                )}
+                {mode === 'all' && items.length > limit && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSections((prev) => ({ ...prev, [id]: 'preview' }))}
+                    className="text-xs font-black text-blue-600 transition hover:text-blue-700"
+                  >
+                    收起到前 {limit} 条
+                  </button>
+                )}
+                {collapsedByDefault && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSections((prev) => ({ ...prev, [id]: 'collapsed' }))}
+                    className="text-xs font-black text-slate-500 transition hover:text-slate-700"
+                  >
+                    收起本组
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+        )}
       </section>
     );
   };
@@ -6645,6 +6754,11 @@ function CalendarSearchResults({
                 ))}
               </div>
             )}
+            {results.length > 100 && (
+              <div className="mt-2 text-xs font-semibold text-orange-600">
+                结果较多，建议缩小时间、人员或搜索范围后再判断。
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -6685,15 +6799,22 @@ function CalendarSearchResults({
         ) : (
           <div className="mx-auto w-full max-w-[1280px]">
             {renderSection({
-              id: 'upcoming',
-              title: '即将到来',
-              subtitle: '按开始时间升序，临近会议用时间标签提示',
-              items: groupedResults.upcoming,
+              id: 'nearFuture',
+              title: '近期相关',
+              subtitle: '未来 30 天内，默认展示前 10 条',
+              items: groupedResults.nearFuture,
+            })}
+            {renderSection({
+              id: 'laterFuture',
+              title: '更远未来',
+              subtitle: '30 天以后，默认收起',
+              items: groupedResults.laterFuture,
+              collapsedByDefault: true,
             })}
             {renderSection({
               id: 'past',
               title: '以前',
-              subtitle: '按最近发生时间倒序',
+              subtitle: '按最近发生时间倒序，默认展示前 10 条',
               items: groupedResults.past,
             })}
           </div>
