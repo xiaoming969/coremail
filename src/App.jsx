@@ -6205,7 +6205,7 @@ function CalendarSearchResults({
   ];
 
   const filterSelectClass =
-    'h-10 appearance-none rounded-lg border border-slate-200 bg-white pl-4 pr-9 text-sm font-black text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'h-9 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm font-black text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
   const filterShellClass = 'relative shrink-0';
   const renderFilterSelect = ({ value, onChange, options, className = 'w-[180px]' }) => (
     <div className={`${filterShellClass} ${className}`}>
@@ -6303,7 +6303,7 @@ function CalendarSearchResults({
             onOpenEvent(event.id);
           }}
           onDoubleClick={(entry) => entry.stopPropagation()}
-          className={`${isCard ? 'flex-1 justify-center' : ''} inline-flex h-9 shrink-0 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50`}
+          className={`${isCard ? 'h-9 flex-1 justify-center px-3' : 'h-8 px-2.5'} inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 transition hover:bg-slate-50`}
         >
           查看详情
         </button>
@@ -6315,7 +6315,7 @@ function CalendarSearchResults({
               openMeetingLink(event);
             }}
             onDoubleClick={(entry) => entry.stopPropagation()}
-            className={`${isCard ? 'flex-1 justify-center' : ''} inline-flex h-9 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700`}
+            className={`${isCard ? 'h-9 flex-1 justify-center px-3' : 'h-8 px-2.5'} inline-flex shrink-0 items-center rounded-lg bg-blue-600 text-xs font-bold text-white transition hover:bg-blue-700`}
           >
             <ArrowRight size={14} className="mr-1" />
             一键入会
@@ -6456,12 +6456,11 @@ function CalendarSearchResults({
             setSelectedResultId(event.id);
           }
         }}
-        className={`group grid w-full grid-cols-1 items-start gap-3 border-b border-slate-100 px-3 py-3 text-left outline-none transition last:border-b-0 sm:px-4 lg:grid-cols-[170px_minmax(0,1fr)_112px] xl:grid-cols-[190px_minmax(220px,1.25fr)_150px_minmax(160px,1fr)_150px_minmax(160px,1fr)_108px] ${
+        className={`group grid w-full grid-cols-1 items-start gap-2.5 border-b border-slate-100 px-3 py-2.5 text-left outline-none transition last:border-b-0 sm:px-4 lg:grid-cols-[206px_minmax(0,1fr)_max-content] lg:items-center xl:grid-cols-[190px_minmax(220px,1.35fr)_140px_minmax(150px,0.9fr)_140px_minmax(150px,1fr)_max-content] ${
           isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
         }`}
       >
-        <div className="min-w-0 text-sm font-bold text-slate-600 lg:row-span-5 xl:row-span-1">
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">时间</span>
+        <div className="min-w-0 text-sm font-bold text-slate-600">
           <div className="truncate">{dateMeta.dateLabel} {dateMeta.timeLabel}</div>
           {timeState && (
             <span className={`mt-1 inline-flex w-fit rounded-md border px-2 py-0.5 text-[11px] font-black ${timeState.className}`}>
@@ -6470,8 +6469,7 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="min-w-0 lg:col-start-2 xl:col-auto">
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">会议</span>
+        <div className="min-w-0 lg:pr-3 xl:pr-0">
           <div className="flex min-w-0 items-center gap-2">
             <div className="truncate text-sm font-black leading-6 text-slate-950">
               {renderHighlighted(event.title || '无标题')}
@@ -6484,22 +6482,49 @@ function CalendarSearchResults({
               </span>
             )}
           </div>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500 xl:hidden">
+            {organizerLabel && (
+              <span className="min-w-0 truncate">
+                <span className="text-slate-400">组织者：</span>
+                {renderHighlighted(organizerLabel.replace(/^组织者：/, ''))}
+              </span>
+            )}
+            {participantLabel && (
+              <span className="flex min-w-0 items-center gap-1 truncate">
+                <Users size={13} className="shrink-0 text-slate-400" />
+                <span className="text-slate-400">参与人：</span>
+                <span className="truncate">{renderHighlighted(participantLabel.replace(/^参与人：/, ''))}</span>
+              </span>
+            )}
+            {meetingMeta[0] && (() => {
+              const MeetingIcon = meetingMeta[0].icon;
+              return (
+                <span className="flex min-w-0 items-center gap-1 truncate">
+                  <MeetingIcon size={13} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{renderHighlighted(meetingMeta[0].label)}</span>
+                </span>
+              );
+            })()}
+          </div>
           {sourceText && (
             <div className="mt-1 truncate text-xs font-semibold text-slate-400">{renderHighlighted(sourceText)}</div>
           )}
+          {snippet && (() => {
+            const SnippetIcon = snippet.icon;
+            return (
+              <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-500 xl:hidden">
+                <SnippetIcon size={13} className="shrink-0 text-slate-400" />
+                <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
+              </div>
+            );
+          })()}
         </div>
 
-        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${organizerLabel ? '' : 'hidden xl:block'}`}>
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">组织者</span>
-          {organizerLabel ? (
-            <span className="block truncate">{renderHighlighted(organizerLabel.replace(/^组织者：/, ''))}</span>
-          ) : (
-            <span className="text-slate-300">-</span>
-          )}
+        <div className={`hidden min-w-0 truncate text-sm font-semibold text-slate-600 xl:block`}>
+          {organizerLabel ? renderHighlighted(organizerLabel.replace(/^组织者：/, '')) : <span className="text-slate-300">-</span>}
         </div>
 
-        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${participantLabel ? '' : 'hidden xl:block'}`}>
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">参与人</span>
+        <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
           {participantLabel ? (
             <div className="flex min-w-0 items-center gap-1.5">
               <Users size={14} className="shrink-0 text-slate-400" />
@@ -6510,8 +6535,7 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${meetingMeta.length > 0 ? '' : 'hidden xl:block'}`}>
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">地点/线上</span>
+        <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
           {meetingMeta.length > 0 ? (
             <div className="flex min-w-0 items-center gap-1.5">
               {meetingMeta[0].icon === MapPin ? <MapPin size={14} className="shrink-0 text-slate-400" /> : <Calendar size={14} className="shrink-0 text-slate-400" />}
@@ -6522,8 +6546,7 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${snippet ? '' : 'hidden xl:block'}`}>
-          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">相关内容</span>
+        <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
           {snippet ? (() => {
             const SnippetIcon = snippet.icon;
             return (
@@ -6537,7 +6560,7 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="flex items-center justify-start gap-2 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:justify-end xl:col-auto xl:row-auto xl:row-span-1 xl:justify-end">
+        <div className="flex items-center justify-start gap-2 lg:justify-end">
           {renderResultActions(event)}
         </div>
       </div>
@@ -6548,8 +6571,8 @@ function CalendarSearchResults({
     if (items.length === 0) return null;
 
     return (
-      <section key={id} className="mb-8 last:mb-0">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-2">
+      <section key={id} className="mb-6 last:mb-0">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-2">
           <div>
             <h3 className="text-sm font-black text-slate-900">{title}</h3>
             {subtitle && <div className="mt-1 text-xs font-semibold text-slate-400">{subtitle}</div>}
@@ -6558,7 +6581,7 @@ function CalendarSearchResults({
         </div>
         <div className={variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
           {variant !== 'cards' && (
-            <div className="hidden grid-cols-[190px_minmax(220px,1.25fr)_150px_minmax(160px,1fr)_150px_minmax(160px,1fr)_108px] border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-black text-slate-400 xl:grid">
+            <div className="hidden grid-cols-[190px_minmax(220px,1.35fr)_140px_minmax(150px,0.9fr)_140px_minmax(150px,1fr)_max-content] border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-black text-slate-400 xl:grid">
               <span>时间</span>
               <span>会议</span>
               <span>组织者</span>
@@ -6631,7 +6654,7 @@ function CalendarSearchResults({
             className: 'w-full sm:w-[190px]',
           })}
           <details className="group/more relative w-full shrink-0 sm:w-auto">
-            <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:justify-start">
+            <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:justify-start">
               更多筛选{secondaryFilterCount > 0 ? ` · ${secondaryFilterCount}` : ''}
               <ChevronDown size={15} className="text-slate-500" />
             </summary>
