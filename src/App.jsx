@@ -1010,14 +1010,18 @@ const eventMatchesAttachmentFilter = (event, attachmentFilter) => {
   return true;
 };
 const normalizeColorCategoryId = (value = '') => String(value || '').trim().toLowerCase();
-const getColorCategoryMeta = (value) => {
+const getColorCategoryMeta = (value, labelOverrides = {}) => {
   const normalized = normalizeColorCategoryId(value);
-  return (
+  const matched =
     SEARCH_COLOR_CATEGORY_OPTIONS.find((option) => option.id === normalized || normalizeColorCategoryId(option.shortLabel) === normalized) ||
-    null
-  );
+    null;
+
+  if (!matched) return null;
+
+  const overrideLabel = labelOverrides[matched.id];
+  return overrideLabel ? { ...matched, label: overrideLabel, shortLabel: overrideLabel } : matched;
 };
-const getEventColorCategories = (event = {}) => {
+const getEventColorCategories = (event = {}, labelOverrides = {}) => {
   const rawCategories = Array.isArray(event.colorCategories)
     ? event.colorCategories
     : Array.isArray(event.colorCategory)
@@ -1027,15 +1031,15 @@ const getEventColorCategories = (event = {}) => {
   return rawCategories
     .map((item) => {
       if (typeof item === 'object' && item) {
-        const meta = getColorCategoryMeta(item.id || item.label);
+        const meta = getColorCategoryMeta(item.id || item.label, labelOverrides);
         return {
           id: normalizeColorCategoryId(item.id || meta?.id || item.label),
-          label: item.label || meta?.shortLabel || item.id,
+          label: labelOverrides[meta?.id] || item.label || meta?.shortLabel || item.id,
           colorClass: item.colorClass || meta?.colorClass || 'bg-slate-400',
         };
       }
 
-      const meta = getColorCategoryMeta(item);
+      const meta = getColorCategoryMeta(item, labelOverrides);
       return {
         id: meta?.id || normalizeColorCategoryId(item),
         label: meta?.shortLabel || String(item || ''),
@@ -5886,12 +5890,15 @@ function CalendarSearchResults({
   onSearchQueryChange,
   onSubmitSearch,
   onClearSearch,
+  colorCategoryLabels,
+  onRenameColorCategory,
   results,
   onBack,
   onOpenEvent,
 }) {
   const trimmedQuery = query.trim();
   const [selectedResultId, setSelectedResultId] = useState(null);
+  const [editingColorCategory, setEditingColorCategory] = useState(null);
   const searchResultsScrollRef = useRef(null);
   const highlightTokens = useMemo(() => tokenizeKeywordQuery(trimmedQuery), [trimmedQuery]);
   const isMultiAccount = accountOptions.length > 1;
@@ -6181,7 +6188,7 @@ function CalendarSearchResults({
     (filters.calendarScope || 'all') !== 'all' ? `搜索范围：${getOptionLabel(SEARCH_ACCOUNT_SCOPE_OPTIONS, filters.calendarScope)}` : '',
     (filters.timeframe || 'all') !== 'all' ? getOptionLabel(SEARCH_TIMEFRAME_OPTIONS, filters.timeframe) : '',
     (filters.person || 'all') !== 'all' ? peopleOptions.find((option) => option.id === filters.person)?.label : '',
-    (filters.colorCategory || 'all') !== 'all' ? `颜色分类：${getColorCategoryMeta(filters.colorCategory)?.shortLabel || '无分类'}` : '',
+    (filters.colorCategory || 'all') !== 'all' ? `颜色分类：${getColorCategoryMeta(filters.colorCategory, colorCategoryLabels)?.shortLabel || '无分类'}` : '',
     (filters.meetingType || 'all') !== 'all' ? getOptionLabel(SEARCH_MEETING_TYPE_OPTIONS, filters.meetingType) : '',
     (filters.attachment || 'all') !== 'all' ? getOptionLabel(SEARCH_ATTACHMENT_OPTIONS, filters.attachment) : '',
     (filters.sort || 'relevance') !== 'relevance' ? getOptionLabel(SEARCH_SORT_OPTIONS, filters.sort) : '',
@@ -6204,6 +6211,75 @@ function CalendarSearchResults({
       <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
     </div>
   );
+  const colorCategoryFilterOptions = useMemo(
+    () =>
+      SEARCH_COLOR_CATEGORY_OPTIONS.map((option) =>
+        colorCategoryLabels?.[option.id]
+          ? { ...option, label: colorCategoryLabels[option.id], shortLabel: colorCategoryLabels[option.id] }
+          : option,
+      ),
+    [colorCategoryLabels],
+  );
+
+  const finishColorCategoryEdit = () => {
+    if (!editingColorCategory) return;
+    const nextLabel = editingColorCategory.value.trim();
+    if (nextLabel) onRenameColorCategory?.(editingColorCategory.id, nextLabel);
+    setEditingColorCategory(null);
+  };
+
+  const renderColorCategoryBadge = (category, extraCount = 0, size = 'sm') => {
+    if (!category) return null;
+
+    const editing = editingColorCategory?.id === category.id;
+    const heightClass = size === 'lg' ? 'h-7 text-xs' : 'h-6 text-[11px]';
+    const dotClass = size === 'lg' ? 'h-2.5 w-2.5' : 'h-2 w-2';
+
+    if (editing) {
+      return (
+        <span
+          className={`inline-flex ${heightClass} shrink-0 items-center rounded-lg bg-slate-100 px-2 font-black text-slate-700`}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
+          <span className={`mr-1.5 shrink-0 rounded-full ${dotClass} ${category.colorClass}`}></span>
+          <input
+            autoFocus
+            value={editingColorCategory.value}
+            onChange={(event) => setEditingColorCategory({ id: category.id, value: event.target.value })}
+            onBlur={finishColorCategoryEdit}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                finishColorCategoryEdit();
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                setEditingColorCategory(null);
+              }
+            }}
+            className="h-5 w-16 border-none bg-transparent p-0 text-xs font-black text-slate-800 outline-none"
+          />
+        </span>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          setEditingColorCategory({ id: category.id, value: category.label });
+        }}
+        onDoubleClick={(event) => event.stopPropagation()}
+        className={`inline-flex ${heightClass} shrink-0 items-center rounded-lg bg-slate-100 px-2 font-black text-slate-700 transition hover:bg-slate-200`}
+        title="点击修改颜色分类名称"
+      >
+        <span className={`mr-1.5 shrink-0 rounded-full ${dotClass} ${category.colorClass}`}></span>
+        {category.label}{extraCount > 0 ? ` +${extraCount}` : ''}
+      </button>
+    );
+  };
 
   const renderResultActions = (event, isCard = false) => {
     const joinable = canJoinCalendarEvent(event);
@@ -6249,11 +6325,10 @@ function CalendarSearchResults({
     const meetingMeta = getMeetingMeta(event);
     const snippet = getMatchedSnippet(event, result.match);
     const sourceText = isCrossAccountSearch ? sourceLabel : '';
-    const isCancelled = event.status === '已取消';
-    const colorCategories = getEventColorCategories(event);
+    const colorCategories = getEventColorCategories(event, colorCategoryLabels);
     const primaryCategory = colorCategories[0];
     const extraCategoryCount = Math.max(0, colorCategories.length - 1);
-    const repeatLabel = event.repeat && event.repeat !== 'does_not_repeat' ? REPEAT_LABELS[event.repeat] || '循环' : '';
+    const repeatLabel = event.repeat && event.repeat !== 'does_not_repeat' ? `循环 · ${REPEAT_LABELS[event.repeat] || '重复'}` : '';
 
     if (variant === 'cards') {
       return (
@@ -6290,13 +6365,14 @@ function CalendarSearchResults({
           </div>
 
           <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
-            <h3 className={`min-w-0 flex-1 truncate text-xl font-black leading-7 ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+            <h3 className="min-w-0 truncate text-xl font-black leading-7 text-slate-950">
               {renderHighlighted(event.title || '无标题')}
             </h3>
-            {primaryCategory && (
+            {renderColorCategoryBadge(primaryCategory, extraCategoryCount, 'lg')}
+            {repeatLabel && (
               <span className="inline-flex h-7 shrink-0 items-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-700">
-                <span className={`mr-1.5 h-2.5 w-2.5 rounded-full ${primaryCategory.colorClass}`}></span>
-                {primaryCategory.label}{extraCategoryCount > 0 ? ` +${extraCategoryCount}` : ''}
+                <RefreshCw size={12} className="mr-1.5" />
+                {repeatLabel}
               </span>
             )}
           </div>
@@ -6327,19 +6403,12 @@ function CalendarSearchResults({
                 <span className="truncate">{renderHighlighted(participantLabel)}</span>
               </div>
             )}
-            {repeatLabel && (
-              <div className="flex min-w-0 items-center gap-2">
-                <RefreshCw size={15} className="shrink-0 text-slate-400" />
-                <span className="truncate">循环 · {repeatLabel}</span>
-              </div>
-            )}
             {sourceText && (
               <div className="flex min-w-0 items-center gap-2">
                 <Mail size={15} className="shrink-0 text-slate-400" />
                 <span className="truncate">{renderHighlighted(sourceText)}</span>
               </div>
             )}
-            {isCancelled && <div className="font-black text-rose-600">会议已取消</div>}
           </div>
 
           {snippet && (() => {
@@ -6392,17 +6461,16 @@ function CalendarSearchResults({
 
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <div className={`truncate text-sm font-black leading-6 ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-950'}`}>
+            <div className="truncate text-sm font-black leading-6 text-slate-950">
               {renderHighlighted(event.title || '无标题')}
             </div>
-            {primaryCategory && (
-              <span className="inline-flex shrink-0 items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-700">
-                <span className={`mr-1.5 h-2 w-2 rounded-full ${primaryCategory.colorClass}`}></span>
-                {primaryCategory.label}{extraCategoryCount > 0 ? ` +${extraCategoryCount}` : ''}
+            {renderColorCategoryBadge(primaryCategory, extraCategoryCount)}
+            {repeatLabel && (
+              <span className="inline-flex h-6 shrink-0 items-center rounded-lg bg-slate-100 px-2 text-[11px] font-black text-slate-700">
+                <RefreshCw size={11} className="mr-1" />
+                {repeatLabel}
               </span>
             )}
-            {repeatLabel && <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-700">循环</span>}
-            {isCancelled && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">会议已取消</span>}
           </div>
           {sourceText && (
             <div className="mt-1 truncate text-xs font-semibold text-slate-400">{renderHighlighted(sourceText)}</div>
@@ -6471,7 +6539,7 @@ function CalendarSearchResults({
           </div>
           <span className="text-xs font-bold text-slate-400">{items.length} 条</span>
         </div>
-        <div className={variant === 'cards' ? 'grid gap-4 xl:grid-cols-3' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
+        <div className={variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
           {items.map((result) => renderSearchResult(result, variant))}
         </div>
       </section>
@@ -6531,7 +6599,7 @@ function CalendarSearchResults({
           {renderFilterSelect({
             value: filters.colorCategory || 'all',
             onChange: (value) => onChangeFilters({ colorCategory: value }),
-            options: SEARCH_COLOR_CATEGORY_OPTIONS,
+            options: colorCategoryFilterOptions,
             className: 'w-[180px]',
           })}
           {renderFilterSelect({
@@ -7778,6 +7846,13 @@ function MainApp() {
     attachment: 'all',
     sort: 'relevance',
   });
+  const [colorCategoryLabels, setColorCategoryLabels] = useState(() =>
+    Object.fromEntries(
+      SEARCH_COLOR_CATEGORY_OPTIONS
+        .filter((option) => option.id !== 'all' && option.id !== 'none')
+        .map((option) => [option.id, option.shortLabel || option.label]),
+    ),
+  );
   const [permissionPanel, setPermissionPanel] = useState({ type: null, targetId: null });
   const [sharedCalendarDialog, setSharedCalendarDialog] = useState({
     open: false,
@@ -7982,7 +8057,7 @@ function MainApp() {
       ? MEETING_PROVIDER_LABELS[selectedEvent.meetingProvider] || '在线会议'
       : '';
   const selectedEventCanJoin = selectedEvent ? canJoinCalendarEvent(selectedEvent) : false;
-  const selectedEventColorCategories = selectedEvent ? getEventColorCategories(selectedEvent) : [];
+  const selectedEventColorCategories = selectedEvent ? getEventColorCategories(selectedEvent, colorCategoryLabels) : [];
   const draftAccountInfo = accountMap[calendarMap[draftForm.calId]?.accountId] || null;
   const draftParticipantAccountLookup = useMemo(() => {
     const nextMap = new Map();
@@ -11935,6 +12010,8 @@ function MainApp() {
                     onSearchQueryChange={setCalendarSearchQuery}
                     onSubmitSearch={executeCalendarSearch}
                     onClearSearch={clearCalendarSearch}
+                    colorCategoryLabels={colorCategoryLabels}
+                    onRenameColorCategory={(id, label) => setColorCategoryLabels((prev) => ({ ...prev, [id]: label }))}
                     results={calendarSearchResults}
                     onBack={() => navTo('calendar')}
                     onOpenEvent={openEventDetails}
