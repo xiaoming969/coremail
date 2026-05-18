@@ -6295,7 +6295,7 @@ function CalendarSearchResults({
     const joinable = canJoinCalendarEvent(event);
 
     return (
-      <div className={`flex shrink-0 items-center gap-2 ${isCard ? 'w-full' : 'justify-end'}`}>
+      <div className={`flex shrink-0 items-center gap-2 ${isCard ? 'w-full' : 'w-full justify-start sm:w-auto sm:justify-end'}`}>
         <button
           type="button"
           onClick={(entry) => {
@@ -6456,11 +6456,12 @@ function CalendarSearchResults({
             setSelectedResultId(event.id);
           }
         }}
-        className={`group grid w-full grid-cols-1 items-center gap-3 border-b border-slate-100 px-3 py-3 text-left outline-none transition last:border-b-0 lg:grid-cols-[220px_minmax(210px,1.2fr)_170px_160px_minmax(150px,1fr)_112px] ${
+        className={`group grid w-full grid-cols-1 items-start gap-3 border-b border-slate-100 px-3 py-3 text-left outline-none transition last:border-b-0 sm:px-4 lg:grid-cols-[170px_minmax(0,1fr)_112px] xl:grid-cols-[190px_minmax(220px,1.25fr)_150px_minmax(160px,1fr)_150px_minmax(160px,1fr)_108px] ${
           isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
         }`}
       >
-        <div className="min-w-0 text-sm font-bold text-slate-600">
+        <div className="min-w-0 text-sm font-bold text-slate-600 lg:row-span-5 xl:row-span-1">
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">时间</span>
           <div className="truncate">{dateMeta.dateLabel} {dateMeta.timeLabel}</div>
           {timeState && (
             <span className={`mt-1 inline-flex w-fit rounded-md border px-2 py-0.5 text-[11px] font-black ${timeState.className}`}>
@@ -6469,7 +6470,8 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 lg:col-start-2 xl:col-auto">
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">会议</span>
           <div className="flex min-w-0 items-center gap-2">
             <div className="truncate text-sm font-black leading-6 text-slate-950">
               {renderHighlighted(event.title || '无标题')}
@@ -6487,11 +6489,29 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="min-w-0 truncate text-sm font-semibold text-slate-600">
-          {organizerLabel ? renderHighlighted(organizerLabel.replace(/^组织者：/, '')) : '-'}
+        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${organizerLabel ? '' : 'hidden xl:block'}`}>
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">组织者</span>
+          {organizerLabel ? (
+            <span className="block truncate">{renderHighlighted(organizerLabel.replace(/^组织者：/, ''))}</span>
+          ) : (
+            <span className="text-slate-300">-</span>
+          )}
         </div>
 
-        <div className="min-w-0 text-sm font-semibold text-slate-600">
+        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${participantLabel ? '' : 'hidden xl:block'}`}>
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">参与人</span>
+          {participantLabel ? (
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Users size={14} className="shrink-0 text-slate-400" />
+              <span className="truncate">{renderHighlighted(participantLabel.replace(/^参与人：/, ''))}</span>
+            </div>
+          ) : (
+            <span className="text-slate-300">-</span>
+          )}
+        </div>
+
+        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${meetingMeta.length > 0 ? '' : 'hidden xl:block'}`}>
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">地点/线上</span>
           {meetingMeta.length > 0 ? (
             <div className="flex min-w-0 items-center gap-1.5">
               {meetingMeta[0].icon === MapPin ? <MapPin size={14} className="shrink-0 text-slate-400" /> : <Calendar size={14} className="shrink-0 text-slate-400" />}
@@ -6502,13 +6522,9 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="min-w-0 text-sm font-semibold text-slate-600">
-          {participantLabel ? (
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Users size={14} className="shrink-0 text-slate-400" />
-              <span className="truncate">{renderHighlighted(participantLabel.replace(/^参与人：/, ''))}</span>
-            </div>
-          ) : snippet ? (() => {
+        <div className={`min-w-0 text-sm font-semibold text-slate-600 lg:col-start-2 xl:col-auto ${snippet ? '' : 'hidden xl:block'}`}>
+          <span className="mb-1 block text-[11px] font-black text-slate-400 xl:hidden">相关内容</span>
+          {snippet ? (() => {
             const SnippetIcon = snippet.icon;
             return (
               <div className="flex min-w-0 items-center gap-1.5">
@@ -6519,18 +6535,9 @@ function CalendarSearchResults({
           })() : (
             <span className="text-slate-300">-</span>
           )}
-          {participantLabel && snippet && (() => {
-            const SnippetIcon = snippet.icon;
-            return (
-              <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
-                <SnippetIcon size={13} className="shrink-0 text-slate-400" />
-                <span className="truncate">{renderHighlighted(snippet.text)}</span>
-              </div>
-            );
-          })()}
         </div>
 
-        <div className="flex items-center justify-start gap-2 lg:justify-end">
+        <div className="flex items-center justify-start gap-2 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:justify-end xl:col-auto xl:row-auto xl:row-span-1 xl:justify-end">
           {renderResultActions(event)}
         </div>
       </div>
@@ -6551,12 +6558,13 @@ function CalendarSearchResults({
         </div>
         <div className={variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
           {variant !== 'cards' && (
-            <div className="hidden grid-cols-[220px_minmax(210px,1.2fr)_170px_160px_minmax(150px,1fr)_112px] border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-black text-slate-400 lg:grid">
+            <div className="hidden grid-cols-[190px_minmax(220px,1.25fr)_150px_minmax(160px,1fr)_150px_minmax(160px,1fr)_108px] border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-black text-slate-400 xl:grid">
               <span>时间</span>
               <span>会议</span>
               <span>组织者</span>
+              <span>参与人</span>
               <span>地点/线上</span>
-              <span>参与人/内容</span>
+              <span>相关内容</span>
               <span className="text-right">操作</span>
             </div>
           )}
@@ -6597,37 +6605,37 @@ function CalendarSearchResults({
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
           {renderFilterSelect({
             value: filters.calendarScope || 'all',
             onChange: (value) => onChangeFilters({ calendarScope: value }),
             options: SEARCH_ACCOUNT_SCOPE_OPTIONS,
-            className: 'w-[180px]',
+            className: 'w-full sm:w-[180px]',
           })}
           {renderFilterSelect({
             value: filters.timeframe || 'all',
             onChange: (value) => onChangeFilters({ timeframe: value }),
             options: SEARCH_TIMEFRAME_OPTIONS,
-            className: 'w-[158px]',
+            className: 'w-full sm:w-[158px]',
           })}
           {renderFilterSelect({
             value: filters.colorCategory || 'all',
             onChange: (value) => onChangeFilters({ colorCategory: value }),
             options: colorCategoryFilterOptions,
-            className: 'w-[180px]',
+            className: 'w-full sm:w-[180px]',
           })}
           {renderFilterSelect({
             value: filters.sort || 'relevance',
             onChange: (value) => onChangeFilters({ sort: value }),
             options: SEARCH_SORT_OPTIONS,
-            className: 'w-[190px]',
+            className: 'w-full sm:w-[190px]',
           })}
-          <details className="group/more relative shrink-0">
-            <summary className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+          <details className="group/more relative w-full shrink-0 sm:w-auto">
+            <summary className="flex h-10 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:justify-start">
               更多筛选{secondaryFilterCount > 0 ? ` · ${secondaryFilterCount}` : ''}
               <ChevronDown size={15} className="text-slate-500" />
             </summary>
-            <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg md:grid-cols-3">
+            <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg sm:left-auto sm:right-0 md:grid-cols-3">
               {renderFilterSelect({
                 value: filters.person || 'all',
                 onChange: (value) => onChangeFilters({ person: value }),
@@ -6710,10 +6718,9 @@ function CalendarSearchResults({
           <div className="mx-auto w-full max-w-[1280px]">
             {renderSection({
               id: 'soon',
-              title: '即将开始（推荐查看）',
-              subtitle: '优先展示即将开始和高相关日程',
+              title: '即将开始',
+              subtitle: '临近开始的相关日程',
               items: groupedResults.soon,
-              variant: 'cards',
             })}
             {renderSection({
               id: 'upcoming',
