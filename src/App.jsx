@@ -5887,9 +5887,6 @@ function CalendarSearchResults({
   accountOptions,
   peopleOptions,
   onChangeFilters,
-  onSearchQueryChange,
-  onSubmitSearch,
-  onClearSearch,
   colorCategoryLabels,
   onRenameColorCategory,
   results,
@@ -6599,36 +6596,9 @@ function CalendarSearchResults({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
-      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-8">
+      <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
         <div className="mx-auto w-full max-w-[1280px]">
-        <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-white px-3 shadow-sm focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-          <Search size={18} className="shrink-0 text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => onSearchQueryChange?.(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSubmitSearch?.(event.currentTarget.value);
-              }
-            }}
-            placeholder="搜索日程"
-            className="ml-3 min-w-0 flex-1 border-none bg-transparent text-base font-black text-slate-800 placeholder:text-slate-400 focus:outline-none"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => onClearSearch?.()}
-              className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              title="清空搜索"
-              aria-label="清空搜索"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
           {renderFilterSelect({
             value: filters.calendarScope || 'all',
             onChange: (value) => onChangeFilters({ calendarScope: value }),
@@ -11713,7 +11683,9 @@ function MainApp() {
         <header className="relative flex min-h-16 shrink-0 flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6" style={{ zIndex: 40 }}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
-              <div className="flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap">
+              <div className={`flex items-center gap-2 min-w-0 pr-1 whitespace-nowrap ${
+                currentScreen === 'search' ? 'flex-1' : ''
+              }`}>
                 {currentScreen === 'search' && (
                   <button
                     onClick={() => navTo('calendar')}
@@ -11723,9 +11695,13 @@ function MainApp() {
                     返回日历
                   </button>
                 )}
-                {currentScreen !== 'search' && (
-                <div ref={calendarSearchBoxRef} className="relative shrink-0">
-                  <div className="flex h-10 w-[324px] items-center rounded-xl bg-black/5 px-3">
+                <div
+                  ref={calendarSearchBoxRef}
+                  className={`relative min-w-0 ${currentScreen === 'search' ? 'flex-1' : 'shrink-0'}`}
+                >
+                  <div className={`flex h-10 items-center rounded-xl bg-black/5 px-3 ${
+                    currentScreen === 'search' ? 'w-full min-w-[260px] max-w-[640px]' : 'w-[324px]'
+                  }`}>
                     <button
                       onClick={() => executeCalendarSearch()}
                       className="shrink-0 text-gray-400 transition hover:text-gray-600"
@@ -11819,7 +11795,6 @@ function MainApp() {
                     </div>
                   )}
                 </div>
-                )}
                 {currentScreen !== 'search' && (
                   <>
                     <button
