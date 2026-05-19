@@ -19,15 +19,19 @@ export default function AvailabilityProposalModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-	          <div className="text-lg font-semibold text-slate-900">插入可用时间</div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+          <div className="text-lg font-semibold text-slate-900">插入可用时间</div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          >
             <X size={16} />
           </button>
         </div>
 
         <div className="space-y-5 px-6 py-5">
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            当前账户：<span className="font-semibold text-slate-900">{account?.email || account?.name || '未选择账户'}</span>
+            当前账户：
+            <span className="font-semibold text-slate-900">{account?.email || account?.name || '未选择账户'}</span>
           </div>
 
           <div className="grid gap-2 md:grid-cols-2">
@@ -47,11 +51,13 @@ export default function AvailabilityProposalModal({
                       <div className="text-sm font-semibold text-slate-900">
                         {formatSuggestedSlotLabel(new Date(slot.dateMs), slot.startH, slot.durationH)}
                       </div>
-	                      {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
+                      {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
                     </div>
                     <span
                       className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border ${
-                        checked ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'
+                        checked
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-slate-300 bg-white text-transparent'
                       }`}
                     >
                       <Check size={12} />
@@ -63,9 +69,12 @@ export default function AvailabilityProposalModal({
           </div>
         </div>
 
-	        <div className="flex items-center justify-end border-t border-slate-200 bg-slate-50 px-6 py-4">
+        <div className="flex items-center justify-end border-t border-slate-200 bg-slate-50 px-6 py-4">
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white">
+            <button
+              onClick={onClose}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-white"
+            >
               取消
             </button>
             <button
@@ -83,4 +92,3 @@ export default function AvailabilityProposalModal({
     </div>
   );
 }
-

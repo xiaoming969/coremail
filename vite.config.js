@@ -5,6 +5,15 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/coremail/' : '/',
   plugins: [react(), tailwindcss()],
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/src/domain/appModel.js')) return 'appModel';
+        },
+      },
+    },
+  },
   server: {
     allowedHosts: true,
   },

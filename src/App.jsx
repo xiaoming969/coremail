@@ -3080,18 +3080,18 @@ function MailboxPermissionModal({
   onIgnoreInvitation,
   onRemoveSharedAccount,
 }) {
-  if (!account) return null;
-
   const [draftName, setDraftName] = useState(getAccountEditableName(account));
   const [activeTab, setActiveTab] = useState(initialTab || 'settings');
 
   useEffect(() => {
     setDraftName(getAccountEditableName(account));
-  }, [account.id, account.displayName, account.name, account.email]);
+  }, [account?.id, account?.displayName, account?.name, account?.email]);
 
   useEffect(() => {
     setActiveTab(initialTab || 'settings');
-  }, [initialTab, account.id]);
+  }, [initialTab, account?.id]);
+
+  if (!account) return null;
 
   const accountLabel = getAccountFullLabel(account);
   const canSaveName = draftName.trim() && draftName.trim() !== getAccountEditableName(account);
@@ -7948,7 +7948,6 @@ function MainApp() {
                       colorCategoryLabels={colorCategoryLabels}
                       onRenameColorCategory={(id, label) => setColorCategoryLabels((prev) => ({ ...prev, [id]: label }))}
                       results={calendarSearchResults}
-                      onBack={() => navTo('calendar')}
                       onOpenEvent={openEventDetails}
                     />
                   </Suspense>

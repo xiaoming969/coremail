@@ -1,5 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Calendar, ChevronDown, Clock, FileText, Mail, MapPin, Paperclip, RefreshCw, Search, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  Calendar,
+  ChevronDown,
+  Clock,
+  FileText,
+  Mail,
+  MapPin,
+  Paperclip,
+  RefreshCw,
+  Search,
+  Users,
+} from 'lucide-react';
 import {
   DAY_MS,
   HUAWEI_CALENDAR_ID,
@@ -38,7 +50,6 @@ export default function CalendarSearchResults({
   colorCategoryLabels,
   onRenameColorCategory,
   results,
-  onBack,
   onOpenEvent,
 }) {
   const trimmedQuery = query.trim();
@@ -159,18 +170,14 @@ export default function CalendarSearchResults({
       return;
     }
 
-    setSelectedResultId((prev) =>
-      results.some((result) => result.event.id === prev) ? prev : firstCurrentResultId,
-    );
+    setSelectedResultId((prev) => (results.some((result) => result.event.id === prev) ? prev : firstCurrentResultId));
   }, [firstCurrentResultId, results]);
 
   useLayoutEffect(() => {
     if (!firstCurrentResultId || !searchResultsScrollRef.current) return undefined;
 
     const timer = window.setTimeout(() => {
-      const target = searchResultsScrollRef.current?.querySelector(
-        `[data-search-result-id="${firstCurrentResultId}"]`,
-      );
+      const target = searchResultsScrollRef.current?.querySelector(`[data-search-result-id="${firstCurrentResultId}"]`);
 
       if (target) {
         target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
@@ -225,7 +232,10 @@ export default function CalendarSearchResults({
       if (diffMinutes > 0 && diffMinutes <= 60) {
         return {
           label: `${diffMinutes} 分钟后开始`,
-          className: diffMinutes <= 15 ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700',
+          className:
+            diffMinutes <= 15
+              ? 'border-blue-200 bg-blue-50 text-blue-700'
+              : 'border-orange-200 bg-orange-50 text-orange-700',
         };
       }
 
@@ -318,7 +328,9 @@ export default function CalendarSearchResults({
     !isMultiAccount ||
     filters.accountId === 'all' ||
     filters.accountId === 'current' ||
-    (!filters.accountId && selectedAccountIds.length === 1 && selectedAccountIds[0] === getPrimarySearchAccountId(accountOptions));
+    (!filters.accountId &&
+      selectedAccountIds.length === 1 &&
+      selectedAccountIds[0] === getPrimarySearchAccountId(accountOptions));
   const hasActiveFilters =
     !isDefaultAccountFilter ||
     (filters.calendarScope || 'all') !== 'all' ||
@@ -344,10 +356,14 @@ export default function CalendarSearchResults({
   const getOptionLabel = (options, value) => options.find((option) => option.id === value)?.label || '';
   const filterSummary = [
     isMultiAccount && !isDefaultAccountFilter ? getSearchAccountLabel(filters, accountOptions) : '',
-    (filters.calendarScope || 'all') !== 'all' ? `搜索范围：${getOptionLabel(SEARCH_ACCOUNT_SCOPE_OPTIONS, filters.calendarScope)}` : '',
+    (filters.calendarScope || 'all') !== 'all'
+      ? `搜索范围：${getOptionLabel(SEARCH_ACCOUNT_SCOPE_OPTIONS, filters.calendarScope)}`
+      : '',
     (filters.timeframe || 'all') !== 'all' ? getOptionLabel(SEARCH_TIMEFRAME_OPTIONS, filters.timeframe) : '',
     (filters.person || 'all') !== 'all' ? peopleOptions.find((option) => option.id === filters.person)?.label : '',
-    (filters.colorCategory || 'all') !== 'all' ? `颜色分类：${getColorCategoryMeta(filters.colorCategory, colorCategoryLabels)?.shortLabel || '无分类'}` : '',
+    (filters.colorCategory || 'all') !== 'all'
+      ? `颜色分类：${getColorCategoryMeta(filters.colorCategory, colorCategoryLabels)?.shortLabel || '无分类'}`
+      : '',
     (filters.meetingType || 'all') !== 'all' ? getOptionLabel(SEARCH_MEETING_TYPE_OPTIONS, filters.meetingType) : '',
     (filters.attachment || 'all') !== 'all' ? getOptionLabel(SEARCH_ATTACHMENT_OPTIONS, filters.attachment) : '',
     (filters.sort || 'relevance') !== 'relevance' ? getOptionLabel(SEARCH_SORT_OPTIONS, filters.sort) : '',
@@ -375,7 +391,9 @@ export default function CalendarSearchResults({
         className={`${filterSelectClass} w-full`}
       >
         {options.map((option) => (
-          <option key={option.id} value={option.id}>{option.label}</option>
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
         ))}
       </select>
       <ChevronDown size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -446,7 +464,8 @@ export default function CalendarSearchResults({
         title="点击修改颜色分类名称"
       >
         <span className={`mr-1.5 shrink-0 rounded-full ${dotClass} ${category.colorClass}`}></span>
-        {category.label}{extraCount > 0 ? ` +${extraCount}` : ''}
+        {category.label}
+        {extraCount > 0 ? ` +${extraCount}` : ''}
       </button>
     );
   };
@@ -455,7 +474,9 @@ export default function CalendarSearchResults({
     const joinable = canJoinCalendarEvent(event);
 
     return (
-      <div className={`flex shrink-0 items-center gap-2 ${isCard ? 'w-full' : 'w-full justify-start sm:w-auto sm:justify-end'}`}>
+      <div
+        className={`flex shrink-0 items-center gap-2 ${isCard ? 'w-full' : 'w-full justify-start sm:w-auto sm:justify-end'}`}
+      >
         <button
           type="button"
           onClick={(entry) => {
@@ -486,7 +507,7 @@ export default function CalendarSearchResults({
   };
 
   const renderSearchResult = (result, variant = 'list') => {
-    const { event, calendar, sourceLabel } = result;
+    const { event, sourceLabel } = result;
     const isSelected = selectedResultId === event.id;
     const dateMeta = getEventDateMeta(event);
     const timeState = getResultTimeState(event);
@@ -498,7 +519,8 @@ export default function CalendarSearchResults({
     const colorCategories = getEventColorCategories(event, colorCategoryLabels);
     const primaryCategory = colorCategories[0];
     const extraCategoryCount = Math.max(0, colorCategories.length - 1);
-    const repeatLabel = event.repeat && event.repeat !== 'does_not_repeat' ? `循环 · ${REPEAT_LABELS[event.repeat] || '重复'}` : '';
+    const repeatLabel =
+      event.repeat && event.repeat !== 'does_not_repeat' ? `循环 · ${REPEAT_LABELS[event.repeat] || '重复'}` : '';
 
     if (variant === 'cards') {
       return (
@@ -516,12 +538,16 @@ export default function CalendarSearchResults({
             }
           }}
           className={`group flex min-h-[286px] flex-col rounded-xl border px-4 py-4 text-left outline-none transition ${
-            isSelected ? 'border-blue-200 bg-blue-50/70 shadow-sm' : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50/70'
+            isSelected
+              ? 'border-blue-200 bg-blue-50/70 shadow-sm'
+              : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50/70'
           }`}
         >
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {timeState && (
-              <span className={`inline-flex h-7 items-center rounded-md border px-2 text-xs font-black ${timeState.className}`}>
+              <span
+                className={`inline-flex h-7 items-center rounded-md border px-2 text-xs font-black ${timeState.className}`}
+              >
                 <Clock size={14} className="mr-1" />
                 {timeState.label}
               </span>
@@ -550,7 +576,9 @@ export default function CalendarSearchResults({
           <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
             <div className="flex min-w-0 items-center gap-2">
               <Calendar size={15} className="shrink-0 text-slate-400" />
-              <span className="truncate">{dateMeta.dateLabel} · {dateMeta.timeLabel}</span>
+              <span className="truncate">
+                {dateMeta.dateLabel} · {dateMeta.timeLabel}
+              </span>
             </div>
             {meetingMeta.map((item) => {
               const Icon = item.icon;
@@ -581,19 +609,18 @@ export default function CalendarSearchResults({
             )}
           </div>
 
-          {snippet && (() => {
-            const SnippetIcon = snippet.icon;
-            return (
-              <div className="mt-4 flex min-w-0 items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm font-semibold text-slate-600">
-                <SnippetIcon size={14} className="mt-0.5 shrink-0 text-slate-400" />
-                <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
-              </div>
-            );
-          })()}
+          {snippet &&
+            (() => {
+              const SnippetIcon = snippet.icon;
+              return (
+                <div className="mt-4 flex min-w-0 items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm font-semibold text-slate-600">
+                  <SnippetIcon size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                  <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
+                </div>
+              );
+            })()}
 
-          <div className="mt-auto pt-4">
-            {renderResultActions(event, true)}
-          </div>
+          <div className="mt-auto pt-4">{renderResultActions(event, true)}</div>
         </article>
       );
     }
@@ -621,9 +648,13 @@ export default function CalendarSearchResults({
         }`}
       >
         <div className="min-w-0 text-sm font-bold text-slate-600">
-          <div className="truncate">{dateMeta.dateLabel} {dateMeta.timeLabel}</div>
+          <div className="truncate">
+            {dateMeta.dateLabel} {dateMeta.timeLabel}
+          </div>
           {timeState && (
-            <span className={`mt-1 inline-flex w-fit rounded-md border px-2 py-0.5 text-[11px] font-black ${timeState.className}`}>
+            <span
+              className={`mt-1 inline-flex w-fit rounded-md border px-2 py-0.5 text-[11px] font-black ${timeState.className}`}
+            >
               {timeState.label}
             </span>
           )}
@@ -656,15 +687,16 @@ export default function CalendarSearchResults({
                 <span className="truncate">{renderHighlighted(participantLabel.replace(/^参与人：/, ''))}</span>
               </span>
             )}
-            {meetingMeta[0] && (() => {
-              const MeetingIcon = meetingMeta[0].icon;
-              return (
-                <span className="flex min-w-0 items-center gap-1 truncate">
-                  <MeetingIcon size={13} className="shrink-0 text-slate-400" />
-                  <span className="truncate">{renderHighlighted(meetingMeta[0].label)}</span>
-                </span>
-              );
-            })()}
+            {meetingMeta[0] &&
+              (() => {
+                const MeetingIcon = meetingMeta[0].icon;
+                return (
+                  <span className="flex min-w-0 items-center gap-1 truncate">
+                    <MeetingIcon size={13} className="shrink-0 text-slate-400" />
+                    <span className="truncate">{renderHighlighted(meetingMeta[0].label)}</span>
+                  </span>
+                );
+              })()}
             {sourceText && (
               <span className="flex min-w-0 items-center gap-1 truncate">
                 <Mail size={13} className="shrink-0 text-slate-400" />
@@ -673,21 +705,28 @@ export default function CalendarSearchResults({
             )}
           </div>
           {sourceText && (
-            <div className="mt-1 hidden truncate text-xs font-semibold text-slate-400 xl:block">{renderHighlighted(sourceText)}</div>
+            <div className="mt-1 hidden truncate text-xs font-semibold text-slate-400 xl:block">
+              {renderHighlighted(sourceText)}
+            </div>
           )}
-          {snippet && (() => {
-            const SnippetIcon = snippet.icon;
-            return (
-              <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-500 xl:hidden">
-                <SnippetIcon size={13} className="shrink-0 text-slate-400" />
-                <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
-              </div>
-            );
-          })()}
+          {snippet &&
+            (() => {
+              const SnippetIcon = snippet.icon;
+              return (
+                <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-500 xl:hidden">
+                  <SnippetIcon size={13} className="shrink-0 text-slate-400" />
+                  <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
+                </div>
+              );
+            })()}
         </div>
 
         <div className={`hidden min-w-0 truncate text-sm font-semibold text-slate-600 xl:block`}>
-          {organizerLabel ? renderHighlighted(organizerLabel.replace(/^组织者：/, '')) : <span className="text-slate-300">-</span>}
+          {organizerLabel ? (
+            renderHighlighted(organizerLabel.replace(/^组织者：/, ''))
+          ) : (
+            <span className="text-slate-300">-</span>
+          )}
         </div>
 
         <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
@@ -704,7 +743,11 @@ export default function CalendarSearchResults({
         <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
           {meetingMeta.length > 0 ? (
             <div className="flex min-w-0 items-center gap-1.5">
-              {meetingMeta[0].icon === MapPin ? <MapPin size={14} className="shrink-0 text-slate-400" /> : <Calendar size={14} className="shrink-0 text-slate-400" />}
+              {meetingMeta[0].icon === MapPin ? (
+                <MapPin size={14} className="shrink-0 text-slate-400" />
+              ) : (
+                <Calendar size={14} className="shrink-0 text-slate-400" />
+              )}
               <span className="truncate">{renderHighlighted(meetingMeta[0].label.replace(/^地点：|^线上：/, ''))}</span>
             </div>
           ) : (
@@ -713,22 +756,22 @@ export default function CalendarSearchResults({
         </div>
 
         <div className="hidden min-w-0 text-sm font-semibold text-slate-600 xl:block">
-          {snippet ? (() => {
-            const SnippetIcon = snippet.icon;
-            return (
-              <div className="flex min-w-0 items-center gap-1.5">
-                <SnippetIcon size={14} className="shrink-0 text-slate-400" />
-                <span className="truncate">{renderHighlighted(snippet.text)}</span>
-              </div>
-            );
-          })() : (
+          {snippet ? (
+            (() => {
+              const SnippetIcon = snippet.icon;
+              return (
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <SnippetIcon size={14} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{renderHighlighted(snippet.text)}</span>
+                </div>
+              );
+            })()
+          ) : (
             <span className="text-slate-300">-</span>
           )}
         </div>
 
-        <div className="flex items-center justify-start gap-2 lg:justify-end">
-          {renderResultActions(event)}
-        </div>
+        <div className="flex items-center justify-start gap-2 lg:justify-end">{renderResultActions(event)}</div>
       </div>
     );
   };
@@ -743,9 +786,15 @@ export default function CalendarSearchResults({
             <h3 className="text-sm font-black text-slate-900">{title}</h3>
             {subtitle && <div className="mt-1 text-xs font-semibold text-slate-400">{subtitle}</div>}
           </div>
-          <span className="text-xs font-bold text-slate-400">显示 {items.length}/{totalCount}</span>
+          <span className="text-xs font-bold text-slate-400">
+            显示 {items.length}/{totalCount}
+          </span>
         </div>
-        <div className={variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'}>
+        <div
+          className={
+            variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'
+          }
+        >
           {variant !== 'cards' && (
             <div className="hidden grid-cols-[190px_minmax(220px,1.35fr)_140px_minmax(150px,0.9fr)_140px_minmax(150px,1fr)_max-content] border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-black text-slate-400 xl:grid">
               <span>时间</span>
@@ -788,94 +837,100 @@ export default function CalendarSearchResults({
     <div className="flex min-h-0 flex-1 flex-col bg-white">
       <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
         <div className="mx-auto w-full max-w-[1280px]">
-        <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
-          {renderFilterSelect({
-            value: filters.calendarScope || 'all',
-            onChange: (value) => onChangeFilters({ calendarScope: value }),
-            options: SEARCH_ACCOUNT_SCOPE_OPTIONS,
-            className: 'w-full sm:w-[180px]',
-          })}
-          {renderFilterSelect({
-            value: filters.timeframe || 'all',
-            onChange: (value) => onChangeFilters({ timeframe: value }),
-            options: SEARCH_TIMEFRAME_OPTIONS,
-            className: 'w-full sm:w-[158px]',
-          })}
-          {renderFilterSelect({
-            value: filters.colorCategory || 'all',
-            onChange: (value) => onChangeFilters({ colorCategory: value }),
-            options: colorCategoryFilterOptions,
-            className: 'w-full sm:w-[180px]',
-          })}
-          {renderFilterSelect({
-            value: filters.sort || 'relevance',
-            onChange: (value) => onChangeFilters({ sort: value }),
-            options: SEARCH_SORT_OPTIONS,
-            className: 'w-full sm:w-[190px]',
-          })}
-          <details className="group/more relative w-full shrink-0 sm:w-auto">
-            <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:justify-start">
-              更多筛选{secondaryFilterCount > 0 ? ` · ${secondaryFilterCount}` : ''}
-              <ChevronDown size={15} className="text-slate-500" />
-            </summary>
-            <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg sm:left-auto sm:right-0 md:grid-cols-3">
-              {renderFilterSelect({
-                value: filters.person || 'all',
-                onChange: (value) => onChangeFilters({ person: value }),
-                options: peopleOptions,
-                className: 'w-full',
-              })}
-              {renderFilterSelect({
-                value: filters.meetingType || 'all',
-                onChange: (value) => onChangeFilters({ meetingType: value }),
-                options: SEARCH_MEETING_TYPE_OPTIONS,
-                className: 'w-full',
-              })}
-              {renderFilterSelect({
-                value: filters.attachment || 'all',
-                onChange: (value) => onChangeFilters({ attachment: value }),
-                options: SEARCH_ATTACHMENT_OPTIONS,
-                className: 'w-full',
-              })}
-            </div>
-          </details>
-        </div>
+          <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
+            {renderFilterSelect({
+              value: filters.calendarScope || 'all',
+              onChange: (value) => onChangeFilters({ calendarScope: value }),
+              options: SEARCH_ACCOUNT_SCOPE_OPTIONS,
+              className: 'w-full sm:w-[180px]',
+            })}
+            {renderFilterSelect({
+              value: filters.timeframe || 'all',
+              onChange: (value) => onChangeFilters({ timeframe: value }),
+              options: SEARCH_TIMEFRAME_OPTIONS,
+              className: 'w-full sm:w-[158px]',
+            })}
+            {renderFilterSelect({
+              value: filters.colorCategory || 'all',
+              onChange: (value) => onChangeFilters({ colorCategory: value }),
+              options: colorCategoryFilterOptions,
+              className: 'w-full sm:w-[180px]',
+            })}
+            {renderFilterSelect({
+              value: filters.sort || 'relevance',
+              onChange: (value) => onChangeFilters({ sort: value }),
+              options: SEARCH_SORT_OPTIONS,
+              className: 'w-full sm:w-[190px]',
+            })}
+            <details className="group/more relative w-full shrink-0 sm:w-auto">
+              <summary className="flex h-9 cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:justify-start">
+                更多筛选{secondaryFilterCount > 0 ? ` · ${secondaryFilterCount}` : ''}
+                <ChevronDown size={15} className="text-slate-500" />
+              </summary>
+              <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg sm:left-auto sm:right-0 md:grid-cols-3">
+                {renderFilterSelect({
+                  value: filters.person || 'all',
+                  onChange: (value) => onChangeFilters({ person: value }),
+                  options: peopleOptions,
+                  className: 'w-full',
+                })}
+                {renderFilterSelect({
+                  value: filters.meetingType || 'all',
+                  onChange: (value) => onChangeFilters({ meetingType: value }),
+                  options: SEARCH_MEETING_TYPE_OPTIONS,
+                  className: 'w-full',
+                })}
+                {renderFilterSelect({
+                  value: filters.attachment || 'all',
+                  onChange: (value) => onChangeFilters({ attachment: value }),
+                  options: SEARCH_ATTACHMENT_OPTIONS,
+                  className: 'w-full',
+                })}
+              </div>
+            </details>
+          </div>
 
-        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-black text-slate-900">共找到 {results.length} 条结果</span>
-              {groupSummaries.map((item) => (
-                <span key={item.label} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">
-                  {item.label} {item.count}
-                </span>
-              ))}
-            </div>
-            {filterSummary.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {filterSummary.map((item) => (
-                  <span key={item} className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                    {item}
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-black text-slate-900">共找到 {results.length} 条结果</span>
+                {groupSummaries.map((item) => (
+                  <span
+                    key={item.label}
+                    className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600"
+                  >
+                    {item.label} {item.count}
                   </span>
                 ))}
               </div>
-            )}
-            {results.length > 30 && (
-              <div className="mt-2 text-xs font-semibold text-orange-600">
-                结果较多，建议先用时间、人员或搜索范围缩小结果。
-              </div>
-            )}
+              {filterSummary.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {filterSummary.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {results.length > 30 && (
+                <div className="mt-2 text-xs font-semibold text-orange-600">
+                  结果较多，建议先用时间、人员或搜索范围缩小结果。
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className={`h-9 shrink-0 rounded-lg px-3 text-sm font-bold transition ${
+                hasActiveFilters ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-50'
+              }`}
+            >
+              清除筛选
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={resetFilters}
-            className={`h-9 shrink-0 rounded-lg px-3 text-sm font-bold transition ${
-              hasActiveFilters ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-50'
-            }`}
-          >
-            清除筛选
-          </button>
-        </div>
         </div>
       </div>
 
@@ -917,4 +972,3 @@ export default function CalendarSearchResults({
     </div>
   );
 }
-

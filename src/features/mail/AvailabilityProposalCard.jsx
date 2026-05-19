@@ -4,12 +4,14 @@ import { formatSuggestedSlotLabel } from '../../domain/appModel.js';
 export default function AvailabilityProposalCard({ proposal, onPickSlot, onRemove, actionLabel = '确认这个时间' }) {
   if (!proposal) return null;
 
-  const confirmedSlot = proposal.confirmedSlotId ? proposal.slots.find((slot) => slot.id === proposal.confirmedSlotId) : null;
+  const confirmedSlot = proposal.confirmedSlotId
+    ? proposal.slots.find((slot) => slot.id === proposal.confirmedSlotId)
+    : null;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-	        <div className="text-sm font-semibold text-slate-900">可用时间</div>
+        <div className="text-sm font-semibold text-slate-900">可用时间</div>
         {onRemove && proposal.status !== 'confirmed' && (
           <button
             onClick={onRemove}
@@ -24,7 +26,8 @@ export default function AvailabilityProposalCard({ proposal, onPickSlot, onRemov
       <div className="space-y-3 px-5 py-4">
         {proposal.status === 'confirmed' && confirmedSlot && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
-            已确认 {formatSuggestedSlotLabel(new Date(confirmedSlot.dateMs), confirmedSlot.startH, confirmedSlot.durationH)}
+            已确认{' '}
+            {formatSuggestedSlotLabel(new Date(confirmedSlot.dateMs), confirmedSlot.startH, confirmedSlot.durationH)}
           </div>
         )}
 
@@ -50,7 +53,7 @@ export default function AvailabilityProposalCard({ proposal, onPickSlot, onRemov
                     <div className="text-sm font-semibold text-slate-900">
                       {formatSuggestedSlotLabel(new Date(slot.dateMs), slot.startH, slot.durationH)}
                     </div>
-	                    {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
+                    {slot.summary && <div className="mt-1 text-xs text-slate-500">{slot.summary}</div>}
                   </div>
                   {isConfirmed ? (
                     <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -64,9 +67,7 @@ export default function AvailabilityProposalCard({ proposal, onPickSlot, onRemov
             );
           })}
         </div>
-
       </div>
     </div>
   );
 }
-

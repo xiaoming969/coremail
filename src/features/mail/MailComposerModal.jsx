@@ -78,7 +78,9 @@ export default function MailComposerModal({
                   title={`${contact.name} <${contact.email}>`}
                 >
                   <span className="max-w-[180px] truncate">{contact.name}</span>
-                  <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-black ${contact.scope === 'external' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                  <span
+                    className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-black ${contact.scope === 'external' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}
+                  >
                     {contact.scope === 'external' ? '外部' : '内部'}
                   </span>
                 </button>
@@ -114,7 +116,10 @@ export default function MailComposerModal({
                   插入可用时间
                 </button>
               )}
-              <button onClick={onAddAttachment} className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 inline-flex items-center">
+              <button
+                onClick={onAddAttachment}
+                className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 inline-flex items-center"
+              >
                 <Paperclip size={13} className="mr-1.5" />
                 添加附件
               </button>
@@ -153,12 +158,18 @@ export default function MailComposerModal({
           />
         </div>
 
-	        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end">
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end">
           <div className="flex items-center gap-3">
-            <button onClick={onSaveDraft} className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-bold text-gray-700">
+            <button
+              onClick={onSaveDraft}
+              className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-bold text-gray-700"
+            >
               存草稿
             </button>
-            <button onClick={onSend} className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center">
+            <button
+              onClick={onSend}
+              className="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold inline-flex items-center"
+            >
               发送
               <Send size={14} className="ml-2" />
             </button>
@@ -168,4 +179,3 @@ export default function MailComposerModal({
     </div>
   );
 }
-
