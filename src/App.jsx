@@ -337,7 +337,6 @@ const formatTimeRange = (startH, durationH) => `${formatHour(startH)} - ${format
 
 const formatDateLabel = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-const formatMonthGroupLabel = (date) => `${date.getFullYear()}年${date.getMonth() + 1}月`;
 
 const formatDraftTime = (date, startH, durationH) => `${formatDateLabel(date)} ${formatTimeRange(startH, durationH)}`;
 const formatTimeSelectLabel = (value) => {
@@ -548,37 +547,6 @@ const formatAgendaEventLabel = (event) => {
   const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
   return `${date.getMonth() + 1}/${date.getDate()} ${WEEKDAY_NAMES[dayIndex]} · ${event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}`;
 };
-const getSearchResultWhenMeta = (event) => {
-  const date = eventToDate(event);
-  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
-  const diffDays = Math.round((stripTime(date).getTime() - stripTime(TODAY_DATE).getTime()) / DAY_MS);
-  const dateLabel =
-    diffDays === 0
-      ? `今天 · ${WEEKDAY_NAMES[dayIndex]}`
-      : diffDays === 1
-        ? `明天 · ${WEEKDAY_NAMES[dayIndex]}`
-        : `${date.getMonth() + 1}月${date.getDate()}日 · ${WEEKDAY_NAMES[dayIndex]}`;
-
-  return {
-    dateLabel,
-    timeLabel: event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1),
-  };
-};
-const getSearchResultStatusTags = (event, calendar) => {
-  const tags = [];
-
-  if (event.isAllDay) tags.push('全天');
-  if (event.repeat && event.repeat !== 'does_not_repeat') tags.push('重复');
-  if (event.status === '已取消') tags.push('已取消');
-  else if (event.status === '待响应') tags.push('未回复');
-  else if (event.status === '已拒绝') tags.push('已拒绝');
-  else if (event.status === '已接受') tags.push('我已接受');
-  if (event.visibility === 'private') tags.push('私密');
-  if (getCalendarPermissionId(calendar?.receivedPermissionId || calendar?.permission) === 'busy_only') tags.push('仅查看闲忙');
-  else if (canEditCalendarContent(calendar?.receivedPermissionId || calendar?.permission)) tags.push('可编辑');
-
-  return Array.from(new Set(tags)).slice(0, 4);
-};
 const getAgendaStatusTone = (status) => {
   if (status === '待响应') return 'bg-blue-50 text-blue-700 border-blue-200';
   if (status === '草稿') return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -655,28 +623,6 @@ const getAccountFullLabel = (account) => {
   return `${person} · ${email}`;
 };
 const getAccountEditableName = (account) => account?.displayName || account?.name || account?.email || '';
-const MAILBOX_PERMISSION_OPTIONS = [
-  {
-    id: 'fullAccess',
-    label: '完全访问',
-    description: '可打开并管理该邮箱内容',
-  },
-  {
-    id: 'sendAs',
-    label: '作为此邮箱发送',
-    description: '收件人看到发件人为该邮箱',
-  },
-  {
-    id: 'sendOnBehalf',
-    label: '代表此邮箱发送',
-    description: '收件人看到由成员代表该邮箱发送',
-  },
-];
-const getMailboxMemberPermission = (member) => {
-  if (member?.sendAs) return 'sendAs';
-  if (member?.sendOnBehalf) return 'sendOnBehalf';
-  return 'fullAccess';
-};
 
 const getPreviewPosition = (clientX, clientY) => {
   if (typeof window === 'undefined') return { x: clientX + 16, y: clientY + 16 };
@@ -740,10 +686,6 @@ const scrollElementToTop = (element, top) => {
   if (!element) return;
   element.scrollTop = top;
   element.scrollTo({ top, behavior: 'auto' });
-};
-const matchesSearchText = (values, query) => {
-  if (!query) return true;
-  return values.some((value) => String(value || '').toLowerCase().includes(query));
 };
 const tokenizeKeywordQuery = (query = '') => {
   const normalized = query.trim().toLowerCase();
@@ -1335,34 +1277,6 @@ const buildAllDayEventLayout = (items) => {
   return {
     positions,
     rowCount: Math.max(1, rowEndDays.length),
-  };
-};
-
-const parseDraftTime = (text) => {
-  const match = text.match(
-    /(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?/,
-  );
-
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const dayNumber = Number(match[3]);
-  const startHour = Number(match[4]);
-  const startMinute = Number(match[5] || 0);
-  const endHour = Number(match[6]);
-  const endMinute = Number(match[7] || 0);
-  const startH = startHour + (startMinute >= 30 ? 0.5 : 0);
-  const endH = endHour + (endMinute >= 30 ? 0.5 : 0);
-
-  if (endH <= startH) return null;
-
-  const date = stripTime(new Date(year, month, dayNumber));
-  return {
-    date,
-    ...dateToEventParts(date),
-    startH,
-    durationH: endH - startH,
   };
 };
 
@@ -3061,31 +2975,6 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
         );
       })}
     </div>
-  );
-}
-
-function ProductRail({ activeProduct, onSelect }) {
-  return (
-    <aside className="w-20 bg-slate-950 text-white border-r border-slate-800 shrink-0 flex flex-col items-center py-4">
-      <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
-        <Mail size={20} />
-      </div>
-      <div className="mt-3 text-[10px] font-black tracking-[0.28em] text-slate-400">MAIL OS</div>
-      <div className="mt-auto w-full px-3 space-y-2">
-        {PRODUCT_TABS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => onSelect(id)}
-            className={`w-full rounded-xl px-2 py-3 flex flex-col items-center transition-colors ${
-              activeProduct === id ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400 hover:bg-slate-900 hover:text-white'
-            }`}
-          >
-            <Icon size={18} />
-            <span className="mt-1.5 text-[11px] font-bold">{label}</span>
-          </button>
-        ))}
-      </div>
-    </aside>
   );
 }
 
@@ -5633,119 +5522,6 @@ function EventPreviewCard({ event, calendar, account, x, y, mode = 'hover', labe
         </div>
       </div>
     </div>
-  );
-}
-
-function AgendaSidebar({
-  title,
-  groupedEvents,
-  accountMap,
-  calendarMap,
-  onOpenEvent,
-  onRespond,
-}) {
-  return (
-    <aside
-      className="relative z-10 hidden shrink-0 border-l border-slate-200 bg-[#fcfcfb] lg:flex lg:flex-col"
-      style={{ width: 'clamp(272px, 23vw, 336px)', zIndex: 20 }}
-    >
-      <div className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5">
-        <h3 className="font-bold text-gray-900 flex items-center">
-          <Calendar size={16} className="mr-2 text-blue-600" />
-          {title}
-        </h3>
-        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
-          {groupedEvents.reduce((total, group) => total + group.items.length, 0)}
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto bg-[#f8f8f7] p-4 space-y-4">
-        {groupedEvents.map((group) => {
-          const account = accountMap[group.accountId];
-          const accountLabel = account?.email || account?.name || '未知账户';
-
-          return (
-            <section key={group.accountId} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                <div className="min-w-0 flex items-center gap-2">
-                  <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${account?.color || 'bg-gray-400'}`}></div>
-                  <div className="truncate text-sm font-bold text-slate-800">{accountLabel}</div>
-                </div>
-                <div className="ml-3 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                  {group.items.length}
-                </div>
-              </div>
-              <div className="relative px-4 py-3">
-                <div className="space-y-3">
-                {group.items.map((event) => {
-                  const calendar = calendarMap[event.calId] || { color: 'bg-gray-500' };
-                  const cleanedTitle =
-                    event.status === '已取消'
-                      ? (event.title || '无标题').replace(/^[【\[]?已取消[】\]]?\s*/, '')
-                      : event.title || '无标题';
-                  const detailText =
-                    event.location ||
-                    (event.meetingProvider && event.meetingProvider !== 'none'
-                      ? MEETING_PROVIDER_LABELS[event.meetingProvider]
-                      : calendar.name || '未补充地点');
-                  return (
-                    <div key={event.id} className="relative pl-5">
-                      <div className={`absolute left-0 top-[10px] h-3 w-3 rounded-full border-2 border-white ${calendar.color}`}></div>
-                      <div className="mb-1 flex items-center justify-between gap-3">
-                        <div className="text-[12px] font-semibold text-slate-500">{formatAgendaEventLabel(event)}</div>
-                        {event.status && event.status !== '已接受' && (
-                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getAgendaStatusTone(event.status)}`}>
-                            {event.status}
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        onClick={() => onOpenEvent(event.id)}
-                        className="cursor-pointer rounded-lg border border-slate-200 bg-[#fcfcfb] p-3 transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50/40"
-                      >
-                        <div
-                          title={cleanedTitle}
-                          className={`text-sm font-semibold leading-snug ${event.status === '已取消' ? 'text-slate-400 line-through' : 'text-slate-900'}`}
-                          style={clampLinesStyle(2)}
-                        >
-                          {cleanedTitle}
-                        </div>
-                        <div title={detailText} className="mt-1 flex items-center gap-1 text-xs text-slate-500" style={clampLinesStyle(1)}>
-                          <MapPin size={10} className="shrink-0" />
-                          <span className="truncate">{detailText}</span>
-                        </div>
-                        {event.status === '待响应' ? (
-                          <div className="mt-3 flex gap-2" onClick={(entry) => entry.stopPropagation()}>
-                            <button
-                              className="flex-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white"
-                              onClick={() => onRespond(event.id, 'reject')}
-                            >
-                              拒绝
-                            </button>
-                            <button
-                              className="flex-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
-                              onClick={() => onRespond(event.id, 'accept')}
-                            >
-                              接受
-                            </button>
-                          </div>
-                        ) : event.status === '已拒绝' ? (
-                          <div className="mt-3 text-[11px] font-medium text-slate-400">你已拒绝这条邀请</div>
-                        ) : event.status === '已取消' ? (
-                          <div className="mt-3 text-[11px] font-medium text-slate-400">该日程已取消</div>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-                </div>
-              </div>
-            </section>
-          );
-        })}
-
-        {groupedEvents.length === 0 && <div className="text-sm text-gray-400 pt-2">当前筛选下没有待处理日程。</div>}
-      </div>
-    </aside>
   );
 }
 

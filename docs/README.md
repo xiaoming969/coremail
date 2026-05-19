@@ -41,7 +41,6 @@
 | `features/calendar-search.md` | 日程搜索结果页功能规格 | 当前主规格 |
 | `features/mail-search.md` | 邮件搜索结果页功能规格 | 当前主规格 |
 | `features/shared-permission.md` | 共享权限功能规格 | 当前主规格 |
-| `archive/shared-permission-spec.md` | 早期共享权限落地方案和流程图 | 历史参考 |
 
 ## 3. 决策优先级
 
@@ -176,7 +175,3 @@ Coremail 当前最重要的原则：
 - `calendar-search.md`
 - `mail-search.md`
 - `shared-permission.md`
-
-归档文档放在 `docs/archive/`：
-
-- `shared-permission-spec.md`
