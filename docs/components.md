@@ -7,7 +7,7 @@
 - `docs/product.md`
 - `docs/design.md`
 - `docs/information-architecture.md`
-- 具体功能文档，例如 `docs/shared-permission-spec.md`
+- 具体功能文档，例如 `docs/features/shared-permission.md`
 
 ## 1. 组件设计原则
 
