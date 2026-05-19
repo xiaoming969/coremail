@@ -37,7 +37,7 @@ export default class ErrorBoundary extends React.Component {
               borderRadius: '8px',
               marginTop: '20px',
               overflow: 'auto',
-              fontSize: '13px',
+              fontSize: '14px',
             }}
           >
             {this.state.error && this.state.error.toString()}
