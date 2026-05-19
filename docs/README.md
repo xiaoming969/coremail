@@ -9,14 +9,16 @@
 1. `product.md`
 2. `design.md`
 3. `information-architecture.md`
-4. `components.md`
-5. `features/*.md`
+4. `data-model.md`
+5. `components.md`
+6. `features/*.md`
 
 原因：
 
 - `product.md` 回答产品是什么、给谁用、解决什么问题。
 - `design.md` 回答整体设计原则、页面密度、交互风格和反模式。
 - `information-architecture.md` 回答模块、页面、导航和用户路径如何组织。
+- `data-model.md` 回答账号、日历、日程、邮件、权限等数据对象如何定义。
 - `components.md` 回答按钮、弹窗、菜单、筛选器、列表、标签等基础组件怎么用。
 - `features/*.md` 回答具体功能怎么交互、展示和验收。
 
@@ -29,6 +31,7 @@
 | `product.md` | 产品定位、目标用户、核心问题、功能边界 | 用户、场景、产品目标发生变化 |
 | `design.md` | 设计原则、页面类型、密度、反模式 | 整体交互风格或设计判断发生变化 |
 | `information-architecture.md` | 模块边界、导航层级、主要用户路径 | 新增模块、页面层级或主路径变化 |
+| `data-model.md` | 核心实体、字段语义、对象关系 | 新增或修改账号、日历、日程、邮件、权限字段 |
 | `components.md` | 基础组件语义和行为规则 | 新增通用组件或调整组件规则 |
 
 ### 2.2 功能规格
@@ -38,7 +41,7 @@
 | `features/calendar-search.md` | 日程搜索结果页功能规格 | 当前主规格 |
 | `features/mail-search.md` | 邮件搜索结果页功能规格 | 当前主规格 |
 | `features/shared-permission.md` | 共享权限功能规格 | 当前主规格 |
-| `shared-permission-spec.md` | 早期共享权限落地方案和流程图 | 历史参考 |
+| `archive/shared-permission-spec.md` | 早期共享权限落地方案和流程图 | 历史参考 |
 
 ## 3. 决策优先级
 
@@ -47,15 +50,17 @@
 1. `product.md`
 2. `design.md`
 3. `information-architecture.md`
-4. `components.md`
-5. `features/*.md`
-6. 历史方案文档
+4. `data-model.md`
+5. `components.md`
+6. `features/*.md`
+7. 历史方案文档
 
 解释：
 
 - 产品方向高于页面实现。
 - 设计原则高于单个组件偏好。
 - 信息架构高于局部交互。
+- 数据模型高于页面临时字段。
 - 组件规范高于某个页面的临时样式。
 - 功能规格负责把上游原则落到具体功能。
 
@@ -68,10 +73,11 @@
 1. 判断功能属于哪个顶层模块。
 2. 检查 `product.md` 是否已经覆盖对应用户和场景。
 3. 检查 `information-architecture.md` 是否需要新增入口、页面状态或用户路径。
-4. 检查 `components.md` 是否已有可复用组件规则。
-5. 在 `features/` 下新增或更新功能规格。
-6. 在功能规格末尾补验收清单。
-7. 如果实现已完成，确认代码行为与功能规格一致。
+4. 检查 `data-model.md` 是否需要新增或调整字段。
+5. 检查 `components.md` 是否已有可复用组件规则。
+6. 在 `features/` 下新增或更新功能规格。
+7. 在功能规格末尾补验收清单。
+8. 如果实现已完成，确认代码行为与功能规格一致。
 
 功能规格建议结构：
 
@@ -94,8 +100,9 @@
 1. 先写 `product.md`：明确产品、用户、问题、范围和非目标。
 2. 再写 `design.md`：明确设计原则、页面密度、风格和反模式。
 3. 再写 `information-architecture.md`：明确模块、页面层级和主要路径。
-4. 再写 `components.md`：沉淀基础组件规则。
-5. 最后写 `features/*.md`：逐个功能写交互规格和验收清单。
+4. 再写 `data-model.md`：明确核心实体、字段和关系。
+5. 再写 `components.md`：沉淀基础组件规则。
+6. 最后写 `features/*.md`：逐个功能写交互规格和验收清单。
 
 组件文档通常不是起点。它更像“设计语言和交互规则的零件库”，必须服务产品定位和信息架构。
 
@@ -112,6 +119,7 @@ Coremail 当前最重要的原则：
 - 颜色分类、会议状态、权限状态不能混淆。
 - 危险操作必须说明影响范围。
 - 字段不存在就收起，不展示空值。
+- 数据字段使用稳定 ID，不用展示文案做业务判断。
 - 大量结果必须提供收敛机制。
 
 ## 7. 维护规则
@@ -123,6 +131,7 @@ Coremail 当前最重要的原则：
 - 是否有对应 feature 文档。
 - 是否影响通用组件。
 - 是否影响信息架构。
+- 是否需要新增或修改数据模型。
 - 是否违反设计反模式。
 
 ### 7.2 修改文案前
@@ -143,6 +152,15 @@ Coremail 当前最重要的原则：
 - 是否已有同类组件规则。
 - 是否能在宽屏和窄屏稳定工作。
 
+### 7.4 修改数据字段前
+
+先检查：
+
+- 字段是否属于持久化业务数据。
+- 字段是否已有同义字段。
+- 字段是否应该使用稳定 ID。
+- 字段是否影响搜索、筛选、权限或来源展示。
+
 ## 8. 文档命名规则
 
 基础文档放在 `docs/` 根目录：
@@ -150,6 +168,7 @@ Coremail 当前最重要的原则：
 - `product.md`
 - `design.md`
 - `information-architecture.md`
+- `data-model.md`
 - `components.md`
 
 具体功能文档放在 `docs/features/`：
@@ -158,4 +177,6 @@ Coremail 当前最重要的原则：
 - `mail-search.md`
 - `shared-permission.md`
 
-历史方案或迁移文档可以暂时保留在 `docs/` 根目录，但新功能优先进入 `docs/features/`。
+归档文档放在 `docs/archive/`：
+
+- `shared-permission-spec.md`

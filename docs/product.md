@@ -295,6 +295,7 @@ Coremail 主要解决以下问题。
 - `docs/product.md`：定义产品方向和边界。
 - `docs/design.md`：定义设计原则、页面密度、交互风格和反模式。
 - `docs/information-architecture.md`：定义导航、模块和页面层级。
+- `docs/data-model.md`：定义核心实体、字段语义和对象关系。
 - `docs/components.md`：定义通用组件规则。
 - `docs/features/*.md`：定义具体功能交互规格。
 

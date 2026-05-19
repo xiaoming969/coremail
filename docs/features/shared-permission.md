@@ -1,6 +1,6 @@
 # 共享权限功能规格
 
-本文档定义 Coremail 日历模块中共享权限的产品语义、入口、交互、文案和验收规则。它是 `docs/shared-permission-spec.md` 的结构化功能规格版，后续实现和评审优先引用本文。
+本文档定义 Coremail 日历模块中共享权限的产品语义、入口、交互、文案和验收规则。它是 `docs/archive/shared-permission-spec.md` 的结构化功能规格版，后续实现和评审优先引用本文。
 
 上游依据：
 
