@@ -1391,6 +1391,10 @@ function WeekView({
                               const isInteracting = interaction?.eventId === event.id;
                               const density = getTimedEventCardDensity({ isSplit: true, columnCount: layout.columnCount, durationH: safeDuration });
                               const showSecondary = density === 'regular' && safeDuration >= 1.25;
+                              const compactTimeLabel =
+                                safeDuration > 0.5
+                                  ? `${formatHour(safeStartH)}–${formatHour(safeStartH + safeDuration)}`
+                                  : formatHour(safeStartH);
 
                               return (
 	                                <div
@@ -1447,12 +1451,16 @@ function WeekView({
                                     </div>
                                   ) : (
                                     <div className={`flex h-full min-w-0 flex-col pl-1 ${statusBadgeMeta ? 'pr-7' : ''}`}>
-                                      <div className={`text-[11px] font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''}`} style={clampLinesStyle(2)}>
+                                      <div
+                                        className={`min-w-0 text-[11px] font-bold leading-tight ${density === 'regular' ? '' : 'truncate'} ${
+                                          event.status === '已取消' ? 'line-through' : ''
+                                        }`}
+                                        style={density === 'regular' ? clampLinesStyle(2) : undefined}
+                                      >
                                         {title}
                                       </div>
-                                      <div className="mt-0.5 text-[10px] font-semibold leading-tight opacity-80">
-                                        {formatHour(safeStartH)}
-                                        {safeDuration > 0.5 ? `–${formatHour(safeStartH + safeDuration)}` : ''}
+                                      <div className="mt-0.5 min-w-0 truncate text-[10px] font-semibold leading-tight opacity-80">
+                                        {compactTimeLabel}
                                       </div>
                                       {showSecondary && (
                                         <div className="mt-0.5 truncate text-[10px] font-medium opacity-60">{getEventSecondaryLine(event, calendar)}</div>
@@ -1615,7 +1623,7 @@ function WeekView({
                               onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
-                              title={`${event.title}${account ? ` · ${account.email || account.name}` : ''}`}
+                              title={event.title}
                               className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container} ${
                                 flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                               }`}
@@ -1744,6 +1752,7 @@ function WeekView({
                               const useCompactCard = cardDensity !== 'regular';
                               const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
                               const statusSurface = getTimedEventStatusSurface(event.status);
+                              const compactTimeLabel = `${formatHour(safeStartH)}–${formatHour(safeStartH + safeDuration)}`;
 
                               return (
 	                                <div
@@ -1765,7 +1774,7 @@ function WeekView({
                                   onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                                   onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                   onMouseLeave={() => onHidePreview(event.id)}
-                                  title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
+                                  title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}`}
                                   className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                                     editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                                   } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'} ${
@@ -1808,18 +1817,16 @@ function WeekView({
                                     <div className={`flex flex-col h-full min-w-0 ${statusBadgeMeta ? 'pr-9' : ''} pl-1`}>
                                       {showAccountLabel && !useCompactCard && account && <div className="text-[10px] font-black opacity-60 truncate">{account.email || account.name}</div>}
                                       <div
-                                        className={`mb-1 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
-                                          useCompactCard ? 'text-[11px] break-words' : 'text-[12px] break-words'
+                                        className={`mb-1 min-w-0 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
+                                          useCompactCard ? 'truncate text-[11px]' : 'text-[12px]'
                                         }`}
-                                        style={clampLinesStyle(cardDensity === 'micro' ? 2 : 2)}
+                                        style={useCompactCard ? undefined : clampLinesStyle(2)}
                                       >
                                         {visibleTitle}
                                       </div>
                                       {useCompactCard ? (
-                                        <div className="mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-semibold leading-tight opacity-80">
-                                          <span className="whitespace-nowrap">{formatHour(safeStartH)}</span>
-                                          <span className="opacity-45">-</span>
-                                          <span className="whitespace-nowrap">{formatHour(safeStartH + safeDuration)}</span>
+                                        <div className="mb-1 min-w-0 truncate text-[11px] font-semibold leading-tight opacity-80">
+                                          {compactTimeLabel}
                                         </div>
                                       ) : (
                                         <div className="mb-1 flex items-center text-xs font-semibold opacity-75">
@@ -2151,6 +2158,7 @@ function DayView({
                         const useCompactCard = cardDensity !== 'regular';
                         const statusBadgeMeta = getEventStatusBadgeMeta(event.status);
                         const statusSurface = getTimedEventStatusSurface(event.status);
+                        const compactTimeLabel = `${formatHour(safeStartH)}–${formatHour(safeStartH + safeDuration)}`;
                               return (
 	                          <div
 	                            key={event.id}
@@ -2172,7 +2180,7 @@ function DayView({
                             onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                             onMouseLeave={() => onHidePreview(event.id)}
                             title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${event.location && !hiddenDetails ? ` · ${event.location}` : ''}`}
-                            className={`group absolute border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
+                            className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
                               editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
                             } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'} ${
                               flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
@@ -2213,11 +2221,17 @@ function DayView({
                             ) : (
                               <div className={`flex flex-col h-full ${useCompactCard ? 'pl-1.5' : 'pl-2'} ${statusBadgeMeta ? 'pr-9' : ''}`}>
                                 {account && !useCompactCard && <div className="text-[10px] font-black opacity-60 truncate">{account.name}</div>}
+                                <div
+                                  className={`mb-1 min-w-0 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
+                                    useCompactCard ? 'truncate text-[11px]' : 'text-sm'
+                                  }`}
+                                  style={useCompactCard ? undefined : clampLinesStyle(2)}
+                                >
+                                  {visibleTitle}
+                                </div>
                                 {useCompactCard ? (
-                                  <div className="mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[11px] font-semibold leading-tight opacity-80">
-                                    <span className="whitespace-nowrap">{formatHour(safeStartH)}</span>
-                                    <span className="opacity-45">-</span>
-                                    <span className="whitespace-nowrap">{formatHour(safeStartH + safeDuration)}</span>
+                                  <div className="mb-1 min-w-0 truncate text-[11px] font-semibold leading-tight opacity-80">
+                                    {compactTimeLabel}
                                   </div>
                                 ) : (
                                   <div className="mb-1 flex items-center text-xs font-semibold opacity-75">
@@ -2225,14 +2239,6 @@ function DayView({
                                     {formatTimeRange(safeStartH, safeDuration)}
                                   </div>
                                 )}
-                                <div
-                                  className={`mb-1 font-bold leading-tight ${event.status === '已取消' ? 'line-through' : ''} ${
-                                    useCompactCard ? 'text-[11px] break-words' : 'text-sm break-words'
-                                  }`}
-                                  style={clampLinesStyle(cardDensity === 'micro' ? 2 : 2)}
-                                >
-                                  {visibleTitle}
-                                </div>
                                 {event.location && !useCompactCard && <div className="text-xs opacity-70 truncate">{event.location}</div>}
                               </div>
                             )}
@@ -2405,7 +2411,7 @@ function MonthView({
                     onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                     onMouseLeave={() => onHidePreview(event.id)}
-                    title={`${visibleTitle}${account && !hiddenDetails ? ` · ${account.email || account.name}` : ''}`}
+                    title={visibleTitle}
                     className={`w-full rounded border px-1.5 py-1 text-left text-[11px] leading-tight ${tones.container} ${
                       flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                     }`}
@@ -2466,86 +2472,72 @@ function MonthView({
   return <div className="flex-1 min-h-0 overflow-auto bg-gray-50 p-4 md:p-6">{renderMonthGrid(events, null, 'overlay', 0)}</div>;
 }
 
-function EventPreviewCard({ event, calendar, account, x, y, mode = 'hover', label = '快速预览' }) {
+function EventPreviewCard({
+  event,
+  calendar,
+  account,
+  x,
+  y,
+  mode = 'hover',
+  label = '',
+  onMouseEnter,
+  onMouseLeave,
+  onOpenEvent,
+  onJoinEvent,
+}) {
   if (!event) return null;
 
   const isBusyOnly = event.type === 'busy_only';
   const isCancelled = event.status === '已取消';
-  const attendees = event.attendees || [];
   const title = isBusyOnly ? '忙碌' : event.title || '无标题';
+  const organizer = !isBusyOnly ? event.organizer || account?.name || '' : '';
+  const isRecurring = !isBusyOnly && event.repeat && event.repeat !== 'does_not_repeat';
+  const joinable = !isBusyOnly && canJoinCalendarEvent(event);
 
   return (
     <div
-      className="fixed pointer-events-none z-[70] w-80 max-w-[calc(100vw-32px)]"
+      className="pointer-events-none fixed z-[70] w-80 max-w-[calc(100vw-32px)]"
       style={{ top: `${y}px`, left: `${x}px` }}
     >
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div
+        className="pointer-events-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
         <div className="border-b border-slate-100 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <div className={`mt-1 h-2.5 w-2.5 rounded-full ${calendar?.color || 'bg-gray-400'}`}></div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">
-                  {label}
-                </span>
-                {account && (
-                  <span className="truncate text-[11px] font-bold text-gray-400">{account.name}</span>
-                )}
-              </div>
-              <div className={`mt-2 text-sm font-black ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                {title}
-              </div>
-              {calendar?.name && <div className="mt-1 text-xs font-semibold text-gray-500">{calendar.name}</div>}
+          {mode === 'drag' && label && (
+            <div className="mb-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+              {label}
             </div>
+          )}
+          <div className="flex min-w-0 items-start gap-2">
+            <div className={`min-w-0 flex-1 text-sm font-black leading-snug ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              {title}
+            </div>
+            {isRecurring && (
+              <RefreshCw size={14} className="mt-0.5 shrink-0 text-slate-400" aria-label="循环会议" />
+            )}
           </div>
         </div>
 
-        <div className="space-y-2 px-4 py-3 text-xs text-gray-600">
-          <div className="flex items-center font-bold text-gray-800">
-            <Clock size={12} className="mr-2 text-blue-600" />
+        <div className="space-y-2.5 px-4 py-3 text-xs text-gray-600">
+          {organizer && (
+            <div className="flex min-w-0 items-center">
+              <Users size={13} className="mr-2 shrink-0 text-slate-400" />
+              <span className="truncate">组织者：{organizer}</span>
+            </div>
+          )}
+
+          <div className="flex min-w-0 items-center font-bold text-gray-800">
+            <Clock size={13} className="mr-2 shrink-0 text-blue-600" />
             {formatEventDateTime(event)}
           </div>
 
           {event.location && !isBusyOnly && (
-            <div className="flex items-center">
-              <MapPin size={12} className="mr-2 text-emerald-600" />
+            <div className="flex min-w-0 items-center">
+              <MapPin size={13} className="mr-2 shrink-0 text-emerald-600" />
               <span className="truncate">{event.location}</span>
             </div>
-          )}
-
-          {event.organizer && !isBusyOnly && (
-            <div className="flex items-center">
-              <Users size={12} className="mr-2 text-violet-600" />
-              <span className="truncate">{event.organizer} 组织</span>
-              {attendees.length > 0 && <span className="ml-1 text-gray-400">· {attendees.length} 人</span>}
-            </div>
-          )}
-
-          {event.meetingProvider && event.meetingProvider !== 'none' && !isBusyOnly && (
-            <div className="flex items-center">
-              <Calendar size={12} className="mr-2 text-sky-600" />
-              <span>{MEETING_PROVIDER_LABELS[event.meetingProvider] || '在线会议'}</span>
-            </div>
-          )}
-
-          {event.status && !isBusyOnly && (
-            <div className="flex items-center">
-              <Bell size={12} className="mr-2 text-amber-600" />
-              <span>{event.status}</span>
-            </div>
-          )}
-
-          {!isBusyOnly && (
-            <div className="flex flex-wrap gap-2 pt-1 text-[11px] font-bold text-gray-500">
-              <span className="rounded-full bg-slate-100 px-2 py-1">{REPEAT_LABELS[event.repeat || 'does_not_repeat']}</span>
-              <span className="rounded-full bg-slate-100 px-2 py-1">{REMINDER_LABELS[event.reminder || '30m']}</span>
-            </div>
-          )}
-
-          {event.description && !isBusyOnly && (
-            <p className="pt-1 text-[12px] leading-relaxed text-gray-500" style={clampLinesStyle(2)}>
-              {event.description}
-            </p>
           )}
 
           {mode === 'drag' && (
@@ -2554,6 +2546,33 @@ function EventPreviewCard({ event, calendar, account, x, y, mode = 'hover', labe
             </div>
           )}
         </div>
+
+        {mode === 'hover' && !isBusyOnly && (
+          <div className="flex gap-2 border-t border-slate-100 px-4 py-3">
+            <button
+              type="button"
+              onClick={(entry) => {
+                entry.stopPropagation();
+                onOpenEvent?.(event.id);
+              }}
+              className="inline-flex h-8 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              查看详情
+            </button>
+            {joinable && (
+              <button
+                type="button"
+                onClick={(entry) => {
+                  entry.stopPropagation();
+                  onJoinEvent?.(event);
+                }}
+                className="inline-flex h-8 flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700"
+              >
+                加入会议
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3763,6 +3782,7 @@ function MainApp() {
   const weekTimelineScrollRef = useRef(null);
   const navToRef = useRef(null);
   const locateFlashTimerRef = useRef(null);
+  const previewCloseTimerRef = useRef(null);
 
   const accountMap = useMemo(() => Object.fromEntries(accounts.map((account) => [account.id, account])), [accounts]);
   const calendarMap = useMemo(() => Object.fromEntries(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
@@ -3785,6 +3805,9 @@ function MainApp() {
   useEffect(() => () => {
     if (locateFlashTimerRef.current) {
       window.clearTimeout(locateFlashTimerRef.current);
+    }
+    if (previewCloseTimerRef.current) {
+      window.clearTimeout(previewCloseTimerRef.current);
     }
   }, []);
 
@@ -5063,18 +5086,39 @@ function MainApp() {
     });
   };
 
+  const clearPreviewCloseTimer = () => {
+    if (!previewCloseTimerRef.current) return;
+    window.clearTimeout(previewCloseTimerRef.current);
+    previewCloseTimerRef.current = null;
+  };
+
   const showEventPreview = (entry, eventId) => {
     if (eventInteractionRef.current || !eventId) return;
     const { x, y } = getPreviewPosition(entry.clientX, entry.clientY);
-    setHoverPreview({ eventId, x, y });
+    clearPreviewCloseTimer();
+    setHoverPreview((prev) => (prev?.eventId === eventId ? prev : { eventId, x, y }));
   };
 
-  const hideEventPreview = (eventId = null) => {
-    setHoverPreview((prev) => {
+  const hideEventPreview = (eventId = null, options = {}) => {
+    clearPreviewCloseTimer();
+    const closePreview = () => setHoverPreview((prev) => {
       if (!prev) return prev;
       if (eventId && prev.eventId !== eventId) return prev;
       return null;
     });
+
+    if (eventId && !options.immediate && typeof window !== 'undefined') {
+      previewCloseTimerRef.current = window.setTimeout(closePreview, 140);
+      return;
+    }
+
+    closePreview();
+  };
+
+  const joinEventFromPreview = (event) => {
+    if (!event?.meetingLink) return;
+    hideEventPreview(event.id, { immediate: true });
+    openExternalLink(event.meetingLink, '已打开会议链接');
   };
 
   const startEventMove = (entry, event) => {
@@ -8505,6 +8549,10 @@ function MainApp() {
           account={accountMap[calendarMap[previewedEvent.calId]?.accountId]}
           x={hoverPreview.x}
           y={hoverPreview.y}
+          onMouseEnter={clearPreviewCloseTimer}
+          onMouseLeave={() => hideEventPreview(previewedEvent.id)}
+          onOpenEvent={openEventDetails}
+          onJoinEvent={joinEventFromPreview}
         />
       )}
 
