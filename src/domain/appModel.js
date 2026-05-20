@@ -1018,66 +1018,6 @@ export const formatWeekdayLabel = (date) => {
   const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
   return WEEKDAY_NAMES[dayIndex];
 };
-export const formatSuggestedSlotLabel = (date, startH, durationH, options = {}) => {
-  const includeWeekday = options.includeWeekday !== false;
-  const weekday = includeWeekday ? ` ${formatWeekdayLabel(date)}` : '';
-  return `${date.getMonth() + 1}/${date.getDate()}${weekday} ${formatTimeRange(startH, durationH)}`;
-};
-export const formatSuggestedTimeReason = ({ requiredCount = 0, optionalCount = 0, permissionLimitedCount = 0 }) => {
-  const segments = [`基于 ${requiredCount} 位必需参会者`];
-  if (optionalCount > 0) segments.push(`${optionalCount} 位可选参会者`);
-  segments.push('的工作时间和忙闲状态');
-  if (permissionLimitedCount > 0) segments.push(`其中 ${permissionLimitedCount} 位仅使用忙闲权限`);
-  return segments.join('，');
-};
-export const getSuggestedTimeStatusMeta = (suggestion, requiredCount = 0, optionalCount = 0) => {
-  if (requiredCount <= 0) {
-    return {
-      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      emphasis: '组织者可用',
-      summary: optionalCount > 0 ? `已结合 ${optionalCount} 位可选参会者的忙闲给出建议时间` : '当前时间位于组织者的工作时间内',
-    };
-  }
-  const requiredAvailable = Math.max(requiredCount - (suggestion?.requiredBusyCount || 0), 0);
-  const optionalAvailable = Math.max(optionalCount - (suggestion?.optionalBusyCount || 0), 0);
-
-  if ((suggestion?.requiredBusyCount || 0) === 0) {
-    return {
-      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      emphasis: '可直接发出',
-      summary:
-        optionalCount > 0 && (suggestion?.optionalBusyCount || 0) > 0
-          ? `全部 ${requiredCount} 位必需参会者可参加，${optionalAvailable}/${optionalCount} 位可选参会者可参加`
-          : `全部 ${requiredCount} 位必需参会者可参加${optionalCount > 0 ? `，${optionalAvailable}/${optionalCount} 位可选参会者可参加` : ''}`,
-    };
-  }
-
-  return {
-    tone: 'border-amber-200 bg-amber-50 text-amber-700',
-    emphasis: '需要协调',
-    summary: `${requiredAvailable}/${requiredCount} 位必需参会者可参加${optionalCount > 0 ? `，${optionalAvailable}/${optionalCount} 位可选参会者可参加` : ''}`,
-  };
-};
-export const SCHEDULING_INTENT_PATTERNS = [
-  /找时间/,
-  /什么时候方便/,
-  /方便沟通/,
-  /约个时间/,
-  /过一下/,
-  /一起过/,
-  /过一遍/,
-  /安排.*会议/,
-  /安排.*会/,
-  /确认.*时间/,
-  /同步.*时间/,
-  /对一下时间/,
-  /锁会/,
-  /下周.*(安排|沟通|确认)/,
-];
-export const detectSchedulingIntent = (subject = '', body = '') => {
-  const content = `${subject}\n${body}`;
-  return SCHEDULING_INTENT_PATTERNS.some((pattern) => pattern.test(content));
-};
 export const normalizeSelectionSlot = (slot) => ({
   ...slot,
   date: stripTime(slot.date),
@@ -2740,7 +2680,6 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       subject: mail.subject || '',
       body: mail.body || '',
       attachments: mail.attachments || [],
-      availabilityProposal: mail.availabilityProposal || null,
     };
   }
 
@@ -2753,7 +2692,6 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       subject: '',
       body: '',
       attachments: [],
-      availabilityProposal: null,
     };
   }
 
@@ -2768,7 +2706,6 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       subject: ensureSubjectPrefix(mail.subject, 'RE'),
       body: quoteBody,
       attachments: [],
-      availabilityProposal: null,
     };
   }
 
@@ -2781,7 +2718,6 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       subject: ensureSubjectPrefix(mail.subject, 'RE'),
       body: quoteBody,
       attachments: [],
-      availabilityProposal: null,
     };
   }
 
@@ -2793,6 +2729,5 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
     subject: ensureSubjectPrefix(mail.subject, 'FW'),
     body: `请查收以下转发内容。${quoteBody}`,
     attachments: mail.attachments || [],
-    availabilityProposal: null,
   };
 };

@@ -104,7 +104,6 @@ Calendar 1 -> N CalendarShare
 ShareInvitation -> Calendar 或待创建共享日历
 Mail 0/1 -> Event
 MailDraft -> Mail
-AvailabilityProposal -> Mail 或 MailDraft
 ```
 
 业务解释：
@@ -526,9 +525,6 @@ startAt + endAt + timezone
 | `attachments` | Attachment[] | 否 | 附件 |
 | `timestamp` | number | 是 | 邮件时间 |
 | `linkedEventId` | string | 否 | 关联日程 ID |
-| `availabilityProposal` | AvailabilityProposal | 否 | 可用时间卡 |
-| `rescheduleRequestForEventId` | string | 否 | 重排请求关联日程 |
-| `rescheduleResolvedAt` | number | 否 | 重排处理时间 |
 
 ### 15.2 `folder`
 
@@ -573,7 +569,6 @@ startAt + endAt + timezone
 | `subject` | string | 否 | 主题 |
 | `body` | string | 否 | 正文 |
 | `attachments` | Attachment[] | 否 | 附件 |
-| `availabilityProposal` | AvailabilityProposal | 否 | 可用时间卡 |
 
 ### 16.2 收件人格式
 
@@ -591,47 +586,11 @@ a@example.com; b@example.com
 
 展示层仍可接受用户粘贴的分隔字符串。
 
-## 17. AvailabilityProposal
-
-可用时间卡用于从邮件中插入候选时间或确认会议时间。
-
-### 17.1 字段
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `id` | string | 是 | 可用时间卡 ID |
-| `accountId` | string | 是 | 创建账号 |
-| `createdByAccountId` | string | 否 | 创建人账号 |
-| `status` | string | 是 | 状态 |
-| `slots` | AvailabilitySlot[] | 是 | 候选时间 |
-| `confirmedSlotId` | string | 否 | 已确认时间 ID |
-
-### 17.2 AvailabilitySlot
-
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `id` | string | 是 | 候选时间 ID |
-| `dateMs` | number | 是 | 日期时间戳 |
-| `startH` | number | 是 | 开始小时 |
-| `durationH` | number | 是 | 持续小时数 |
-| `summary` | string | 否 | 可读说明 |
-
-### 17.3 状态
-
-推荐取值：
-
-- `draft`
-- `sent`
-- `confirmed`
-- `removed`
-
-可用时间卡是邮件能力，不应替代日历忙闲模型。
-
-## 18. SearchResult
+## 17. SearchResult
 
 搜索结果通常是派生对象，不应作为持久化实体。
 
-### 18.1 CalendarSearchResult
+### 17.1 CalendarSearchResult
 
 字段：
 
@@ -643,7 +602,7 @@ a@example.com; b@example.com
 | `sourceLabel` | string | 跨账号来源展示 |
 | `match` | SearchMatch | 匹配信息 |
 
-### 18.2 MailSearchResult
+### 17.2 MailSearchResult
 
 建议字段：
 
@@ -655,7 +614,7 @@ a@example.com; b@example.com
 | `sourceLabel` | string | 跨账号来源展示 |
 | `match` | SearchMatch | 匹配信息 |
 
-### 18.3 SearchMatch
+### 17.3 SearchMatch
 
 建议字段：
 
@@ -670,7 +629,7 @@ a@example.com; b@example.com
 - 普通搜索结果页不展示“命中来源”文案。
 - `matchedFields` 只用于决定是否展示正文片段或附件信息。
 
-## 19. UI State
+## 18. UI State
 
 以下属于界面状态，不应作为核心业务实体：
 
@@ -690,7 +649,7 @@ a@example.com; b@example.com
 - 不应污染业务实体字段。
 - 不应依赖 UI state 判断权限。
 
-## 20. Mock 数据规则
+## 19. Mock 数据规则
 
 当前 demo 使用 mock 数据。
 
@@ -707,7 +666,7 @@ a@example.com; b@example.com
 - 用展示文案代替稳定 ID。
 - 把 UI 状态写进 mock 实体。
 
-## 21. 数据模型检查清单
+## 20. 数据模型检查清单
 
 新增或修改字段前，检查：
 

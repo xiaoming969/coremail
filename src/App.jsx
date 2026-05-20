@@ -47,7 +47,6 @@ import {
   X,
 } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import AvailabilityProposalCard from './features/mail/AvailabilityProposalCard.jsx';
 import {
   DAY_MS,
   TODAY_DATE,
@@ -156,10 +155,6 @@ import {
   stripMailSubjectPrefixes,
   buildConferenceLink,
   formatMailTime,
-  formatSuggestedSlotLabel,
-  formatSuggestedTimeReason,
-  getSuggestedTimeStatusMeta,
-  detectSchedulingIntent,
   normalizeSelectionSlot,
   selectionMatchesSlot,
   buildTimedEventLayout,
@@ -187,7 +182,6 @@ import {
 
 const CalendarSearchResults = lazy(() => import('./features/calendarSearch/CalendarSearchResults.jsx'));
 const MailComposerModal = lazy(() => import('./features/mail/MailComposerModal.jsx'));
-const AvailabilityProposalModal = lazy(() => import('./features/mail/AvailabilityProposalModal.jsx'));
 
 function ProductActiveIcon({ id, size = 20 }) {
   const commonProps = {
@@ -436,18 +430,12 @@ function MailWorkspace({
   onOpenLinkedEvent,
   onToggleUnreadOnly,
   onSetMailFocusTab,
-  onOpenAvailabilityPicker,
-  onConfirmAvailabilitySlot,
-  rescheduleSuggestions,
-  onOpenReschedule,
-  onApplyRescheduleSuggestion,
   upcomingEvents,
   linkedEventLookup,
   accountMap,
   calendarMap,
   onOpenEvent,
 }) {
-  const selectedMailHasSchedulingIntent = detectSchedulingIntent(selectedMail?.subject || '', selectedMail?.body || '');
   const selectedLinkedEvent = selectedMail?.linkedEventId ? linkedEventLookup[selectedMail.linkedEventId] || null : null;
 
   return (
@@ -541,11 +529,6 @@ function MailWorkspace({
                             附件 {mail.attachments.length}
                           </span>
                         )}
-                        {mail.availabilityProposal && (
-                          <span className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-black">
-                            可用时间卡
-                          </span>
-                        )}
                         {linkedEvent?.status === '已取消' && (
                           <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[11px] font-black">Cancel</span>
                         )}
@@ -554,11 +537,6 @@ function MailWorkspace({
                         )}
                         {linkedEvent?.status === '待响应' && (
                           <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[11px] font-black">待响应</span>
-                        )}
-                        {mail.rescheduleRequestForEventId && !mail.rescheduleResolvedAt && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-black">
-                            待重排
-                          </span>
                         )}
                         {mail.linkedEventId && (
                           <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-black">关联日程</span>
@@ -640,14 +618,6 @@ function MailWorkspace({
                         <Archive size={15} className="mr-2" />
                         存档
                       </button>
-                      {selectedMailHasSchedulingIntent && !selectedMail.availabilityProposal && (
-                        <button
-                          onClick={() => onOpenAvailabilityPicker(selectedMail.id)}
-                          className="px-3 py-2 rounded-xl bg-white border border-blue-200 text-sm font-bold text-blue-700"
-                        >
-                          插入可用时间
-                        </button>
-                      )}
                       <button onClick={() => onScheduleFromMail(selectedMail.id)} className="px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-sm font-bold text-blue-700">
                         生成日程
                       </button>
@@ -656,64 +626,6 @@ function MailWorkspace({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-6">
-              {selectedMailHasSchedulingIntent && !selectedMail.availabilityProposal && (
-                <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-	                    <div className="text-sm font-semibold text-blue-900">识别到排期需求</div>
-                    <button
-                      onClick={() => onOpenAvailabilityPicker(selectedMail.id)}
-                      className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                    >
-                      插入可用时间
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedMail.availabilityProposal && (
-                <div className="mb-6">
-                  <AvailabilityProposalCard
-                    proposal={selectedMail.availabilityProposal}
-                    onPickSlot={(slotId) => onConfirmAvailabilitySlot(selectedMail.id, slotId)}
-                  />
-                </div>
-              )}
-
-              {selectedMail.rescheduleRequestForEventId && !selectedMail.rescheduleResolvedAt && (
-                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="text-sm font-semibold text-amber-900">邀请被拒绝</div>
-                    </div>
-                    <button
-                      onClick={() => onOpenReschedule(selectedMail.rescheduleRequestForEventId)}
-                      className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
-                    >
-                      寻找新时间
-                    </button>
-                  </div>
-
-                  {rescheduleSuggestions.length > 0 && (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {rescheduleSuggestions.map((suggestion, index) => (
-                        <button
-                          key={`${selectedMail.rescheduleRequestForEventId}-${index}`}
-                          onClick={() => onApplyRescheduleSuggestion(selectedMail.rescheduleRequestForEventId, suggestion)}
-                          className="rounded-lg border border-white/80 bg-white px-3 py-2 text-left transition hover:border-amber-300"
-                        >
-                          <div className="text-sm font-semibold text-slate-900">
-                            {formatSuggestedSlotLabel(suggestion.date, suggestion.startH, suggestion.durationH)}
-                          </div>
-                          <div className="mt-1 text-[11px] text-slate-500">
-                            {suggestion.requiredBusyCount === 0 ? '可直接全员更新' : `仍有 ${suggestion.requiredBusyCount} 位必需参会者冲突`}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {selectedLinkedEvent?.status === '已取消' && (
                 <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3004,7 +2916,7 @@ function CalendarPermissionModal({
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-[760px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="w-[760px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
           <div>
             <div className="text-lg font-black text-gray-900">共享权限</div>
@@ -3014,7 +2926,7 @@ function CalendarPermissionModal({
             <X size={18} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto max-h-[72vh] space-y-4">
+        <div className="p-6 overflow-y-auto max-h-[calc(70vh-88px)] space-y-4">
           <div className="text-sm font-black text-gray-900">我共享给了谁</div>
           <ShareMemberComposer existingShares={visibleShares} onAdd={onAddShare} />
 
@@ -3105,7 +3017,7 @@ function MailboxPermissionModal({
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-[760px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="w-[760px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
           <div className="flex min-w-0 items-center gap-3">
             <span className={`h-4 w-4 shrink-0 rounded-full ${account.color || 'bg-blue-500'}`}></span>
@@ -3118,7 +3030,7 @@ function MailboxPermissionModal({
             <X size={18} />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto max-h-[72vh] space-y-5">
+        <div className="p-6 overflow-y-auto max-h-[calc(70vh-88px)] space-y-5">
 
           {activeTab === 'settings' && (
             <div className="space-y-7">
@@ -3395,7 +3307,7 @@ function AddSharedCalendarModal({
     <>
       <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
         <div
-          className="flex max-h-[88vh] w-[820px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+          className="flex max-h-[70vh] w-[820px] max-w-[92vw] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
@@ -3535,7 +3447,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
-      <div className="w-[560px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="w-[560px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className={`h-4 w-4 shrink-0 rounded-full ${calendar.color || account?.color || 'bg-gray-400'}`}></span>
@@ -3549,7 +3461,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
           </button>
         </div>
 
-        <div className="max-h-[72vh] overflow-y-auto p-6">
+        <div className="max-h-[calc(70vh-88px)] overflow-y-auto p-6">
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
@@ -3585,7 +3497,7 @@ function ReminderModal({ open, onClose, pendingEvents, upcomingEvents, accountMa
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
       <div
-        className="w-[720px] max-w-[92vw] max-h-[88vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+        className="w-[720px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
@@ -3595,7 +3507,7 @@ function ReminderModal({ open, onClose, pendingEvents, upcomingEvents, accountMa
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[72vh] space-y-6">
+        <div className="p-6 overflow-y-auto max-h-[calc(70vh-88px)] space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
 	              <div className="text-xs font-black text-orange-700 uppercase">待响应邀请</div>
@@ -3818,13 +3730,6 @@ function MainApp() {
     mode: 'new',
     sourceMailId: null,
     draft: buildMailDraft({ fallbackAccountId: MOCK_ACCOUNTS[0]?.id }),
-  });
-  const [availabilityPicker, setAvailabilityPicker] = useState({
-    open: false,
-    source: 'composer',
-    mailId: null,
-    accountId: MOCK_ACCOUNTS[0]?.id || 'acc1',
-    selectedSlotIds: [],
   });
   const [timeSelection, setTimeSelection] = useState(null);
   const [isSelectingTime, setIsSelectingTime] = useState(false);
@@ -4186,63 +4091,6 @@ function MainApp() {
   const draftConflicts = useMemo(() => {
     return collectSlotConflicts(draftForm.date, draftForm.startH, draftForm.durationH, draftRelevantAccountIds, draftForm.eventId);
   }, [calendarMap, draftForm.date, draftForm.durationH, draftForm.eventId, draftForm.startH, draftRelevantAccountIds, events]);
-  const scheduleSuggestions = useMemo(() => {
-    const maxStart = Math.max(WORK_START_HOUR, WORK_END_HOUR - draftForm.durationH);
-    const requiredSet = new Set(draftRequiredAccountIds);
-    const optionalSet = new Set(draftOptionalAccountIds);
-    const relevantAccountIds = new Set(draftRelevantAccountIds);
-    const candidates = [];
-    const privacyLimitedCount = draftRelevantAccountIds.filter((accountId) => getAccountPermissionMode(accountId) === 'busy_only').length;
-
-    for (let dayOffset = 0; dayOffset < 5; dayOffset += 1) {
-      const date = addDays(draftForm.date, dayOffset);
-      const day = date.getDay();
-      if (day === 0 || day === 6) continue;
-
-      for (let startH = WORK_START_HOUR; startH <= maxStart; startH += HALF_HOUR_STEP) {
-        const conflicts = collectSlotConflicts(date, startH, draftForm.durationH, draftRelevantAccountIds, draftForm.eventId);
-        const requiredConflicts = conflicts.filter((event) => requiredSet.has(event.accountId));
-        const optionalConflicts = conflicts.filter((event) => optionalSet.has(event.accountId));
-        const requiredBusyCount = new Set(requiredConflicts.map((event) => event.accountId)).size;
-        const optionalBusyCount = new Set(optionalConflicts.map((event) => event.accountId)).size;
-
-        candidates.push({
-          date,
-          dayOffset,
-          startH,
-          conflicts,
-          requiredBusyCount,
-          optionalBusyCount,
-          privacyLimitedCount,
-          distance: dayOffset * 24 + Math.abs(startH - draftForm.startH),
-          matchedRequiredCount: Math.max(draftRequiredAccountIds.length - requiredBusyCount, 0),
-          matchedOptionalCount: Math.max(draftOptionalAccountIds.length - optionalBusyCount, 0),
-        });
-      }
-    }
-
-    return candidates
-      .sort(
-        (left, right) =>
-          left.requiredBusyCount - right.requiredBusyCount ||
-          left.optionalBusyCount - right.optionalBusyCount ||
-          left.dayOffset - right.dayOffset ||
-          left.distance - right.distance ||
-          left.startH - right.startH,
-      )
-      .slice(0, 5);
-  }, [
-    calendarMap,
-    draftForm.date,
-    draftForm.durationH,
-    draftForm.eventId,
-    draftForm.startH,
-    draftOptionalAccountIds,
-    draftRelevantAccountIds,
-    draftRequiredAccountIds,
-    events,
-  ]);
-  const bestScheduleSuggestion = scheduleSuggestions[0] || null;
   const currentSlotAccountStates = useMemo(
     () =>
       draftRelevantAccounts.map((account) => {
@@ -4259,77 +4107,6 @@ function MainApp() {
       }),
     [calendarMap, draftForm.date, draftForm.durationH, draftForm.eventId, draftForm.startH, draftRelevantAccounts, draftRequiredAccountIds, events],
   );
-  const buildPersonalAvailabilityCandidates = (accountId, baseDate = TODAY_DATE, limit = 8) => {
-    if (!accountId) return [];
-    const slots = [];
-
-    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
-      const date = addDays(stripTime(baseDate), dayOffset);
-      const weekday = date.getDay();
-      if (weekday === 0 || weekday === 6) continue;
-
-      for (let startH = 9; startH <= 16; startH += 1) {
-        const conflicts = collectSlotConflicts(date, startH, 1, [accountId], null);
-        if (conflicts.length > 0) continue;
-        slots.push({
-          id: `${accountId}-${formatDateLabel(date)}-${startH}`,
-          dateMs: date.getTime(),
-          startH,
-          durationH: 1,
-          summary: '工作时间内空闲，可直接分享',
-        });
-        if (slots.length >= limit) return slots;
-      }
-    }
-
-    return slots;
-  };
-  const buildRescheduleSuggestions = (event) => {
-    if (!event) return [];
-    const optionalParticipants = event.optionalAttendees || [];
-    const requiredIds = Array.from(
-      new Set([
-        ...(calendarMap[event.calId]?.accountId ? [calendarMap[event.calId].accountId] : []),
-        ...resolveParticipantAccountIds([event.organizer, ...(event.attendees || [])]),
-      ]),
-    );
-    const optionalIds = resolveParticipantAccountIds(optionalParticipants).filter((accountId) => !requiredIds.includes(accountId));
-    const candidates = [];
-    const durationH = event.durationH || 1;
-    const startDate = stripTime(eventToDate(event));
-    const maxStart = Math.max(WORK_START_HOUR, WORK_END_HOUR - durationH);
-
-    for (let dayOffset = 0; dayOffset < 5; dayOffset += 1) {
-      const date = addDays(startDate, dayOffset);
-      const weekday = date.getDay();
-      if (weekday === 0 || weekday === 6) continue;
-
-      for (let startH = WORK_START_HOUR; startH <= maxStart; startH += HALF_HOUR_STEP) {
-        if (sameDay(date, startDate) && Math.abs(startH - (event.startH || 0)) < 0.01) continue;
-        const conflicts = collectSlotConflicts(date, startH, durationH, [...requiredIds, ...optionalIds], event.id);
-        const requiredBusyCount = new Set(conflicts.filter((entry) => requiredIds.includes(entry.accountId)).map((entry) => entry.accountId)).size;
-        const optionalBusyCount = new Set(conflicts.filter((entry) => optionalIds.includes(entry.accountId)).map((entry) => entry.accountId)).size;
-        candidates.push({
-          date,
-          startH,
-          durationH,
-          requiredBusyCount,
-          optionalBusyCount,
-          distance: dayOffset * 24 + Math.abs(startH - (event.startH || WORK_START_HOUR)),
-        });
-      }
-    }
-
-    return candidates
-      .sort(
-        (left, right) =>
-          left.requiredBusyCount - right.requiredBusyCount ||
-          left.optionalBusyCount - right.optionalBusyCount ||
-          left.distance - right.distance ||
-          left.startH - right.startH,
-      )
-      .slice(0, 3);
-  };
   const editableCalendars = useMemo(() => calendars.filter((calendar) => canEditCalendarContent(calendar)), [calendars]);
   const draftAccountCalendars = useMemo(
     () => editableCalendars.filter((calendar) => calendar.accountId === draftAccountInfo?.id),
@@ -4351,23 +4128,6 @@ function MainApp() {
     [accountDisplayMode, activeAccounts, splitAccounts],
   );
   const effectiveAccountDisplayMode = activeAccounts.length > 1 ? accountDisplayMode : 'overlay';
-  const availabilityPickerAccount = accountMap[availabilityPicker.accountId] || null;
-  const availabilityPickerCandidates = useMemo(
-    () => buildPersonalAvailabilityCandidates(availabilityPicker.accountId, TODAY_DATE, 8),
-    [availabilityPicker.accountId, events, calendars],
-  );
-  const selectedMailRescheduleEvent = useMemo(
-    () => events.find((event) => event.id === selectedMail?.rescheduleRequestForEventId) || null,
-    [events, selectedMail],
-  );
-  const selectedMailRescheduleSuggestions = useMemo(
-    () => buildRescheduleSuggestions(selectedMailRescheduleEvent),
-    [selectedMailRescheduleEvent, events, calendars, accounts],
-  );
-  const selectedEventRescheduleSuggestions = useMemo(
-    () => buildRescheduleSuggestions(selectedEvent?.status === '已拒绝' ? selectedEvent : null),
-    [selectedEvent, events, calendars, accounts],
-  );
   const calendarSearchResults = useMemo(() => {
     if (!normalizedCalendarSearch) return [];
 
@@ -5538,7 +5298,6 @@ function MainApp() {
 
   const closeMailComposer = () => {
     setMailComposer((prev) => ({ ...prev, open: false }));
-    if (availabilityPicker.open) closeAvailabilityPicker();
   };
 
   const patchMailComposer = (patch) => {
@@ -5591,177 +5350,6 @@ function MainApp() {
     }));
   };
 
-  const openAvailabilityPicker = (source = 'composer', mailId = null) => {
-    const sourceMail = mailId ? mails.find((mail) => mail.id === mailId) : null;
-    const accountId =
-      source === 'composer'
-        ? mailComposer.draft.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1'
-        : sourceMail?.accountId || selectedMail?.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
-    const seededCandidates = buildPersonalAvailabilityCandidates(accountId, TODAY_DATE, 6);
-
-    setAvailabilityPicker({
-      open: true,
-      source,
-      mailId: mailId || sourceMail?.id || selectedMail?.id || null,
-      accountId,
-      selectedSlotIds: seededCandidates.slice(0, 3).map((slot) => slot.id),
-    });
-  };
-
-  const closeAvailabilityPicker = () => {
-    setAvailabilityPicker((prev) => ({ ...prev, open: false, selectedSlotIds: [] }));
-  };
-
-  const toggleAvailabilityPickerSlot = (slotId) => {
-    setAvailabilityPicker((prev) => {
-      const current = prev.selectedSlotIds.includes(slotId)
-        ? prev.selectedSlotIds.filter((id) => id !== slotId)
-        : [...prev.selectedSlotIds, slotId].slice(0, 5);
-      return {
-        ...prev,
-        selectedSlotIds: current,
-      };
-    });
-  };
-
-  const applyAvailabilityProposal = () => {
-    const selectedSlots = availabilityPickerCandidates.filter((slot) => availabilityPicker.selectedSlotIds.includes(slot.id)).slice(0, 5);
-    if (selectedSlots.length === 0) return;
-
-    const proposal = {
-      id: `avail-${Date.now()}`,
-      createdByAccountId: availabilityPicker.accountId,
-      status: 'open',
-      confirmedSlotId: null,
-      lockedEventId: null,
-      reason: '',
-      privacyNote: '',
-      slots: selectedSlots,
-    };
-
-    if (availabilityPicker.source === 'composer') {
-      patchMailComposer({ availabilityProposal: proposal });
-    } else {
-      const sourceMail = mails.find((mail) => mail.id === availabilityPicker.mailId) || selectedMail;
-      const fallbackAccountId = sourceMail?.accountId || availabilityPicker.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
-      setMailComposer({
-        open: true,
-        mode: 'reply',
-        sourceMailId: sourceMail?.id || null,
-        draft: {
-          ...buildMailDraft({
-            mode: 'reply',
-            mail: sourceMail,
-            fallbackAccountId,
-          }),
-          accountId: fallbackAccountId,
-          availabilityProposal: proposal,
-        },
-      });
-      setActiveProduct('mail');
-      if (sourceMail?.id) setSelectedMailId(sourceMail.id);
-    }
-
-    closeAvailabilityPicker();
-    triggerFeedback('L3', {
-      msg: '已插入可用时间卡片',
-      icon: <Clock size={16} />,
-      color: 'bg-blue-600',
-    });
-  };
-
-  const removeComposerAvailabilityProposal = () => {
-    patchMailComposer({ availabilityProposal: null });
-  };
-
-  const confirmAvailabilityProposalSlot = (mailId, slotId) => {
-    const sourceMail = mails.find((mail) => mail.id === mailId);
-    const proposal = sourceMail?.availabilityProposal;
-    const slot = proposal?.slots?.find((item) => item.id === slotId);
-    if (!sourceMail || !proposal || !slot) return;
-
-    const accountId = proposal.createdByAccountId || sourceMail.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
-    const targetCalendarId =
-      getDefaultEditableCalendarId(calendars, [accountId], accountId) ||
-      getDefaultEditableCalendarId(calendars, activeAccountIds, accountId);
-    const targetCalendar = calendars.find((calendar) => calendar.id === targetCalendarId) || calendars[0];
-    const account = accountMap[accountId] || accounts[0];
-    const date = stripTime(new Date(slot.dateMs));
-    const parts = dateToEventParts(date);
-    const title = stripMailSubjectPrefixes(sourceMail.subject) || '邮件沟通同步';
-    const attendees = Array.from(
-      new Set([sourceMail.fromEmail, ...(sourceMail.to || []), ...(sourceMail.cc || [])].filter(Boolean)),
-    ).filter((person) => person !== (account?.email || ''));
-    const optionalAttendees = Array.from(new Set(sourceMail.cc || [])).filter(Boolean);
-    const nextEventId = `e${Date.now()}`;
-    const payload = {
-      id: nextEventId,
-      title,
-      day: parts.day,
-      weekOffset: parts.weekOffset,
-      startH: slot.startH,
-      durationH: slot.durationH,
-      calId: targetCalendar?.id || '',
-      location: '',
-      organizer: account?.email || targetCalendar?.owner || '我',
-      status: '待响应',
-      description: `来自邮件中的可用时间确认。\n\n原邮件主题：${sourceMail.subject}\n确认时间：${formatSuggestedSlotLabel(date, slot.startH, slot.durationH)}`,
-      type: 'normal',
-      attendees,
-      kind: 'event',
-      meetingProvider: 'none',
-      meetingLink: '',
-      optionalAttendees,
-      repeat: 'does_not_repeat',
-      reminder: '30m',
-      availability: 'busy',
-      visibility: 'default',
-      attachments: [],
-    };
-    const confirmationMail = {
-      id: `mail-${Date.now()}`,
-      accountId,
-      folder: 'sent',
-      category: 'focused',
-      unread: false,
-      starred: false,
-      subject: `已确认时间：${title}`,
-      fromName: account?.name || '我',
-      fromEmail: account?.email || 'me@calendarpro.io',
-      to: Array.from(new Set([sourceMail.fromEmail, ...(sourceMail.to || [])].filter(Boolean))),
-      cc: Array.from(new Set(sourceMail.cc || [])),
-      preview: `已确认 ${formatSuggestedSlotLabel(date, slot.startH, slot.durationH)}，系统已生成日历邀请。`,
-      body: `已确认以下时间，并已同步生成日历邀请：\n${formatSuggestedSlotLabel(date, slot.startH, slot.durationH)}\n\n如需改期，可直接在邀请或邮件里再次寻找新时间。`,
-      attachments: [],
-      timestamp: Date.now(),
-      linkedEventId: nextEventId,
-    };
-
-    setEvents((prev) => [...prev, payload]);
-    setMails((prev) => [
-      confirmationMail,
-      ...prev.map((mail) =>
-        mail.id === mailId
-          ? {
-              ...mail,
-              linkedEventId: nextEventId,
-              availabilityProposal: {
-                ...proposal,
-                status: 'confirmed',
-                confirmedSlotId: slotId,
-                lockedEventId: nextEventId,
-              },
-            }
-          : mail,
-      ),
-    ]);
-    triggerFeedback('L3', {
-      msg: '已锁定时间并生成日历邀请',
-      icon: <Check size={16} />,
-      color: 'bg-emerald-600',
-    });
-  };
-
   const saveMailComposer = (mode) => {
     const draft = mailComposer.draft;
     const to = parseRecipients(draft.to);
@@ -5789,12 +5377,11 @@ function MainApp() {
       fromEmail: account?.email || 'me@calendarpro.io',
       to,
       cc,
-      preview: draft.body.trim().split('\n').find(Boolean) || (draft.availabilityProposal ? '已插入可用时间卡片' : '(无正文)'),
+      preview: draft.body.trim().split('\n').find(Boolean) || '(无正文)',
       body: draft.body.trim(),
       attachments: draft.attachments,
       timestamp: Date.now(),
       linkedEventId: mails.find((mail) => mail.id === mailComposer.sourceMailId)?.linkedEventId || null,
-      availabilityProposal: draft.availabilityProposal || null,
     };
 
     setMails((prev) => {
@@ -6632,137 +6219,9 @@ function MainApp() {
     });
   };
 
-  const openRescheduleView = (eventId, suggestion = null) => {
-    const sourceEvent = events.find((event) => event.id === eventId);
-    if (!sourceEvent) return;
-
-    const nextDraft = buildDraftForm({
-      event: sourceEvent,
-      slot: null,
-      focusDate,
-      calendars,
-      activeAccountIds,
-    });
-
-    if (suggestion) {
-      const nextDate = stripTime(suggestion.date);
-      const parts = dateToEventParts(nextDate);
-      nextDraft.date = nextDate;
-      nextDraft.weekOffset = parts.weekOffset;
-      nextDraft.day = parts.day;
-      nextDraft.startH = suggestion.startH;
-      nextDraft.durationH = suggestion.durationH;
-      nextDraft.timeText = formatDraftTime(nextDate, suggestion.startH, suggestion.durationH);
-    }
-
-    setDraftForm(nextDraft);
-    setCreateDraft({
-      isDirty: false,
-      saveStatus: 'idle',
-      mode: 'reschedule',
-      eventId: sourceEvent.id,
-    });
-    setCreateDraftPanels(INITIAL_CREATE_DRAFT_PANELS);
-    setCreateDraftBulkInputs(INITIAL_CREATE_DRAFT_BULK_INPUTS);
-    setFocusDate(stripTime(nextDraft.date));
-    setSelectedEventId(sourceEvent.id);
-    setActiveProduct('calendar');
-    setCurrentScreen('create');
-  };
-
-  const applyRescheduleSuggestion = (eventId, suggestion) => {
-    const sourceEvent = events.find((event) => event.id === eventId);
-    if (!sourceEvent || !suggestion) return;
-
-    const nextDate = stripTime(suggestion.date);
-    const parts = dateToEventParts(nextDate);
-    const nextPatch = {
-      day: parts.day,
-      weekOffset: parts.weekOffset,
-      startH: suggestion.startH,
-      durationH: suggestion.durationH,
-      status: '待响应',
-    };
-    const organizerAccountId = calendarMap[sourceEvent.calId]?.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
-    const organizerAccount = accountMap[organizerAccountId] || accounts[0];
-    const notificationMail = {
-      id: `mail-${Date.now()}`,
-      accountId: organizerAccountId,
-      folder: 'sent',
-      category: 'focused',
-      unread: false,
-      starred: false,
-      subject: `已更新会议时间：${sourceEvent.title}`,
-      fromName: organizerAccount?.name || '我',
-      fromEmail: organizerAccount?.email || 'me@calendarpro.io',
-      to: Array.from(new Set((sourceEvent.attendees || []).filter(Boolean))),
-      cc: Array.from(new Set(sourceEvent.optionalAttendees || [])),
-      preview: `已改到 ${formatSuggestedSlotLabel(nextDate, suggestion.startH, suggestion.durationH)}，新的日历邀请将发送给所有参会者。`,
-      body: `会议已重新安排为：\n${formatSuggestedSlotLabel(nextDate, suggestion.startH, suggestion.durationH)}\n\n系统已根据最新忙闲状态完成重排，并重新向所有参会者发出邀请。`,
-      attachments: [],
-      timestamp: Date.now(),
-      linkedEventId: sourceEvent.id,
-    };
-
-    setEvents((prev) => prev.map((event) => (event.id === eventId ? { ...event, ...nextPatch } : event)));
-    setMails((prev) => [
-      notificationMail,
-      ...prev.map((mail) =>
-        mail.rescheduleRequestForEventId === eventId
-          ? {
-              ...mail,
-              unread: false,
-              linkedEventId: eventId,
-              rescheduleResolvedAt: Date.now(),
-            }
-          : mail,
-      ),
-    ]);
-    setActiveProduct('calendar');
-    setSelectedEventId(eventId);
-    setCurrentScreen('details');
-    setFocusDate(nextDate);
-    triggerFeedback('L3', {
-      msg: `已改到 ${formatSuggestedSlotLabel(nextDate, suggestion.startH, suggestion.durationH)}`,
-      icon: <RefreshCw size={16} />,
-      color: 'bg-blue-600',
-    });
-  };
-
   const handleRespondToEvent = (id, action) => {
     const nextStatus = action === 'accept' ? '已接受' : '已拒绝';
     setEvents((prev) => prev.map((event) => (event.id === id ? { ...event, status: nextStatus } : event)));
-    if (action === 'reject') {
-      const sourceEvent = events.find((event) => event.id === id);
-      if (sourceEvent) {
-        const organizerAccountId = calendarMap[sourceEvent.calId]?.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
-        const organizerAccount = accountMap[organizerAccountId] || accounts[0];
-        const responderAccount =
-          accounts.find((account) => account.email && account.email !== sourceEvent.organizer && (sourceEvent.attendees || []).includes(account.email)) ||
-          activeAccounts.find((account) => account.email && account.email !== sourceEvent.organizer) ||
-          organizerAccount;
-        const rejectionMail = {
-          id: `mail-${Date.now()}`,
-          accountId: organizerAccountId,
-          folder: 'inbox',
-          category: 'focused',
-          unread: true,
-          starred: false,
-          subject: `需要重新安排：${sourceEvent.title}`,
-          fromName: responderAccount?.name || '参会人',
-          fromEmail: responderAccount?.email || 'participant@calendarpro.io',
-          to: [sourceEvent.organizer].filter(Boolean),
-          cc: [],
-          preview: `${responderAccount?.email || responderAccount?.name || '有参会人'} 已拒绝当前邀请，建议直接寻找新时间。`,
-          body: `${responderAccount?.email || responderAccount?.name || '有参会人'} 已拒绝本次邀请。\n\n可以直接点击"寻找新时间"，系统会基于所有参会者最新的工作时间与忙闲状态重新推荐 2-3 个时间。`,
-          attachments: [],
-          timestamp: Date.now(),
-          linkedEventId: sourceEvent.id,
-          rescheduleRequestForEventId: sourceEvent.id,
-        };
-        setMails((prev) => [rejectionMail, ...prev]);
-      }
-    }
     triggerFeedback('L3', {
       msg: nextStatus,
       icon: action === 'accept' ? <Check size={16} /> : <X size={16} />,
@@ -6969,10 +6428,6 @@ function MainApp() {
       status:
         mode === 'draft' && !normalizedDraft.eventId
           ? '草稿'
-          : createDraft.mode === 'reschedule'
-          ? mode === 'send'
-            ? '待响应'
-            : selectedEvent?.status || '已拒绝'
           : normalizedDraft.eventId
             ? selectedEvent?.status || '已接受'
             : '已接受',
@@ -7015,14 +6470,10 @@ function MainApp() {
     triggerFeedback('L3', {
       msg:
         mode === 'send'
-          ? createDraft.mode === 'reschedule'
-            ? `已重新安排到 ${selectedCalendar?.name || '目标日历'}${successDetail}`
-            : createDraft.mode === 'edit'
+          ? createDraft.mode === 'edit'
             ? `已更新 ${selectedCalendar?.name || '目标日历'}${successDetail}`
             : `已创建到 ${selectedCalendar?.name || '目标日历'}${successDetail}`
-          : createDraft.mode === 'reschedule'
-            ? '改期待确认'
-            : createDraft.mode === 'edit'
+          : createDraft.mode === 'edit'
             ? `草稿已更新 · ${selectedCalendar?.name || '目标日历'}`
             : `已保存为草稿 · ${selectedCalendar?.name || '目标日历'}`,
       icon: <Check size={16} />,
@@ -7044,16 +6495,11 @@ function MainApp() {
   const createDraftSpansMultipleDays = !sameDay(draftForm.date, draftEndMeta.date);
   const createDraftScheduleTone =
     draftConflicts.length > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  const createDraftPermissionLimitedCount = currentSlotAccountStates.filter((state) => state.permissionMode === 'busy_only').length;
   const createDraftInviteeCount = draftForm.attendees.length + (draftForm.optionalAttendees || []).length;
   const createDraftLargeAudience = createDraftInviteeCount >= 20;
   const createDraftMassAudience = createDraftInviteeCount >= 80;
   const createDraftRequiredMatchedCount = draftMatchedRequiredParticipantIds.length;
   const createDraftOptionalMatchedCount = draftMatchedOptionalParticipantIds.length;
-  const createDraftScopeRequiredCount = currentSlotAccountStates.filter((state) => state.scope === 'required').length;
-  const createDraftScopeOptionalCount = currentSlotAccountStates.filter((state) => state.scope === 'optional').length;
-  const createDraftMatchedInviteeCount = createDraftRequiredMatchedCount + createDraftOptionalMatchedCount;
-  const createDraftUnmatchedInviteeCount = Math.max(createDraftInviteeCount - createDraftMatchedInviteeCount, 0);
   const createDraftRequiredUnmatchedCount = Math.max(draftForm.attendees.length - createDraftRequiredMatchedCount, 0);
   const createDraftOptionalUnmatchedCount = Math.max((draftForm.optionalAttendees || []).length - createDraftOptionalMatchedCount, 0);
   const createDraftRequiredBusyOnlyCount = draftMatchedRequiredParticipantIds.filter((accountId) => getAccountPermissionMode(accountId) === 'busy_only').length;
@@ -7065,16 +6511,9 @@ function MainApp() {
   const createDraftAccountLabel = draftAccountInfo?.email || draftAccountInfo?.name || '未选择账户';
   const createDraftCalendarInfo = calendarMap[draftForm.calId] || null;
   const createDraftCalendarLabel = createDraftCalendarInfo?.name || '未选择日历';
-  const createDraftBestSuggestion =
-    bestScheduleSuggestion &&
-    (!sameDay(bestScheduleSuggestion.date, draftForm.date) || Math.abs(bestScheduleSuggestion.startH - draftForm.startH) > 0.01)
-      ? bestScheduleSuggestion
-      : null;
   const createDraftBusyStates = currentSlotAccountStates.filter((state) => state.conflicts.length > 0);
   const createDraftRequiredBusyCount = currentSlotAccountStates.filter((state) => state.scope === 'required' && state.conflicts.length > 0).length;
   const createDraftOptionalBusyCount = currentSlotAccountStates.filter((state) => state.scope === 'optional' && state.conflicts.length > 0).length;
-  const createDraftRequiredFreeCount = Math.max(draftRequiredAccountIds.length - createDraftRequiredBusyCount, 0);
-  const createDraftOptionalFreeCount = Math.max(draftOptionalAccountIds.length - createDraftOptionalBusyCount, 0);
   const createDraftParticipantCheckMessage =
     draftRelevantAccountIds.length <= 1
       ? `当前按 ${createDraftAccountLabel} 的工作时间检查忙闲`
@@ -7124,55 +6563,6 @@ function MainApp() {
     createDraftConflictSourceStates.length - createDraftConflictDetailStates.length,
     0,
   );
-  const createDraftSuggestionReason =
-    createDraftScopeRequiredCount + createDraftScopeOptionalCount > 0
-      ? formatSuggestedTimeReason({
-          requiredCount: createDraftScopeRequiredCount,
-          optionalCount: createDraftScopeOptionalCount,
-          permissionLimitedCount: createDraftPermissionLimitedCount,
-        })
-      : '';
-  const createDraftPrimarySuggestion = createDraftBestSuggestion || scheduleSuggestions[0] || null;
-  const createDraftPrimarySuggestionMeta = createDraftPrimarySuggestion
-    ? getSuggestedTimeStatusMeta(createDraftPrimarySuggestion, createDraftRequiredMatchedCount, createDraftOptionalMatchedCount)
-    : null;
-  const createDraftDirectSuggestions = scheduleSuggestions
-    .filter(
-      (suggestion) =>
-        (!createDraftPrimarySuggestion ||
-          !(
-            sameDay(suggestion.date, createDraftPrimarySuggestion.date) &&
-            Math.abs(suggestion.startH - createDraftPrimarySuggestion.startH) < 0.01
-          )) &&
-        suggestion.requiredBusyCount === 0,
-    )
-    .slice(0, 3);
-  const createDraftCoordinationSuggestions = scheduleSuggestions
-    .filter(
-      (suggestion) =>
-        (!createDraftPrimarySuggestion ||
-          !(
-            sameDay(suggestion.date, createDraftPrimarySuggestion.date) &&
-            Math.abs(suggestion.startH - createDraftPrimarySuggestion.startH) < 0.01
-          )) &&
-        suggestion.requiredBusyCount > 0,
-    )
-    .slice(0, 3);
-  const createDraftCurrentSelectionMeta = getSuggestedTimeStatusMeta(
-    {
-      requiredBusyCount: createDraftRequiredBusyCount,
-      optionalBusyCount: createDraftOptionalBusyCount,
-    },
-    createDraftRequiredMatchedCount,
-    createDraftOptionalMatchedCount,
-  );
-  const createDraftCurrentMatchesPrimary =
-    !!createDraftPrimarySuggestion &&
-    sameDay(createDraftPrimarySuggestion.date, draftForm.date) &&
-    Math.abs(createDraftPrimarySuggestion.startH - draftForm.startH) < 0.01;
-  const createDraftDirectSuggestionHeading = createDraftCurrentMatchesPrimary ? '其他可直接发出的时间' : '可直接发出的时间';
-  const createDraftSuggestionPrivacyText =
-    createDraftPermissionLimitedCount > 0 ? `${createDraftPermissionLimitedCount} 位仅忙闲权限` : '';
 
   const handleContextMenu = (event, entry) => {
     event.preventDefault();
@@ -7336,10 +6726,6 @@ function MainApp() {
       if (event.key === 'Escape') {
         event.preventDefault();
         if (isInputFocused && event.target.blur) event.target.blur();
-        if (availabilityPicker.open) {
-          closeAvailabilityPicker();
-          return;
-        }
         if (mailComposer.open) {
           closeMailComposer();
           return;
@@ -7476,7 +6862,6 @@ function MainApp() {
     calendarLayout,
     createDraft.isDirty,
     mailComposer.open,
-    availabilityPicker.open,
     mails,
     timeSelection,
     sharedCalendarDialog.open,
@@ -7968,7 +7353,7 @@ function MainApp() {
                 {currentScreen === 'details' && selectedEvent && createPortal(
                   (
 	                  <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
-	                    <div className="h-[calc(100vh-32px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+	                    <div className="max-h-[70vh] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
 	                      <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
 	                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
 	                          <div className="min-w-0">
@@ -7998,22 +7383,6 @@ function MainApp() {
                           </div>
                           <button onClick={() => handleDeleteEvent(selectedEvent.id)} className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl shadow-sm">
                             移除
-                          </button>
-                        </div>
-                      )}
-
-                      {selectedEvent.status === '已拒绝' && (
-                        <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-slate-700 text-sm font-bold">
-                          <div className="flex items-center">
-                            <X size={16} className="mr-2" />
-                            您已拒绝本次邀请，系统已准备新的可用时间。
-                          </div>
-                          <button
-                            onClick={() => openRescheduleView(selectedEvent.id)}
-                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            <RefreshCw size={15} className="mr-2" />
-                            寻找新时间
                           </button>
                         </div>
                       )}
@@ -8153,41 +7522,6 @@ function MainApp() {
                               </div>
                             )}
 
-                            {selectedEvent.status === '已拒绝' && selectedEventRescheduleSuggestions.length > 0 && (
-                              <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
-                                <div className="flex items-center justify-between gap-4">
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">寻找新时间</div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                      基于当前参与人的最新忙闲状态，再推荐 2-3 个新的可用时段。
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => openRescheduleView(selectedEvent.id)}
-                                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-                                  >
-                                    在编辑页微调
-                                  </button>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {selectedEventRescheduleSuggestions.map((suggestion, index) => (
-                                    <button
-                                      key={`${selectedEvent.id}-retry-${index}`}
-                                      onClick={() => applyRescheduleSuggestion(selectedEvent.id, suggestion)}
-                                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-200 hover:bg-blue-50"
-                                    >
-                                      <div className="text-sm font-semibold text-slate-900">
-                                        {formatSuggestedSlotLabel(suggestion.date, suggestion.startH, suggestion.durationH)}
-                                      </div>
-                                      <div className="mt-1 text-[11px] text-slate-500">
-                                        {suggestion.requiredBusyCount === 0 ? '必需参会者可参加' : `仍有 ${suggestion.requiredBusyCount} 位必需参会者冲突`}
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                               <div className="md:col-span-2">
                                 <h3 className="text-sm font-black text-gray-800 flex items-center mb-4 border-b border-gray-200 pb-2">
@@ -8231,7 +7565,7 @@ function MainApp() {
                 {currentScreen === 'create' && createPortal(
                   (
                   <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
-                    <div className="h-[calc(100vh-32px)] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+                    <div className="max-h-[70vh] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
                       <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
                           <div className="flex min-w-0 items-center gap-3">
@@ -8251,11 +7585,7 @@ function MainApp() {
                             </div>
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-slate-900">
-                                {createDraft.mode === 'edit'
-                                  ? '编辑日程'
-                                  : createDraft.mode === 'reschedule'
-                                    ? '重新安排日程'
-                                    : '新建日程'}
+                                {createDraft.mode === 'edit' ? '编辑日程' : '新建日程'}
                               </div>
                               <div className="mt-1 text-xs text-slate-400">
                                 {createWindowTimestamp} {createWindowSaveLabel}
@@ -8849,255 +8179,6 @@ function MainApp() {
                           </div>
 
                           <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">建议时间</div>
-                            <div className="space-y-3">
-                              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <div className="text-sm font-semibold text-slate-900">建议时间</div>
-	                                    {createDraftSuggestionReason && <div className="mt-1 text-xs text-slate-500">{createDraftSuggestionReason}</div>}
-                                  </div>
-                                  <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${createDraftCurrentSelectionMeta.tone}`}>
-                                    {createDraftCurrentMatchesPrimary ? '当前时间可直接发出' : `当前时间：${createDraftCurrentSelectionMeta.emphasis}`}
-                                  </span>
-                                </div>
-                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                                  {createDraftScopeRequiredCount > 0 && (
-                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700">
-                                      组织内必需 {createDraftScopeRequiredCount} 位
-                                    </span>
-                                  )}
-                                  {createDraftScopeOptionalCount > 0 && (
-                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700">
-                                      组织内可选 {createDraftScopeOptionalCount} 位
-                                    </span>
-                                  )}
-                                  {createDraftUnmatchedInviteeCount > 0 && (
-                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                      仅发送邀请 {createDraftUnmatchedInviteeCount} 位
-                                    </span>
-                                  )}
-                                  {createDraftPermissionLimitedCount > 0 && (
-                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                      仅忙闲权限 {createDraftPermissionLimitedCount} 位
-                                    </span>
-                                  )}
-                                </div>
-                                {createDraftPrimarySuggestion && createDraftPrimarySuggestionMeta && (
-                                  <div className="mt-3 rounded-lg border border-blue-200 bg-white px-4 py-3">
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                      <div className="min-w-0">
-                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-500">
-                                          {createDraftCurrentMatchesPrimary ? '推荐结果' : '推荐时间'}
-                                        </div>
-                                        <div className="mt-1 text-base font-semibold text-slate-900">
-                                          {formatSuggestedSlotLabel(createDraftPrimarySuggestion.date, createDraftPrimarySuggestion.startH, draftForm.durationH)}
-                                        </div>
-                                        <div className="mt-1 text-sm text-slate-600">
-                                          {createDraftCurrentMatchesPrimary ? createDraftCurrentSelectionMeta.summary : createDraftPrimarySuggestionMeta.summary}
-                                        </div>
-                                      </div>
-                                      {!createDraftCurrentMatchesPrimary && (
-                                        <button
-                                          onClick={() =>
-                                            updateDraftSchedule({
-                                              date: createDraftPrimarySuggestion.date,
-                                              startH: createDraftPrimarySuggestion.startH,
-                                              durationH: draftForm.durationH,
-                                            })
-                                          }
-                                          className="inline-flex items-center rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                                        >
-                                          应用此建议
-                                        </button>
-                                      )}
-                                    </div>
-                                    {!createDraftCurrentMatchesPrimary && (
-                                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">当前时间</div>
-                                        <div className="mt-1 text-sm font-semibold text-slate-900">
-                                          {formatSuggestedSlotLabel(draftForm.date, draftForm.startH, draftForm.durationH)}
-                                        </div>
-                                        <div className="mt-1 text-xs text-slate-500">{createDraftCurrentSelectionMeta.summary}</div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {createDraftDirectSuggestions.length > 0 && (
-                                <div>
-                                  <div className="mb-2 text-xs font-semibold text-slate-500">
-                                    {createDraftDirectSuggestionHeading} · {createDraftDirectSuggestions.length} 个
-                                  </div>
-                                  <div className="grid gap-2 lg:grid-cols-3">
-                                    {createDraftDirectSuggestions.map((suggestion, index) => {
-                                      const meta = getSuggestedTimeStatusMeta(suggestion, createDraftRequiredMatchedCount, createDraftOptionalMatchedCount);
-                                      return (
-                                        <button
-                                          key={`direct-${formatDateLabel(suggestion.date)}-${suggestion.startH}-${index}`}
-                                          onClick={() =>
-                                            updateDraftSchedule({
-                                              date: suggestion.date,
-                                              startH: suggestion.startH,
-                                              durationH: draftForm.durationH,
-                                            })
-                                          }
-                                          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-left transition hover:bg-white"
-                                        >
-                                          <div className="text-sm font-semibold text-slate-900">
-                                            {formatSuggestedSlotLabel(suggestion.date, suggestion.startH, draftForm.durationH)}
-                                          </div>
-                                          <div className="mt-1 text-xs font-medium text-emerald-700">{meta.summary}</div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {createDraftCoordinationSuggestions.length > 0 && (
-                                <div>
-                                  <div className="mb-2 text-xs font-semibold text-slate-500">需要协调的备选 · {createDraftCoordinationSuggestions.length} 个</div>
-                                  <div className="grid gap-2 lg:grid-cols-3">
-                                    {createDraftCoordinationSuggestions.map((suggestion, index) => {
-                                      const meta = getSuggestedTimeStatusMeta(suggestion, createDraftRequiredMatchedCount, createDraftOptionalMatchedCount);
-                                      return (
-                                        <button
-                                          key={`coord-${formatDateLabel(suggestion.date)}-${suggestion.startH}-${index}`}
-                                          onClick={() =>
-                                            updateDraftSchedule({
-                                              date: suggestion.date,
-                                              startH: suggestion.startH,
-                                              durationH: draftForm.durationH,
-                                            })
-                                          }
-                                          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-left transition hover:bg-white"
-                                        >
-                                          <div className="text-sm font-semibold text-slate-900">
-                                            {formatSuggestedSlotLabel(suggestion.date, suggestion.startH, draftForm.durationH)}
-                                          </div>
-                                          <div className="mt-1 text-xs font-medium text-amber-700">{meta.summary}</div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                                  组织内必需可用 {createDraftRequiredFreeCount}
-                                </span>
-                                <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 font-semibold text-red-700">
-                                  组织内必需冲突 {createDraftRequiredBusyCount}
-                                </span>
-                                {draftOptionalAccountIds.length > 0 && (
-                                  <>
-                                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-semibold text-emerald-700">
-                                      组织内可选可用 {createDraftOptionalFreeCount}
-                                    </span>
-                                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                                      组织内可选冲突 {createDraftOptionalBusyCount}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-
-	                              {createDraftSuggestionPrivacyText && <div className="text-xs text-slate-500">{createDraftSuggestionPrivacyText}</div>}
-
-                              {createDraftConflictSourceStates.length > 0 ? createDraftLargeAudience ? (
-                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-	                                    <div className="text-xs font-semibold text-slate-700">冲突明细</div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
-                                        当前冲突 {createDraftConflictSourceStates.length} 位
-                                      </span>
-                                      {createDraftHiddenConflictStateCount > 0 && (
-                                        <button
-                                          onClick={() => setCreateDraftPanels((prev) => ({ ...prev, conflictsExpanded: true }))}
-                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                        >
-                                          还有 {createDraftHiddenConflictStateCount} 位，展开查看
-                                        </button>
-                                      )}
-                                      {createDraftPanels.conflictsExpanded && createDraftConflictSourceStates.length > 10 && (
-                                        <button
-                                          onClick={() => setCreateDraftPanels((prev) => ({ ...prev, conflictsExpanded: false }))}
-                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                        >
-                                          收起明细
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {createDraftConflictDetailStates.length > 0 ? (
-                                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
-                                      {createDraftConflictDetailStates.map((state) => {
-                                        const firstConflict = state.conflicts[0];
-                                        return (
-                                          <div key={state.account.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                                            <div className="min-w-0">
-                                              <div className="flex flex-wrap items-center gap-2">
-                                                <span className="truncate text-sm font-medium text-slate-800">{state.account.email || state.account.name}</span>
-                                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                                  {state.scope === 'required' ? '必需' : '可选'}
-                                                </span>
-                                                {state.permissionMode === 'busy_only' && (
-                                                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                                    <Lock size={10} />
-                                                    仅忙闲
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="mt-1 truncate text-xs text-slate-400">
-                                                {firstConflict
-                                                  ? `${formatTimeRange(firstConflict.startH || 0, firstConflict.durationH || 1)} · ${
-                                                      state.permissionMode === 'busy_only' || firstConflict.type === 'busy_only'
-                                                        ? '忙碌'
-                                                        : firstConflict.title || '忙碌'
-                                                    }`
-                                                  : '当前无冲突'}
-                                              </div>
-                                            </div>
-                                            <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] font-semibold text-red-700">
-                                              忙碌
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-	                                  ) : null}
-                                </div>
-                              ) : (
-                                <div className="flex flex-wrap gap-2">
-                                  {createDraftConflictDetailStates.map((state) => (
-                                    <span
-                                      key={state.account.id}
-                                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
-                                        state.conflicts.length > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                      }`}
-                                      title={
-                                        state.conflicts.length > 0
-                                          ? `${state.account.email || state.account.name} 忙碌：${state.conflicts
-                                              .map((event) => event.title || '忙碌')
-                                              .join('、')}`
-                                          : `${state.account.email || state.account.name} 当前空闲`
-                                      }
-                                    >
-                                      <span>{state.account.email || state.account.name}</span>
-                                      <span className="text-[11px] opacity-80">{state.scope === 'required' ? '必需' : '可选'}</span>
-                                      {state.permissionMode === 'busy_only' && <Lock size={11} />}
-                                      <span>{state.conflicts.length > 0 ? '忙碌' : '可用'}</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
                             <div className="pt-2 text-slate-500">定期</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
@@ -9292,11 +8373,6 @@ function MainApp() {
               onOpenLinkedEvent={(eventId) => navTo('details', eventId)}
               onToggleUnreadOnly={() => setMailUnreadOnly((prev) => !prev)}
               onSetMailFocusTab={setMailFocusTab}
-              onOpenAvailabilityPicker={(mailId) => openAvailabilityPicker('reader', mailId)}
-              onConfirmAvailabilitySlot={confirmAvailabilityProposalSlot}
-              rescheduleSuggestions={selectedMailRescheduleSuggestions}
-              onOpenReschedule={openRescheduleView}
-              onApplyRescheduleSuggestion={applyRescheduleSuggestion}
               upcomingEvents={reminderEvents.upcoming}
               linkedEventLookup={allEventLookup}
               accountMap={accountMap}
@@ -9323,22 +8399,6 @@ function MainApp() {
             onRemoveAttachment={removeMailAttachment}
             onSaveDraft={() => saveMailComposer('draft')}
             onSend={() => saveMailComposer('send')}
-            onOpenAvailabilityPicker={() => openAvailabilityPicker('composer')}
-            onRemoveAvailabilityProposal={removeComposerAvailabilityProposal}
-          />
-        </Suspense>
-      )}
-
-      {availabilityPicker.open && (
-        <Suspense fallback={null}>
-          <AvailabilityProposalModal
-            open={availabilityPicker.open}
-            account={availabilityPickerAccount}
-            candidates={availabilityPickerCandidates}
-            selectedSlotIds={availabilityPicker.selectedSlotIds}
-            onToggleSlot={toggleAvailabilityPickerSlot}
-            onClose={closeAvailabilityPicker}
-            onApply={applyAvailabilityProposal}
           />
         </Suspense>
       )}
@@ -9377,7 +8437,7 @@ function MainApp() {
       {/* ===== 日历颜色选择器 ===== */}
       {calendarColorPicker.open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeColorPicker}>
-          <div className="w-72 rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[70vh] w-72 overflow-y-auto rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 text-sm font-bold text-gray-800">选择颜色</h3>
             <div className="grid grid-cols-9 gap-2">
               {CALENDAR_COLORS.map((c) => (
@@ -9396,7 +8456,7 @@ function MainApp() {
       {/* ===== 日历重命名 ===== */}
       {calendarRenameDialog.open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeRenameDialog}>
-          <div className="w-80 rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[70vh] w-80 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-3 text-sm font-bold text-gray-800">重命名日历</h3>
             <input
               autoFocus
@@ -9423,7 +8483,7 @@ function MainApp() {
         const cal = calendars.find((c) => c.id === calendarDeleteConfirm.targetId);
         return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeDeleteConfirm}>
-          <div className="w-80 rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[70vh] w-80 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-1.5 text-sm font-bold text-gray-800">删除日历</h3>
             <p className="mb-4 text-sm text-gray-500 leading-relaxed">
               确认删除「<span className="font-medium text-gray-700">{cal?.name || '该日历'}</span>」？

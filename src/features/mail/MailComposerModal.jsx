@@ -1,6 +1,4 @@
-import { Clock, Paperclip, Send, X } from 'lucide-react';
-import { detectSchedulingIntent } from '../../domain/appModel.js';
-import AvailabilityProposalCard from './AvailabilityProposalCard.jsx';
+import { Paperclip, Send, X } from 'lucide-react';
 
 export default function MailComposerModal({
   open,
@@ -14,16 +12,12 @@ export default function MailComposerModal({
   onRemoveAttachment,
   onSaveDraft,
   onSend,
-  onOpenAvailabilityPicker,
-  onRemoveAvailabilityProposal,
 }) {
   if (!open || !draft) return null;
 
-  const hasSchedulingIntent = detectSchedulingIntent(draft.subject || '', draft.body || '');
-
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-      <div className="flex w-full max-w-[820px] max-h-[88vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+      <div className="flex w-full max-w-[820px] max-h-[70vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
           <div className="text-lg font-black text-gray-900">写邮件</div>
           <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-white">
@@ -107,15 +101,6 @@ export default function MailComposerModal({
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center justify-between">
             <div className="text-xs font-bold text-gray-500">附件</div>
             <div className="flex items-center gap-2">
-              {hasSchedulingIntent && (
-                <button
-                  onClick={onOpenAvailabilityPicker}
-                  className="px-3 py-1.5 rounded-lg bg-white border border-blue-200 text-xs font-bold text-blue-700 inline-flex items-center"
-                >
-                  <Clock size={13} className="mr-1.5" />
-                  插入可用时间
-                </button>
-              )}
               <button
                 onClick={onAddAttachment}
                 className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-bold text-gray-700 inline-flex items-center"
@@ -140,14 +125,6 @@ export default function MailComposerModal({
                 </button>
               ))}
             </div>
-          )}
-
-          {draft.availabilityProposal && (
-            <AvailabilityProposalCard
-              proposal={draft.availabilityProposal}
-              onRemove={onRemoveAvailabilityProposal}
-              actionLabel="等待对方确认"
-            />
           )}
 
           <textarea
