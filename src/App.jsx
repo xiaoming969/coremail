@@ -2515,7 +2515,15 @@ function EventPreviewCard({
               {title}
             </div>
             {isRecurring && (
-              <RefreshCw size={14} className="mt-0.5 shrink-0 text-slate-400" aria-label="循环会议" />
+              <span
+                className="group/recurrence relative mt-0.5 inline-flex shrink-0 text-slate-400"
+                title={`循环：${REPEAT_LABELS[event.repeat] || '重复'}`}
+              >
+                <RefreshCw size={14} aria-label="循环会议" />
+                <span className="pointer-events-none absolute right-0 top-6 z-10 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 opacity-0 shadow-md transition group-hover/recurrence:opacity-100">
+                  循环：{REPEAT_LABELS[event.repeat] || '重复'}
+                </span>
+              </span>
             )}
           </div>
         </div>
@@ -5233,7 +5241,7 @@ function MainApp() {
     if (!eventId) return;
     clearTimeSelection();
     setSelectedEventId(eventId);
-    setShowRightSidebar(true);
+    setShowRightSidebar(false);
   };
   const locateEventInCalendar = (eventId) => {
     const targetEvent = events.find((event) => event.id === eventId);
@@ -7382,23 +7390,11 @@ function MainApp() {
                   </Suspense>
                 )}
 
-                {showRightSidebar && currentScreen === 'calendar' && selectedEvent && (
-                  <CalendarEventSidebar
-                    event={selectedEvent}
-                    calendar={selectedEventCalInfo}
-                    account={selectedEventAccountInfo}
-                    onBackToAgenda={() => setSelectedEventId(null)}
-                    onOpenDetails={() => openEventDetails(selectedEvent.id)}
-                    onDeleteEvent={handleDeleteEvent}
-                    onRespond={handleRespondToEvent}
-                  />
-                )}
-
                 {currentScreen === 'details' && selectedEvent && createPortal(
                   (
-	                  <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
-	                    <div className="max-h-[70vh] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
-	                      <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
+	                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/10 p-0">
+	                    <div className="h-[70vh] max-h-[calc(100vh-32px)] w-[70vw] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+	                      <div className="flex h-full w-full flex-col overflow-hidden bg-white">
 	                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
 	                          <div className="min-w-0">
 	                            <div className="truncate font-semibold text-slate-900">日历详情</div>
@@ -7431,7 +7427,7 @@ function MainApp() {
                         </div>
                       )}
 
-                      <div className="p-6 md:p-8">
+                      <div className="flex-1 overflow-y-auto p-6 md:p-8">
                         {selectedEvent.type === 'busy_only' ? (
                           <div className="text-center py-16 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
                             <Lock className="mx-auto h-12 w-12 text-gray-300 mb-4" />
