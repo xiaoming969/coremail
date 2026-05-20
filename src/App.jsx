@@ -77,12 +77,9 @@ import {
   VISIBILITY_OPTIONS,
   INITIAL_CREATE_DRAFT_PANELS,
   INITIAL_CREATE_DRAFT_BULK_INPUTS,
-  EVENT_KIND_LABELS,
   MEETING_PROVIDER_LABELS,
   REPEAT_LABELS,
   REMINDER_LABELS,
-  AVAILABILITY_LABELS,
-  VISIBILITY_LABELS,
   stripTime,
   addDays,
   addMonths,
@@ -113,7 +110,6 @@ import {
   clampDuration,
   formatEventDateTime,
   formatAgendaEventLabel,
-  getAgendaStatusTone,
   getCalendarPermissionId,
   getCalendarPermissionLabel,
   getCalendarPermissionOption,
@@ -146,6 +142,7 @@ import {
   eventMatchesColorCategory,
   eventMatchesSearchTimeframe,
   getEventStartTimestamp,
+  getEventEndTimestamp,
   canJoinCalendarEvent,
   getSearchSelectedAccountIds,
   getSearchSourceAccountLabel,
@@ -2586,138 +2583,6 @@ function EventPreviewCard({
   );
 }
 
-function CalendarEventSidebar({
-  event,
-  calendar,
-  account,
-  onBackToAgenda,
-  onDeleteEvent,
-  onRespond,
-}) {
-  const organizerLabel = event.organizer || account?.name || '我';
-  const attendeeList = Array.from(new Set([...(event.attendees || []), ...(event.optionalAttendees || [])])).filter(
-    (person) => person && person !== organizerLabel && person !== event.organizer,
-  );
-  const participantPreview = attendeeList.slice(0, 4);
-  const hiddenParticipantCount = Math.max(attendeeList.length - participantPreview.length, 0);
-  const locationLabel =
-    event.location || (event.meetingProvider && event.meetingProvider !== 'none' ? MEETING_PROVIDER_LABELS[event.meetingProvider] : '未填写地点');
-  const sourceLabel = calendar?.name || account?.email || account?.name || '日历';
-  const statusLabel = event.status && event.status !== '已接受' ? event.status : null;
-
-  return (
-    <aside
-      className="relative z-10 hidden shrink-0 border-l border-slate-200 bg-[#fcfcfb] lg:flex lg:flex-col"
-      style={{ width: 'clamp(288px, 24vw, 352px)', zIndex: 20 }}
-    >
-      <div className="flex h-16 items-center justify-end border-b border-slate-200 bg-[#fcfcfb] px-5">
-        <button
-          onClick={onBackToAgenda}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          title="关闭侧栏"
-          aria-label="关闭侧栏"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[#f8f8f7] p-4">
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
-            <span className="truncate">{sourceLabel}</span>
-            {statusLabel && (
-              <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${getAgendaStatusTone(statusLabel)}`}>
-                {statusLabel}
-              </span>
-            )}
-          </div>
-
-          <div className="text-xl font-black leading-tight text-slate-900" style={clampLinesStyle(3)}>
-            {event.title || '无标题'}
-          </div>
-
-          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50 text-sm">
-            <div className="flex gap-3 px-3 py-3">
-              <Clock size={16} className="mt-0.5 shrink-0 text-blue-500" />
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold text-slate-400">时间</div>
-                <div className="font-bold text-slate-900">{formatAgendaEventLabel(event)}</div>
-              </div>
-            </div>
-            <div className="flex gap-3 px-3 py-3">
-              <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-500" />
-              <div className="min-w-0">
-                <div className="text-[11px] font-semibold text-slate-400">地点</div>
-                <div className="truncate font-semibold text-slate-800">{locationLabel}</div>
-              </div>
-            </div>
-            <div className="flex gap-3 px-3 py-3">
-              <Users size={16} className="mt-0.5 shrink-0 text-slate-400" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-semibold text-slate-400">人员</div>
-                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-900 ring-1 ring-slate-200">
-                    {organizerLabel}
-                    <span className="ml-1 text-[11px] font-semibold text-blue-600">组织者</span>
-                  </span>
-                  {participantPreview.map((person) => (
-                    <span key={person} className="max-w-full truncate rounded-md bg-white px-2 py-1 font-medium text-slate-700 ring-1 ring-slate-200">
-                      {person}
-                    </span>
-                  ))}
-                  {hiddenParticipantCount > 0 && (
-                    <span className="rounded-md bg-white px-2 py-1 font-medium text-slate-500 ring-1 ring-slate-200">
-                      +{hiddenParticipantCount}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {event.description && (
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                <AlignLeft size={14} />
-                日程说明
-              </div>
-              <div className="text-sm leading-6 text-slate-700" style={clampLinesStyle(4)}>
-                {event.description}
-              </div>
-            </div>
-          )}
-
-          {event.status === '待响应' && (
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => onRespond(event.id, 'reject')}
-                className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                拒绝
-              </button>
-              <button
-                onClick={() => onRespond(event.id, 'accept')}
-                className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                接受
-              </button>
-            </div>
-          )}
-
-          <button
-            onClick={() => onDeleteEvent(event.id)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
-          >
-            <Trash size={15} />
-            删除日程
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 function PermissionDropdown({ value, onChange, className = '' }) {
   const [open, setOpen] = useState(false);
   const [menuRect, setMenuRect] = useState(null);
@@ -3688,7 +3553,6 @@ function MainApp() {
   const [mails, setMails] = useState(MOCK_MAILS);
   const [focusDate, setFocusDate] = useState(stripTime(TODAY_DATE));
   const [calendarSidebarCollapsed, setCalendarSidebarCollapsed] = useState(false);
-  const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [focusedAccountId, setFocusedAccountId] = useState(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null);
   const [feedback, setFeedback] = useState({ type: null, payload: null });
@@ -3920,13 +3784,45 @@ function MainApp() {
       owner: '我',
     };
   const selectedEventAccountInfo = selectedEventCalInfo.accountId ? accountMap[selectedEventCalInfo.accountId] : null;
-  const selectedEventKindLabel = selectedEvent ? EVENT_KIND_LABELS[selectedEvent.kind || 'event'] || '日程' : '';
   const selectedEventMeetingLabel =
     selectedEvent && selectedEvent.meetingProvider && selectedEvent.meetingProvider !== 'none'
       ? MEETING_PROVIDER_LABELS[selectedEvent.meetingProvider] || '在线会议'
       : '';
-  const selectedEventCanJoin = selectedEvent ? canJoinCalendarEvent(selectedEvent) : false;
   const selectedEventColorCategories = selectedEvent ? getEventColorCategories(selectedEvent, colorCategoryLabels) : [];
+  const selectedEventStartDate = selectedEvent ? new Date(getEventStartTimestamp(selectedEvent)) : null;
+  const selectedEventEndDate = selectedEvent ? new Date(getEventEndTimestamp(selectedEvent)) : null;
+  const selectedEventSentDate = selectedEvent
+    ? new Date(selectedEvent.sentAt || selectedEvent.sentTime || selectedEvent.updatedAt || selectedEvent.createdAt || getEventStartTimestamp(selectedEvent) - DAY_MS)
+    : null;
+  const formatDetailDateTime = (date) => (date ? `${formatDateLabel(date)} ${formatClockStamp(date).slice(0, 5)}` : '未记录');
+  const selectedEventOrganizerLabel = selectedEvent?.organizer || selectedEventAccountInfo?.name || '我';
+  const selectedEventMethodLabel = selectedEvent
+    ? selectedEvent.meetingProvider && selectedEvent.meetingProvider !== 'none'
+      ? selectedEvent.meetingProvider === 'phone'
+        ? '电话会议'
+        : `线上会议 · ${selectedEventMeetingLabel}`
+      : selectedEvent.location
+        ? '线下会议'
+        : '待定'
+    : '';
+  const selectedEventRuleLabel = selectedEvent
+    ? [
+        selectedEvent.repeat && selectedEvent.repeat !== 'does_not_repeat' ? `循环：${REPEAT_LABELS[selectedEvent.repeat]}` : '不循环',
+        selectedEvent.reminder && selectedEvent.reminder !== 'none' ? `提醒：${REMINDER_LABELS[selectedEvent.reminder]}` : '不提醒',
+      ].join(' · ')
+    : '';
+  const selectedEventParticipants = selectedEvent
+    ? Array.from(new Set([...(selectedEvent.attendees || [])].filter(Boolean))).filter(
+        (person) => normalizeParticipantIdentity(person) !== normalizeParticipantIdentity(selectedEventOrganizerLabel),
+      )
+    : [];
+  const selectedEventOptionalParticipants = selectedEvent
+    ? Array.from(new Set([...(selectedEvent.optionalAttendees || [])].filter(Boolean))).filter(
+        (person) =>
+          normalizeParticipantIdentity(person) !== normalizeParticipantIdentity(selectedEventOrganizerLabel) &&
+          !selectedEventParticipants.some((participant) => normalizeParticipantIdentity(participant) === normalizeParticipantIdentity(person)),
+      )
+    : [];
   const draftAccountInfo = accountMap[calendarMap[draftForm.calId]?.accountId] || null;
   const draftParticipantAccountLookup = useMemo(() => {
     const nextMap = new Map();
@@ -5241,7 +5137,6 @@ function MainApp() {
     if (!eventId) return;
     clearTimeSelection();
     setSelectedEventId(eventId);
-    setShowRightSidebar(false);
   };
   const locateEventInCalendar = (eventId) => {
     const targetEvent = events.find((event) => event.id === eventId);
@@ -5253,7 +5148,6 @@ function MainApp() {
     setFlashingEventId(null);
     setFocusDate(stripTime(eventToDate(targetEvent)));
     setSelectedEventId(eventId);
-    setShowRightSidebar(false);
     setCurrentScreen('calendar');
     setCalendarReturnScreen('calendar');
 
@@ -5285,7 +5179,6 @@ function MainApp() {
     setCalendarRecentSearches((prev) => [nextQuery, ...prev.filter((item) => item !== nextQuery)].slice(0, 5));
     clearTimeSelection();
     hideEventPreview();
-    setShowRightSidebar(false);
     setSelectedEventId(null);
     setCurrentScreen('search');
     setCalendarReturnScreen('search');
@@ -6021,7 +5914,6 @@ function MainApp() {
   const restoreCalendarLandingView = () => {
     setCalendarLayout('week');
     setAccountDisplayMode('overlay');
-    setShowRightSidebar(false);
     setCalendarSearchQuery('');
     setCalendarReturnScreen('calendar');
     setFocusDate(stripTime(TODAY_DATE));
@@ -6510,7 +6402,6 @@ function MainApp() {
     setSelectedEventId(nextId);
     setFocusDate(stripTime(normalizedDraft.date));
     setCurrentScreen(mode === 'send' ? 'details' : 'calendar');
-    setShowRightSidebar(mode !== 'send');
     resetDraftState();
     if (typeof afterSave === 'function') {
       setTimeout(() => afterSave(nextId), 0);
@@ -7436,161 +7327,162 @@ function MainApp() {
                           </div>
                         ) : (
                           <>
-                            <div className="mb-6">
-                              <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <span className="bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg flex items-center font-bold">
-                                  <div className={`w-2 h-2 rounded-full mr-1 ${selectedEventCalInfo.color || 'bg-gray-500'}`}></div>
-                                  {selectedEventCalInfo.name || '未知'}
-                                </span>
-                                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                  {selectedEventCalInfo.permission || ''}
-                                </span>
-                                {selectedEventAccountInfo && (
-                                  <span className="bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                    {selectedEventAccountInfo.name}
-                                  </span>
-                                )}
-                                {selectedEvent.status && (
-                                  <span className={`text-xs px-2 py-1 rounded-lg border font-bold ${getAgendaStatusTone(selectedEvent.status)}`}>
-                                    {selectedEvent.status}
-                                  </span>
-                                )}
-                                <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                  {selectedEventKindLabel}
-                                </span>
-                                {selectedEvent.repeat && selectedEvent.repeat !== 'does_not_repeat' && (
-                                  <span className="bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                    {REPEAT_LABELS[selectedEvent.repeat]}
-                                  </span>
-                                )}
-                                {selectedEventColorCategories.map((category) => (
-                                  <span key={category.id} className="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                    <span className={`mr-1.5 h-2 w-2 rounded-full ${category.colorClass}`}></span>
-                                    {category.label}
-                                  </span>
-                                ))}
-                                {selectedEvent.reminder && selectedEvent.reminder !== 'none' && (
-                                  <span className="bg-gray-100 text-gray-700 border border-gray-200 text-xs px-2 py-1 rounded-lg font-bold">
-                                    {REMINDER_LABELS[selectedEvent.reminder]}
-                                  </span>
-                                )}
-                              </div>
+                            <div className="mb-8 border-b border-gray-200 pb-6">
+                              <div className="mb-2 text-xs font-bold text-gray-400">标题</div>
                               <h1 className={`text-2xl md:text-3xl font-black ${selectedEvent.status === '已取消' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                                 {selectedEvent.title || '无标题'}
                               </h1>
-                              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 font-bold text-gray-800">
-                                  <div className="flex items-center text-xs font-black uppercase tracking-[0.12em] text-gray-400 mb-2">
-                                    <Clock size={14} className="mr-2 text-blue-600" />
-                                    时间
-                                  </div>
-                                  {formatDateLabel(eventToDate(selectedEvent))} {formatTimeRange(selectedEvent.startH || 8, selectedEvent.durationH || 1)}
-                                </div>
-                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 font-bold text-gray-800">
-                                  <div className="flex items-center text-xs font-black uppercase tracking-[0.12em] text-gray-400 mb-2">
-                                    <MapPin size={14} className="mr-2 text-emerald-600" />
-                                    地点 / 加入方式
-                                  </div>
-                                  <div>{selectedEvent.location || (selectedEventMeetingLabel ? '线上会议' : '待补充')}</div>
-                                  {selectedEventMeetingLabel && <div className="mt-1 text-xs text-gray-500">{selectedEventMeetingLabel}</div>}
-                                </div>
-                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 font-bold text-gray-800">
-                                  <div className="text-xs font-black uppercase tracking-[0.12em] text-gray-400 mb-2">日程设置</div>
-                                  <div className="flex flex-wrap gap-2 text-xs">
-                                    <span className="rounded-full bg-white px-2.5 py-1 border border-gray-200 text-gray-700">
-                                      {REPEAT_LABELS[selectedEvent.repeat || 'does_not_repeat']}
-                                    </span>
-                                    <span className="rounded-full bg-white px-2.5 py-1 border border-gray-200 text-gray-700">
-                                      {REMINDER_LABELS[selectedEvent.reminder || '30m']}
-                                    </span>
+
+                              <div className="mt-5 grid grid-cols-1 gap-x-10 gap-y-4 text-sm text-gray-700 md:grid-cols-2">
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <Clock size={16} className="mt-0.5 shrink-0 text-blue-600" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">开始时间</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{formatDetailDateTime(selectedEventStartDate)}</div>
                                   </div>
                                 </div>
-                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 font-bold text-gray-800">
-                                  <div className="text-xs font-black uppercase tracking-[0.12em] text-gray-400 mb-2">显示方式</div>
-                                  <div className="flex flex-wrap gap-2 text-xs">
-                                    <span className="rounded-full bg-white px-2.5 py-1 border border-gray-200 text-gray-700">
-                                      {AVAILABILITY_LABELS[selectedEvent.availability || 'busy']}
-                                    </span>
-                                    <span className="rounded-full bg-white px-2.5 py-1 border border-gray-200 text-gray-700">
-                                      {VISIBILITY_LABELS[selectedEvent.visibility || 'default']}
-                                    </span>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <Clock size={16} className="mt-0.5 shrink-0 text-blue-600" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">结束时间</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{formatDetailDateTime(selectedEventEndDate)}</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <Users size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">组织者</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{selectedEventOrganizerLabel}</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <MapPin size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">方式</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{selectedEventMethodLabel}</div>
+                                    {selectedEvent.location && <div className="mt-0.5 text-xs font-semibold text-gray-500">地点：{selectedEvent.location}</div>}
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <RefreshCw size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">规则</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{selectedEventRuleLabel}</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${selectedEventColorCategories[0]?.colorClass || 'bg-slate-300'}`}></span>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">颜色分类</div>
+                                    {selectedEventColorCategories.length > 0 ? (
+                                      <div className="mt-1 flex flex-wrap gap-1.5">
+                                        {selectedEventColorCategories.map((category) => (
+                                          <span
+                                            key={category.id}
+                                            className="inline-flex max-w-full items-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700"
+                                          >
+                                            <span className={`mr-1.5 h-2 w-2 shrink-0 rounded-full ${category.colorClass}`}></span>
+                                            <span className="truncate">{category.label}</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="mt-0.5 font-bold text-gray-900">无分类</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <Send size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">发送时间</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{formatDetailDateTime(selectedEventSentDate)}</div>
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">响应</div>
+                                    <div className="mt-0.5 font-bold text-gray-900">{selectedEvent.status || '已接受'}</div>
+                                    {selectedEvent.status === '待响应' && (
+                                      <div className="mt-2 flex gap-2">
+                                        <button
+                                          onClick={() => handleRespondToEvent(selectedEvent.id, 'reject')}
+                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700"
+                                        >
+                                          拒绝
+                                        </button>
+                                        <button
+                                          onClick={() => handleRespondToEvent(selectedEvent.id, 'accept')}
+                                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white"
+                                        >
+                                          接受
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex min-w-0 items-start gap-3 md:col-span-2">
+                                  <UserPlus size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-400">参与者</div>
+                                    <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-1 font-bold text-gray-900">
+                                      {selectedEventParticipants.length > 0 ? (
+                                        selectedEventParticipants.map((person) => <span key={`required-${person}`}>{person}</span>)
+                                      ) : (
+                                        <span>无参与者</span>
+                                      )}
+                                      {selectedEventOptionalParticipants.map((person) => (
+                                        <span key={`optional-${person}`} className="text-gray-500">
+                                          {person}（可选）
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
+                            </div>
+
+                            <div className="space-y-6">
+                              <div>
+                                <h3 className="mb-4 flex items-center border-b border-gray-200 pb-2 text-sm font-black text-gray-800">
+                                  <AlignLeft size={16} className="mr-2" />
+                                  正文
+                                </h3>
+                                <p className="text-sm font-medium leading-relaxed text-gray-700">{selectedEvent.description || '暂无详细说明。'}</p>
+                              </div>
+
                               {selectedEvent.meetingLink && (
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {selectedEventCanJoin && (
+                                <div>
+                                  <h3 className="mb-4 flex items-center border-b border-gray-200 pb-2 text-sm font-black text-gray-800">
+                                    <ArrowRight size={16} className="mr-2" />
+                                    会议入口
+                                  </h3>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      onClick={() => openExternalLink(selectedEvent.meetingLink, '已打开主持人入口')}
+                                      className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700"
+                                    >
+                                      <Settings size={14} className="mr-2" />
+                                      主持人入口
+                                    </button>
                                     <button
                                       onClick={() => openExternalLink(selectedEvent.meetingLink, '已打开会议链接')}
                                       className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
                                     >
                                       <ArrowRight size={14} className="mr-2" />
-                                      一键入会
+                                      加入会议
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => copyTextToClipboard(selectedEvent.meetingLink, '会议链接已复制')}
-                                    className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700"
-                                  >
-                                    <Copy size={14} className="mr-2" />
-                                    复制链接
-                                  </button>
+                                  </div>
                                 </div>
                               )}
-                            </div>
-
-                            {selectedEvent.status === '待响应' && (
-                              <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <div className="flex items-center text-orange-800 font-bold">
-                                  <HelpCircle size={18} className="mr-2 text-orange-600" />
-                                  等待您的响应
-                                </div>
-                                <div className="flex space-x-3 w-full sm:w-auto">
-                                  <button
-                                    onClick={() => handleRespondToEvent(selectedEvent.id, 'reject')}
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold"
-                                  >
-                                    拒绝
-                                  </button>
-                                  <button
-                                    onClick={() => handleRespondToEvent(selectedEvent.id, 'accept')}
-                                    className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold"
-                                  >
-                                    接受
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                              <div className="md:col-span-2">
-                                <h3 className="text-sm font-black text-gray-800 flex items-center mb-4 border-b border-gray-200 pb-2">
-                                  <AlignLeft size={16} className="mr-2" />
-                                  日程说明
-                                </h3>
-                                <div className="text-sm text-gray-700 leading-relaxed">
-                                  <p className="mb-4 font-medium">{selectedEvent.description || '暂无详细说明。'}</p>
-                                </div>
-                              </div>
-                              <div className="md:col-span-1">
-                                <h3 className="text-sm font-black text-gray-800 flex items-center mb-4 border-b border-gray-200 pb-2">
-                                  <Users size={16} className="mr-2" />
-                                  参与者
-                                </h3>
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-                                  {(selectedEvent.attendees || [selectedEvent.organizer]).map((person) => (
-                                    <div key={person} className="flex items-center justify-between text-sm">
-                                      <div className="flex items-center">
-                                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold mr-2">
-                                          {person[0] || '无'}
-                                        </div>
-                                        <span className="font-bold">{person}</span>
-                                      </div>
-                                      {person === selectedEvent.organizer && <span className="text-xs font-bold text-blue-600">组织者</span>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
                             </div>
                           </>
                         )}
