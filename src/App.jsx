@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Bell,
   Calendar,
-  Camera,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -21,7 +20,6 @@ import {
   FileText,
   Forward,
   HelpCircle,
-  LayoutGrid,
   Lock,
   Mail,
   MapPin,
@@ -41,7 +39,6 @@ import {
   SquarePen,
   Star,
   Trash,
-  Type,
   UserPlus,
   Users,
   X,
@@ -76,7 +73,6 @@ import {
   AVAILABILITY_OPTIONS,
   VISIBILITY_OPTIONS,
   INITIAL_CREATE_DRAFT_PANELS,
-  INITIAL_CREATE_DRAFT_BULK_INPUTS,
   MEETING_PROVIDER_LABELS,
   REPEAT_LABELS,
   REMINDER_LABELS,
@@ -124,7 +120,6 @@ import {
   getSlotFromPointer,
   clampLinesStyle,
   getTimedEventCardDensity,
-  overlapsWindow,
   isWorkHour,
   getTimeTop,
   getTimeHeight,
@@ -3632,7 +3627,6 @@ function MainApp() {
     eventId: null,
   });
   const [createDraftPanels, setCreateDraftPanels] = useState(INITIAL_CREATE_DRAFT_PANELS);
-  const [createDraftBulkInputs, setCreateDraftBulkInputs] = useState(INITIAL_CREATE_DRAFT_BULK_INPUTS);
   const [hoverPreview, setHoverPreview] = useState(null);
   const [eventInteraction, setEventInteraction] = useState(null);
   const calendarSearchBoxRef = useRef(null);
@@ -3824,77 +3818,6 @@ function MainApp() {
       )
     : [];
   const draftAccountInfo = accountMap[calendarMap[draftForm.calId]?.accountId] || null;
-  const draftParticipantAccountLookup = useMemo(() => {
-    const nextMap = new Map();
-
-    const register = (value, accountId) => {
-      const key = normalizeParticipantIdentity(value);
-      if (!key) return;
-      const current = nextMap.get(key) || new Set();
-      current.add(accountId);
-      nextMap.set(key, current);
-    };
-
-    accounts.forEach((account) => {
-      register(account.email, account.id);
-      register(account.name, account.id);
-      account.mailboxMembers?.forEach((member) => {
-        register(member.name, account.id);
-        register(member.email, account.id);
-      });
-    });
-
-    calendars.forEach((calendar) => {
-      register(calendar.owner, calendar.accountId);
-    });
-
-    return nextMap;
-  }, [accounts, calendars]);
-  const resolveParticipantAccountIds = (participants = []) => {
-    const nextIds = new Set();
-
-    participants.forEach((participant) => {
-      const matched = draftParticipantAccountLookup.get(normalizeParticipantIdentity(participant));
-      if (!matched) return;
-      matched.forEach((accountId) => nextIds.add(accountId));
-    });
-
-    return Array.from(nextIds);
-  };
-  const getAccountPermissionMode = (accountId) => {
-    const accountCalendars = calendars.filter((calendar) => calendar.accountId === accountId);
-    if (accountCalendars.length === 0) return 'full';
-    return accountCalendars.every((calendar) => getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission) === 'busy_only') ? 'busy_only' : 'full';
-  };
-  const draftRequiredAccountIds = useMemo(() => {
-    const nextIds = new Set();
-    const selectedAccountId = calendarMap[draftForm.calId]?.accountId;
-
-    if (selectedAccountId) nextIds.add(selectedAccountId);
-    resolveParticipantAccountIds([draftForm.organizer, ...draftForm.attendees]).forEach((accountId) => nextIds.add(accountId));
-
-    return Array.from(nextIds);
-  }, [calendarMap, draftForm.attendees, draftForm.calId, draftForm.organizer, draftParticipantAccountLookup]);
-  const draftOptionalAccountIds = useMemo(() => {
-    const requiredIds = new Set(draftRequiredAccountIds);
-    return resolveParticipantAccountIds(draftForm.optionalAttendees || []).filter((accountId) => !requiredIds.has(accountId));
-  }, [draftForm.optionalAttendees, draftParticipantAccountLookup, draftRequiredAccountIds]);
-  const draftRelevantAccountIds = useMemo(
-    () => Array.from(new Set([...draftRequiredAccountIds, ...draftOptionalAccountIds])),
-    [draftOptionalAccountIds, draftRequiredAccountIds],
-  );
-  const draftRelevantAccounts = useMemo(
-    () => draftRelevantAccountIds.map((accountId) => accountMap[accountId]).filter(Boolean),
-    [accountMap, draftRelevantAccountIds],
-  );
-  const draftMatchedRequiredParticipantIds = useMemo(
-    () => resolveParticipantAccountIds(draftForm.attendees),
-    [draftForm.attendees, draftParticipantAccountLookup],
-  );
-  const draftMatchedOptionalParticipantIds = useMemo(() => {
-    const requiredIds = new Set(draftMatchedRequiredParticipantIds);
-    return resolveParticipantAccountIds(draftForm.optionalAttendees || []).filter((accountId) => !requiredIds.has(accountId));
-  }, [draftForm.optionalAttendees, draftMatchedRequiredParticipantIds, draftParticipantAccountLookup]);
   const participantDisplayLookup = useMemo(() => {
     const nextMap = new Map();
     const register = (key, payload) => {
@@ -3997,43 +3920,6 @@ function MainApp() {
       upcoming: visible.filter((event) => event.reminderEndTime >= now - 2 * 60 * 60 * 1000).slice(0, 8),
     };
   }, [activeCalIds, events]);
-  const collectSlotConflicts = (date, startH, durationH, accountIds = [], excludeEventId = null) => {
-    const relevantAccountIds = new Set(accountIds);
-
-    return events
-      .filter((event) => {
-        if (event.id === excludeEventId || event.isAllDay) return false;
-        if (event.availability === 'free') return false;
-        if (!sameDay(eventToDate(event), date)) return false;
-        const accountId = calendarMap[event.calId]?.accountId;
-        if (!relevantAccountIds.has(accountId)) return false;
-        return overlapsWindow(startH, startH + durationH, event.startH || 0, (event.startH || 0) + (event.durationH || 1));
-      })
-      .map((event) => ({
-        ...event,
-        accountId: calendarMap[event.calId]?.accountId,
-      }));
-  };
-
-  const draftConflicts = useMemo(() => {
-    return collectSlotConflicts(draftForm.date, draftForm.startH, draftForm.durationH, draftRelevantAccountIds, draftForm.eventId);
-  }, [calendarMap, draftForm.date, draftForm.durationH, draftForm.eventId, draftForm.startH, draftRelevantAccountIds, events]);
-  const currentSlotAccountStates = useMemo(
-    () =>
-      draftRelevantAccounts.map((account) => {
-        const conflicts = collectSlotConflicts(draftForm.date, draftForm.startH, draftForm.durationH, [account.id], draftForm.eventId).sort(
-          (left, right) => (left.startH || 0) - (right.startH || 0),
-        );
-
-        return {
-          account,
-          conflicts,
-          scope: draftRequiredAccountIds.includes(account.id) ? 'required' : 'optional',
-          permissionMode: getAccountPermissionMode(account.id),
-        };
-      }),
-    [calendarMap, draftForm.date, draftForm.durationH, draftForm.eventId, draftForm.startH, draftRelevantAccounts, draftRequiredAccountIds, events],
-  );
   const editableCalendars = useMemo(() => calendars.filter((calendar) => canEditCalendarContent(calendar)), [calendars]);
   const draftAccountCalendars = useMemo(
     () => editableCalendars.filter((calendar) => calendar.accountId === draftAccountInfo?.id),
@@ -4173,7 +4059,6 @@ function MainApp() {
       eventId: null,
     });
     setCreateDraftPanels(INITIAL_CREATE_DRAFT_PANELS);
-    setCreateDraftBulkInputs(INITIAL_CREATE_DRAFT_BULK_INPUTS);
   };
 
   const toggleSplitAccount = (id) => {
@@ -5410,7 +5295,6 @@ function MainApp() {
       eventId: null,
     });
     setCreateDraftPanels(INITIAL_CREATE_DRAFT_PANELS);
-    setCreateDraftBulkInputs(INITIAL_CREATE_DRAFT_BULK_INPUTS);
     setActiveProduct('calendar');
     setCurrentScreen('create');
     setFocusDate(stripTime(nextDraft.date));
@@ -5840,7 +5724,6 @@ function MainApp() {
       eventId: editingEvent?.id ?? null,
     });
     setCreateDraftPanels(INITIAL_CREATE_DRAFT_PANELS);
-    setCreateDraftBulkInputs(INITIAL_CREATE_DRAFT_BULK_INPUTS);
     setFocusDate(stripTime(nextDraft.date));
   };
 
@@ -6272,58 +6155,12 @@ function MainApp() {
     markDraftDirty();
   };
 
-  const applyBulkAttendeeInput = (listKey = 'attendees') => {
-    const bulkValue = createDraftBulkInputs[listKey]?.trim();
-    if (!bulkValue) return;
-
-    addAttendeeByValue(bulkValue, listKey, null, () => {
-      setCreateDraftBulkInputs((prev) => ({ ...prev, [listKey]: '' }));
-      setCreateDraftPanels((prev) => ({
-        ...prev,
-        [listKey === 'attendees' ? 'requiredBulkOpen' : 'optionalBulkOpen']: false,
-        [listKey === 'attendees' ? 'requiredExpanded' : 'optionalExpanded']: true,
-      }));
-    });
-  };
-
   const removeAttendee = (name, listKey = 'attendees') => {
     setDraftForm((prev) => ({
       ...prev,
       [listKey]: (prev[listKey] || []).filter((person) => person !== name),
     }));
     markDraftDirty();
-  };
-
-  const applyDraftSuggestion = (startH) => {
-    updateDraftSchedule({
-      date: draftForm.date,
-      startH,
-      durationH: draftForm.durationH,
-    });
-  };
-
-  const handleEditorTool = (tool) => {
-    const snippets = {
-      agenda: '会议议程\n1. 背景同步\n2. 方案评审\n3. 决策与分工\n',
-      grid: '任务清单\n- 待确认事项：\n- 会后动作：\n',
-      camera: '\n[插入现场截图占位]\n',
-      attachment: '\n[附件] 请在会前查看《Calendar_规约.pdf》\n',
-    };
-
-    const patch = {
-      description: `${draftForm.description}${draftForm.description ? '\n\n' : ''}${snippets[tool] || ''}`,
-    };
-
-    if (tool === 'attachment' && !draftForm.attachments.includes('Calendar_规约.pdf')) {
-      patch.attachments = [...draftForm.attachments, 'Calendar_规约.pdf'];
-    }
-
-    patchDraft(patch);
-    triggerFeedback('L3', {
-      msg: '内容已插入',
-      icon: <Check size={16} />,
-      color: 'bg-gray-800',
-    });
   };
 
   const saveDraft = (mode, options = {}) => {
@@ -6428,64 +6265,9 @@ function MainApp() {
   const createWindowSaveLabel =
     createDraft.saveStatus === 'saving' ? '自动保存中' : createDraft.saveStatus === 'saved' ? '已自动保存' : '自动保存';
   const draftEndMeta = getDraftEndMeta(draftForm.date, draftForm.startH, draftForm.durationH);
-  const createDraftSummaryText =
-    sameDay(draftForm.date, draftEndMeta.date)
-      ? `${formatDateLabel(draftForm.date)} · ${formatTimeRange(draftForm.startH, draftForm.durationH)}`
-      : `${formatDateLabel(draftForm.date)} ${formatTimeSelectLabel(draftForm.startH)} - ${formatDateLabel(draftEndMeta.date)} ${formatTimeSelectLabel(
-          draftEndMeta.hour,
-        )}`;
-  const createDraftDurationLabel = formatDurationLabel(draftForm.durationH);
-  const createDraftSpansMultipleDays = !sameDay(draftForm.date, draftEndMeta.date);
-  const createDraftScheduleTone =
-    draftConflicts.length > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700';
   const createDraftInviteeCount = draftForm.attendees.length + (draftForm.optionalAttendees || []).length;
   const createDraftLargeAudience = createDraftInviteeCount >= 20;
   const createDraftMassAudience = createDraftInviteeCount >= 80;
-  const createDraftRequiredMatchedCount = draftMatchedRequiredParticipantIds.length;
-  const createDraftOptionalMatchedCount = draftMatchedOptionalParticipantIds.length;
-  const createDraftRequiredUnmatchedCount = Math.max(draftForm.attendees.length - createDraftRequiredMatchedCount, 0);
-  const createDraftOptionalUnmatchedCount = Math.max((draftForm.optionalAttendees || []).length - createDraftOptionalMatchedCount, 0);
-  const createDraftRequiredBusyOnlyCount = draftMatchedRequiredParticipantIds.filter((accountId) => getAccountPermissionMode(accountId) === 'busy_only').length;
-  const createDraftOptionalBusyOnlyCount = draftMatchedOptionalParticipantIds.filter((accountId) => getAccountPermissionMode(accountId) === 'busy_only').length;
-  const createDraftScheduleText =
-    draftConflicts.length > 0
-      ? `${currentSlotAccountStates.filter((state) => state.conflicts.length > 0).length}/${Math.max(currentSlotAccountStates.length, 1)} 位参与人当前忙碌`
-      : `当前时间满足 ${Math.max(createDraftRequiredMatchedCount, 1)} 位已识别必需参会者`;
-  const createDraftAccountLabel = draftAccountInfo?.email || draftAccountInfo?.name || '未选择账户';
-  const createDraftCalendarInfo = calendarMap[draftForm.calId] || null;
-  const createDraftCalendarLabel = createDraftCalendarInfo?.name || '未选择日历';
-  const createDraftBusyStates = currentSlotAccountStates.filter((state) => state.conflicts.length > 0);
-  const createDraftRequiredBusyCount = currentSlotAccountStates.filter((state) => state.scope === 'required' && state.conflicts.length > 0).length;
-  const createDraftOptionalBusyCount = currentSlotAccountStates.filter((state) => state.scope === 'optional' && state.conflicts.length > 0).length;
-  const createDraftParticipantCheckMessage =
-    draftRelevantAccountIds.length <= 1
-      ? `当前按 ${createDraftAccountLabel} 的工作时间检查忙闲`
-      : createDraftLargeAudience && createDraftBusyStates.length > 0
-        ? `当前有 ${createDraftRequiredBusyCount} 位必需参会者、${createDraftOptionalBusyCount} 位可选参会者忙碌`
-        : createDraftBusyStates.length > 0
-        ? `${createDraftBusyStates
-            .map((state) => `${state.account.email || state.account.name}${state.scope === 'required' ? '（必需）' : '（可选）'}`)
-            .join('、')} 当前忙碌`
-        : `已检查 ${Math.max(createDraftRequiredMatchedCount, 1)} 位必需参会者${createDraftOptionalMatchedCount > 0 ? ` 和 ${createDraftOptionalMatchedCount} 位可选参会者` : ''}`;
-  const createDraftConflictPreviewItems = currentSlotAccountStates
-    .flatMap(({ account, conflicts }) =>
-      conflicts.slice(0, 1).map((event) => ({
-        id: `${account.id}-${event.id}`,
-        accountLabel: account.email || account.name,
-        eventLabel: `${formatTimeRange(event.startH || 0, event.durationH || 1)} · ${
-          getAccountPermissionMode(account.id) === 'busy_only' || event.type === 'busy_only' ? '忙碌' : event.title || '忙碌'
-        }`,
-      })),
-    )
-    .slice(0, 3);
-  const createDraftRequiredText =
-    draftForm.attendees.length > 0
-      ? `已添加 ${draftForm.attendees.length} 位必需参与人${createDraftRequiredUnmatchedCount > 0 ? `，其中 ${createDraftRequiredUnmatchedCount} 位暂未识别到组织内日历` : ''}`
-      : '';
-  const createDraftOptionalText =
-    (draftForm.optionalAttendees || []).length > 0
-      ? `已添加 ${(draftForm.optionalAttendees || []).length} 位可选参与人${createDraftOptionalUnmatchedCount > 0 ? `，其中 ${createDraftOptionalUnmatchedCount} 位暂未识别到组织内日历` : ''}`
-      : '';
   const createDraftRequiredPreviewCount = createDraftMassAudience ? 5 : 8;
   const createDraftOptionalPreviewCount = createDraftMassAudience ? 4 : 6;
   const createDraftVisibleRequiredAttendees =
@@ -6496,16 +6278,6 @@ function MainApp() {
     createDraftPanels.optionalExpanded || !createDraftLargeAudience
       ? draftForm.optionalAttendees || []
       : (draftForm.optionalAttendees || []).slice(0, createDraftOptionalPreviewCount);
-  const createDraftConflictSourceStates = createDraftLargeAudience
-    ? currentSlotAccountStates.filter((state) => state.conflicts.length > 0)
-    : currentSlotAccountStates;
-  const createDraftConflictDetailStates = createDraftPanels.conflictsExpanded
-    ? createDraftConflictSourceStates
-    : createDraftConflictSourceStates.slice(0, 10);
-  const createDraftHiddenConflictStateCount = Math.max(
-    createDraftConflictSourceStates.length - createDraftConflictDetailStates.length,
-    0,
-  );
 
   const handleContextMenu = (event, entry) => {
     event.preventDefault();
@@ -7489,12 +7261,30 @@ function MainApp() {
                     <div className="h-[70vh] max-h-[calc(100vh-32px)] w-[70vw] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
                       <div className="flex h-full w-full flex-col overflow-hidden bg-white">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
-                          <div className="min-w-0">
-                            <div className="truncate font-semibold text-slate-900">
-                              {createDraft.mode === 'edit' ? '编辑日程' : '新建日程'}
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="relative w-[260px] max-w-[42vw] shrink-0">
+                              <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <select
+                                value={draftAccountInfo?.id || ''}
+                                onChange={(event) => handleDraftAccountChange(event.target.value)}
+                                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-semibold text-slate-900 focus:outline-none"
+                                aria-label="发起账号"
+                              >
+                                {selectableDraftAccounts.map((account) => (
+                                  <option key={account.id} value={account.id}>
+                                    {account.email || account.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             </div>
-                            <div className="mt-1 text-xs text-slate-400">
-                              {createWindowTimestamp} {createWindowSaveLabel}
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-slate-900">
+                                {createDraft.mode === 'edit' ? '编辑日程' : '新建日程'}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-400">
+                                {createWindowTimestamp} {createWindowSaveLabel}
+                              </div>
                             </div>
                           </div>
                           <div className="ml-4 flex items-center gap-1 text-slate-400">
@@ -7518,9 +7308,9 @@ function MainApp() {
                           </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+                        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                           <div className="mx-auto w-full max-w-[980px]">
-                          <div className="border-b border-slate-200 py-3">
+                          <div className="space-y-2.5 border-b border-slate-200 py-2.5">
                             <input
                               type="text"
                               value={draftForm.title}
@@ -7529,401 +7319,15 @@ function MainApp() {
                               className="min-w-0 w-full border-none bg-transparent py-1 text-2xl font-semibold text-slate-900 placeholder:text-slate-300 focus:outline-none"
                               autoFocus
                             />
+                            <textarea
+                              value={draftForm.description}
+                              onChange={(event) => patchDraft({ description: event.target.value })}
+                              className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              placeholder="补充会议背景、目标、议程和会前准备..."
+                            ></textarea>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">写入到</div>
-                            <div className="space-y-2">
-                              <div className="grid gap-3 lg:grid-cols-2">
-                                <div className="relative">
-                                  <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                  <select
-                                    value={draftAccountInfo?.id || ''}
-                                    onChange={(event) => handleDraftAccountChange(event.target.value)}
-                                    className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-medium text-slate-900 focus:outline-none"
-                                  >
-                                    {selectableDraftAccounts.map((account) => (
-                                      <option key={account.id} value={account.id}>
-                                        账户：{account.email || account.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                </div>
-                                <div className="relative">
-                                <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <select
-                                  value={draftForm.calId}
-                                  onChange={(event) => handleDraftCalendarChange(event.target.value)}
-                                  className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-medium text-slate-900 focus:outline-none"
-                                >
-                                  {draftAccountCalendars.map((calendar) => (
-                                    <option key={calendar.id} value={calendar.id}>
-                                      {calendar.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                  发起账号 {createDraftAccountLabel}
-                                </span>
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                  目标日历 {createDraftCalendarLabel}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">必需</div>
-                            <div className="space-y-3">
-                              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700">
-                                  共 {draftForm.attendees.length} 位
-                                </span>
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                  忙闲可检查 {createDraftRequiredMatchedCount} 位
-                                </span>
-                                {createDraftRequiredUnmatchedCount > 0 && (
-                                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                                    仅邮件名单 {createDraftRequiredUnmatchedCount} 位
-                                  </span>
-                                )}
-                                {createDraftRequiredBusyOnlyCount > 0 && (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-semibold text-slate-600">
-                                    仅忙闲权限 {createDraftRequiredBusyOnlyCount} 位
-                                  </span>
-                                )}
-                              </div>
-                              {createDraftLargeAudience ? (
-                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-                                    <div className="text-xs font-semibold text-slate-600">必需参会人</div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button
-                                        onClick={() =>
-                                          setCreateDraftPanels((prev) => ({ ...prev, requiredBulkOpen: !prev.requiredBulkOpen }))
-                                        }
-                                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                      >
-                                        {createDraftPanels.requiredBulkOpen ? '收起批量粘贴' : '批量粘贴名单'}
-                                      </button>
-                                      {draftForm.attendees.length > createDraftRequiredPreviewCount && (
-                                        <button
-                                          onClick={() =>
-                                            setCreateDraftPanels((prev) => ({ ...prev, requiredExpanded: !prev.requiredExpanded }))
-                                          }
-                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                        >
-                                          {createDraftPanels.requiredExpanded ? '收起名单' : `查看全部 ${draftForm.attendees.length} 位`}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {createDraftVisibleRequiredAttendees.length > 0 ? (
-                                    <div className="max-h-44 overflow-y-auto divide-y divide-slate-100">
-                                      {createDraftVisibleRequiredAttendees.map((person) => {
-                                        const display = getParticipantDisplay(person);
-                                        return (
-                                          <div key={person} className="flex items-center justify-between gap-3 px-3 py-2">
-                                            <div className="min-w-0">
-                                              <div className="truncate text-sm font-medium text-slate-800">{display.title}</div>
-                                              <div className="truncate text-xs text-slate-400">{display.subtitle || person}</div>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-2">
-                                              {display.tag && (
-                                                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                                  {display.tag}
-                                                </span>
-                                              )}
-                                              <button
-                                                onClick={() => removeAttendee(person, 'attendees')}
-                                                title={`移除 ${person}`}
-                                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100"
-                                              >
-                                                <X size={12} />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : (
-                                    <div className="px-3 py-4 text-sm text-slate-400">还没有添加必需参会人</div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="flex min-h-[42px] flex-wrap items-center gap-2">
-                                  {createDraftVisibleRequiredAttendees.map((person) => {
-                                    const display = getParticipantDisplay(person);
-                                    return (
-                                      <button
-                                        key={person}
-                                        onClick={() => removeAttendee(person, 'attendees')}
-                                        title={person}
-                                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-left text-sm font-medium text-slate-700"
-                                      >
-                                        <span className="max-w-[220px] truncate">{display.title}</span>
-                                        {display.subtitle && <span className="max-w-[180px] truncate text-xs text-slate-400">{display.subtitle}</span>}
-                                        <X size={12} className="shrink-0" />
-                                      </button>
-                                    );
-                                  })}
-                                  <input
-                                    type="text"
-                                    value={draftForm.inviteInput}
-                                    onChange={(event) => patchDraft({ inviteInput: event.target.value })}
-                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
-	                                    placeholder="姓名或邮箱"
-                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => addAttendee('attendees', 'inviteInput')}
-                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    <UserPlus size={15} />
-                                    添加
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      setCreateDraftPanels((prev) => ({ ...prev, requiredBulkOpen: !prev.requiredBulkOpen }))
-                                    }
-                                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    批量粘贴
-                                  </button>
-                                </div>
-                              )}
-                              {createDraftPanels.requiredBulkOpen && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-	                                  <textarea
-                                    value={createDraftBulkInputs.attendees}
-                                    onChange={(event) => setCreateDraftBulkInputs((prev) => ({ ...prev, attendees: event.target.value }))}
-                                    rows={createDraftMassAudience ? 6 : 4}
-                                    placeholder="例如：\nme@calendarpro.io\nsales@calendarpro.io\n客户代表A <guest@example.com>"
-                                    className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setCreateDraftBulkInputs((prev) => ({ ...prev, attendees: '' }));
-                                        setCreateDraftPanels((prev) => ({ ...prev, requiredBulkOpen: false }));
-                                      }}
-                                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-                                    >
-                                      取消
-                                    </button>
-                                    <button
-                                      onClick={() => applyBulkAttendeeInput('attendees')}
-                                      className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                                    >
-                                      <UserPlus size={15} />
-                                      导入到必需参会人
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              {createDraftLargeAudience && (
-                                <div className="flex min-h-[42px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                  <input
-                                    type="text"
-                                    value={draftForm.inviteInput}
-                                    onChange={(event) => patchDraft({ inviteInput: event.target.value })}
-                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
-	                                    placeholder="姓名或邮箱"
-                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => addAttendee('attendees', 'inviteInput')}
-                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                                  >
-                                    <UserPlus size={15} />
-                                    添加
-                                  </button>
-                                </div>
-                              )}
-	                              {createDraftRequiredText && <div className="mt-2 text-xs text-slate-400">{createDraftRequiredText}</div>}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">可选</div>
-                            <div className="space-y-3">
-                              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700">
-                                  共 {(draftForm.optionalAttendees || []).length} 位
-                                </span>
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                  忙闲可检查 {createDraftOptionalMatchedCount} 位
-                                </span>
-                                {createDraftOptionalUnmatchedCount > 0 && (
-                                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                                    仅邮件名单 {createDraftOptionalUnmatchedCount} 位
-                                  </span>
-                                )}
-                                {createDraftOptionalBusyOnlyCount > 0 && (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-semibold text-slate-600">
-                                    仅忙闲权限 {createDraftOptionalBusyOnlyCount} 位
-                                  </span>
-                                )}
-                              </div>
-                              {createDraftLargeAudience ? (
-                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
-                                    <div className="text-xs font-semibold text-slate-600">可选参会人</div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button
-                                        onClick={() =>
-                                          setCreateDraftPanels((prev) => ({ ...prev, optionalBulkOpen: !prev.optionalBulkOpen }))
-                                        }
-                                        className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                      >
-                                        {createDraftPanels.optionalBulkOpen ? '收起批量粘贴' : '批量粘贴名单'}
-                                      </button>
-                                      {(draftForm.optionalAttendees || []).length > createDraftOptionalPreviewCount && (
-                                        <button
-                                          onClick={() =>
-                                            setCreateDraftPanels((prev) => ({ ...prev, optionalExpanded: !prev.optionalExpanded }))
-                                          }
-                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                        >
-                                          {createDraftPanels.optionalExpanded ? '收起名单' : `查看全部 ${(draftForm.optionalAttendees || []).length} 位`}
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {createDraftVisibleOptionalAttendees.length > 0 ? (
-                                    <div className="max-h-40 overflow-y-auto divide-y divide-slate-100">
-                                      {createDraftVisibleOptionalAttendees.map((person) => {
-                                        const display = getParticipantDisplay(person);
-                                        return (
-                                          <div key={person} className="flex items-center justify-between gap-3 px-3 py-2">
-                                            <div className="min-w-0">
-                                              <div className="truncate text-sm font-medium text-slate-800">{display.title}</div>
-                                              <div className="truncate text-xs text-slate-400">{display.subtitle || person}</div>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-2">
-                                              {display.tag && (
-                                                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                                  {display.tag}
-                                                </span>
-                                              )}
-                                              <button
-                                                onClick={() => removeAttendee(person, 'optionalAttendees')}
-                                                title={`移除 ${person}`}
-                                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100"
-                                              >
-                                                <X size={12} />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : (
-                                    <div className="px-3 py-4 text-sm text-slate-400">当前没有可选参与人</div>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="flex min-h-[42px] flex-wrap items-center gap-2">
-                                  {createDraftVisibleOptionalAttendees.map((person) => {
-                                    const display = getParticipantDisplay(person);
-                                    return (
-                                      <button
-                                        key={person}
-                                        onClick={() => removeAttendee(person, 'optionalAttendees')}
-                                        title={person}
-                                        className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
-                                      >
-                                        <span className="max-w-[220px] truncate">{display.title}</span>
-                                        {display.subtitle && <span className="max-w-[180px] truncate text-xs text-slate-400">{display.subtitle}</span>}
-                                        <X size={12} className="shrink-0" />
-                                      </button>
-                                    );
-                                  })}
-                                  <input
-                                    type="text"
-                                    value={draftForm.optionalInviteInput || ''}
-                                    onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
-                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
-	                                    placeholder="可选参与人"
-                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => addAttendee('optionalAttendees', 'optionalInviteInput')}
-                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    <UserPlus size={15} />
-                                    添加
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      setCreateDraftPanels((prev) => ({ ...prev, optionalBulkOpen: !prev.optionalBulkOpen }))
-                                    }
-                                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    批量粘贴
-                                  </button>
-                                </div>
-                              )}
-                              {createDraftPanels.optionalBulkOpen && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-	                                  <textarea
-                                    value={createDraftBulkInputs.optionalAttendees}
-                                    onChange={(event) =>
-                                      setCreateDraftBulkInputs((prev) => ({ ...prev, optionalAttendees: event.target.value }))
-                                    }
-                                    rows={createDraftMassAudience ? 5 : 4}
-                                    placeholder="例如：\nassistant@calendarpro.io\nfinance@calendarpro.io"
-                                    className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setCreateDraftBulkInputs((prev) => ({ ...prev, optionalAttendees: '' }));
-                                        setCreateDraftPanels((prev) => ({ ...prev, optionalBulkOpen: false }));
-                                      }}
-                                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-                                    >
-                                      取消
-                                    </button>
-                                    <button
-                                      onClick={() => applyBulkAttendeeInput('optionalAttendees')}
-                                      className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                                    >
-                                      <UserPlus size={15} />
-                                      导入到可选参与人
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              {createDraftLargeAudience && (
-                                <div className="flex min-h-[42px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                  <input
-                                    type="text"
-                                    value={draftForm.optionalInviteInput || ''}
-                                    onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
-                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
-	                                    placeholder="可选参与人"
-                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => addAttendee('optionalAttendees', 'optionalInviteInput')}
-                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                                  >
-                                    <UserPlus size={15} />
-                                    添加
-                                  </button>
-                                </div>
-                              )}
-	                              {createDraftOptionalText && <div className="mt-2 text-xs text-slate-400">{createDraftOptionalText}</div>}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
                             <div className="pt-2 text-slate-500">时间</div>
                             <div className="space-y-3">
                               <div className="grid gap-3 lg:grid-cols-[minmax(160px,1fr)_140px_minmax(160px,1fr)_140px]">
@@ -7981,41 +7385,261 @@ function MainApp() {
                                   </select>
                                 </label>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2 text-xs">
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-500">
-                                  组织者：{draftForm.organizer || createDraftAccountLabel}
-                                </span>
-                                <span className={`inline-flex items-center rounded-full border px-3 py-1 font-semibold ${createDraftScheduleTone}`}>
-                                  {createDraftScheduleText}
-                                </span>
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
-                                  时长 {createDraftDurationLabel}
-                                </span>
-                                {createDraftSpansMultipleDays && (
-                                  <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700">
-                                    跨天
-                                  </span>
-                                )}
-                              </div>
-                              {createDraftConflictPreviewItems.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2 text-xs">
-                                  {createDraftConflictPreviewItems.map((item) => (
-                                    <span
-                                      key={item.id}
-                                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 font-semibold text-red-700"
-                                      title={`${item.accountLabel} · ${item.eventLabel}`}
-                                    >
-                                      <span className="max-w-[140px] truncate">{item.accountLabel}</span>
-                                      <span className="text-red-400">·</span>
-                                      <span className="max-w-[220px] truncate">{item.eventLabel}</span>
-                                    </span>
-                                  ))}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
+                            <div className="pt-2 text-slate-500">必需</div>
+                            <div className="space-y-3">
+                              {createDraftLargeAudience ? (
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
+                                    <div className="text-xs font-semibold text-slate-600">必需参会人</div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {draftForm.attendees.length > createDraftRequiredPreviewCount && (
+                                        <button
+                                          onClick={() =>
+                                            setCreateDraftPanels((prev) => ({ ...prev, requiredExpanded: !prev.requiredExpanded }))
+                                          }
+                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                                        >
+                                          {createDraftPanels.requiredExpanded ? '收起名单' : '展开全部'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {createDraftVisibleRequiredAttendees.length > 0 ? (
+                                    <div className="max-h-44 overflow-y-auto divide-y divide-slate-100">
+                                      {createDraftVisibleRequiredAttendees.map((person) => {
+                                        const display = getParticipantDisplay(person);
+                                        return (
+                                          <div key={person} className="flex items-center justify-between gap-3 px-3 py-2">
+                                            <div className="min-w-0">
+                                              <div className="truncate text-sm font-medium text-slate-800">{display.title}</div>
+                                              <div className="truncate text-xs text-slate-400">{display.subtitle || person}</div>
+                                            </div>
+                                            <button
+                                              onClick={() => removeAttendee(person, 'attendees')}
+                                              title={`移除 ${person}`}
+                                              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100"
+                                            >
+                                              <X size={12} />
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="px-3 py-4 text-sm text-slate-400">还没有添加必需参会人</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex min-h-[42px] flex-wrap items-center gap-2">
+                                  {createDraftVisibleRequiredAttendees.map((person) => {
+                                    const display = getParticipantDisplay(person);
+                                    return (
+                                      <button
+                                        key={person}
+                                        onClick={() => removeAttendee(person, 'attendees')}
+                                        title={person}
+                                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-left text-sm font-medium text-slate-700"
+                                      >
+                                        <span className="max-w-[220px] truncate">{display.title}</span>
+                                        {display.subtitle && <span className="max-w-[180px] truncate text-xs text-slate-400">{display.subtitle}</span>}
+                                        <X size={12} className="shrink-0" />
+                                      </button>
+                                    );
+                                  })}
+                                  <input
+                                    type="text"
+                                    value={draftForm.inviteInput}
+                                    onChange={(event) => patchDraft({ inviteInput: event.target.value })}
+                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
+                                    placeholder="输入姓名或邮箱，按 Enter 添加"
+                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                                  />
+                                </div>
+                              )}
+                              {createDraftLargeAudience && (
+                                <div className="flex min-h-[42px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                  <input
+                                    type="text"
+                                    value={draftForm.inviteInput}
+                                    onChange={(event) => patchDraft({ inviteInput: event.target.value })}
+                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'attendees', 'inviteInput')}
+                                    placeholder="输入姓名或邮箱，按 Enter 添加"
+                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                                  />
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
+                            <div className="pt-2 text-slate-500">可选</div>
+                            <div className="space-y-3">
+                              {createDraftLargeAudience ? (
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
+                                    <div className="text-xs font-semibold text-slate-600">可选参会人</div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {(draftForm.optionalAttendees || []).length > createDraftOptionalPreviewCount && (
+                                        <button
+                                          onClick={() =>
+                                            setCreateDraftPanels((prev) => ({ ...prev, optionalExpanded: !prev.optionalExpanded }))
+                                          }
+                                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                                        >
+                                          {createDraftPanels.optionalExpanded ? '收起名单' : '展开全部'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {createDraftVisibleOptionalAttendees.length > 0 ? (
+                                    <div className="max-h-40 overflow-y-auto divide-y divide-slate-100">
+                                      {createDraftVisibleOptionalAttendees.map((person) => {
+                                        const display = getParticipantDisplay(person);
+                                        return (
+                                          <div key={person} className="flex items-center justify-between gap-3 px-3 py-2">
+                                            <div className="min-w-0">
+                                              <div className="truncate text-sm font-medium text-slate-800">{display.title}</div>
+                                              <div className="truncate text-xs text-slate-400">{display.subtitle || person}</div>
+                                            </div>
+                                            <button
+                                              onClick={() => removeAttendee(person, 'optionalAttendees')}
+                                              title={`移除 ${person}`}
+                                              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100"
+                                            >
+                                              <X size={12} />
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="px-3 py-4 text-sm text-slate-400">当前没有可选参与人</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex min-h-[42px] flex-wrap items-center gap-2">
+                                  {createDraftVisibleOptionalAttendees.map((person) => {
+                                    const display = getParticipantDisplay(person);
+                                    return (
+                                      <button
+                                        key={person}
+                                        onClick={() => removeAttendee(person, 'optionalAttendees')}
+                                        title={person}
+                                        className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700"
+                                      >
+                                        <span className="max-w-[220px] truncate">{display.title}</span>
+                                        {display.subtitle && <span className="max-w-[180px] truncate text-xs text-slate-400">{display.subtitle}</span>}
+                                        <X size={12} className="shrink-0" />
+                                      </button>
+                                    );
+                                  })}
+                                  <input
+                                    type="text"
+                                    value={draftForm.optionalInviteInput || ''}
+                                    onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
+                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
+                                    placeholder="输入可选参与人，按 Enter 添加"
+                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                                  />
+                                </div>
+                              )}
+                              {createDraftLargeAudience && (
+                                <div className="flex min-h-[42px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                  <input
+                                    type="text"
+                                    value={draftForm.optionalInviteInput || ''}
+                                    onChange={(event) => patchDraft({ optionalInviteInput: event.target.value })}
+                                    onKeyDown={(event) => handleAttendeeInputKeyDown(event, 'optionalAttendees', 'optionalInviteInput')}
+                                    placeholder="输入可选参与人，按 Enter 添加"
+                                    className="min-w-[220px] flex-1 border-none bg-transparent py-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
+                            <div className="pt-2 text-slate-500">地点</div>
+                            <div className="space-y-2.5">
+                              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                                <div className="flex min-h-[42px] items-center gap-3">
+                                  <MapPin size={15} className="shrink-0 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    value={draftForm.location}
+                                    onChange={(event) => patchDraft({ location: event.target.value })}
+                                    placeholder="地点或会议室"
+                                    className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                                  />
+                                </div>
+                                <div className="relative">
+                                  <Calendar size={15} className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400" />
+                                  <select
+                                    value={draftForm.meetingProvider}
+                                    onChange={(event) => setDraftMeetingProvider(event.target.value)}
+                                    className="w-full appearance-none border-none bg-transparent py-1 pl-6 pr-6 text-sm font-medium text-slate-700 focus:outline-none"
+                                  >
+                                    {MEETING_PROVIDER_OPTIONS.map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown size={14} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                              </div>
+                              {draftForm.meetingProvider !== 'none' && draftForm.meetingProvider !== 'phone' && (
+                                <div className="flex items-center gap-3">
+                                  <Copy size={15} className="shrink-0 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    value={draftForm.meetingLink}
+                                    onChange={(event) => patchDraft({ meetingLink: event.target.value })}
+                                    placeholder="粘贴或编辑加入链接"
+                                    className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => copyTextToClipboard(draftForm.meetingLink, '会议链接已复制')}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                                  >
+                                    复制链接
+                                  </button>
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-400">
+                                {draftForm.meetingProvider === 'none'
+                                  ? '不附带会议链接，适合线下或待定会议方式的日程'
+                                  : draftForm.meetingProvider === 'phone'
+                                    ? '已按电话 / 线下方式处理，可直接补充会议室或拨号信息'
+                                    : '保存或发送时会保留当前会议链接'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
+                            <div className="pt-2 text-slate-500">写入到</div>
+                            <div className="relative">
+                              <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <select
+                                value={draftForm.calId}
+                                onChange={(event) => handleDraftCalendarChange(event.target.value)}
+                                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-medium text-slate-900 focus:outline-none"
+                              >
+                                {draftAccountCalendars.map((calendar) => (
+                                  <option key={calendar.id} value={calendar.id}>
+                                    {calendar.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
                             <div className="pt-2 text-slate-500">规则</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
@@ -8069,7 +7693,7 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
                             <div className="pt-2 text-slate-500">显示</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <div className="relative">
@@ -8105,109 +7729,6 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">地点</div>
-                            <div className="space-y-3">
-                              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                                <div className="flex min-h-[42px] items-center gap-3">
-                                  <MapPin size={15} className="shrink-0 text-slate-400" />
-                                  <input
-                                    type="text"
-                                    value={draftForm.location}
-                                    onChange={(event) => patchDraft({ location: event.target.value })}
-	                                    placeholder="地点或会议室"
-                                    className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                </div>
-                                <div className="relative">
-                                  <Calendar size={15} className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400" />
-                                  <select
-                                    value={draftForm.meetingProvider}
-                                    onChange={(event) => setDraftMeetingProvider(event.target.value)}
-                                    className="w-full appearance-none border-none bg-transparent py-1 pl-6 pr-6 text-sm font-medium text-slate-700 focus:outline-none"
-                                  >
-                                    {MEETING_PROVIDER_OPTIONS.map((option) => (
-                                      <option key={option.id} value={option.id}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <ChevronDown size={14} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400" />
-                                </div>
-                              </div>
-                              {draftForm.meetingProvider !== 'none' && draftForm.meetingProvider !== 'phone' && (
-                                <div className="flex items-center gap-3">
-                                  <Copy size={15} className="shrink-0 text-slate-400" />
-                                  <input
-                                    type="text"
-                                    value={draftForm.meetingLink}
-                                    onChange={(event) => patchDraft({ meetingLink: event.target.value })}
-                                    placeholder="粘贴或编辑加入链接"
-                                    className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => copyTextToClipboard(draftForm.meetingLink, '会议链接已复制')}
-                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                                  >
-                                    复制链接
-                                  </button>
-                                </div>
-                              )}
-                              <div className="text-xs text-slate-400">
-                                {draftForm.meetingProvider === 'none'
-                                  ? '不附带会议链接，适合线下或待定会议方式的日程'
-                                  : draftForm.meetingProvider === 'phone'
-                                    ? '已按电话 / 线下方式处理，可直接补充会议室或拨号信息'
-                                    : '保存或发送时会保留当前会议链接'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">正文</div>
-                            <div className="space-y-3">
-                              <div className="flex flex-wrap items-center gap-1">
-                                <button
-                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                                  onClick={() => handleEditorTool('agenda')}
-                                  aria-label="插入议程"
-                                >
-                                  <Type size={15} />
-                                </button>
-                                <button
-                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                                  onClick={() => handleEditorTool('grid')}
-                                  aria-label="插入待办"
-                                >
-                                  <LayoutGrid size={15} />
-                                </button>
-                                <button
-                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-                                  onClick={() => handleEditorTool('camera')}
-                                  aria-label="插入截图占位"
-                                >
-                                  <Camera size={15} />
-                                </button>
-                                <button
-                                  onClick={() => copyTextToClipboard(draftForm.meetingLink, '会议链接已复制')}
-                                  disabled={!draftForm.meetingLink}
-                                  className={`rounded-md p-2 transition ${
-                                    draftForm.meetingLink
-                                      ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                                      : 'cursor-not-allowed text-slate-300'
-                                  }`}
-                                  aria-label="复制会议链接"
-                                >
-                                  <Copy size={15} />
-                                </button>
-                              </div>
-                              <textarea
-                                value={draftForm.description}
-                                onChange={(event) => patchDraft({ description: event.target.value })}
-                                className="min-h-[160px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                placeholder="补充会议背景、目标、议程和会前准备..."
-                              ></textarea>
-                            </div>
-                          </div>
                           </div>
                         </div>
 
