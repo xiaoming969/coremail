@@ -3921,10 +3921,6 @@ function MainApp() {
     };
   }, [activeCalIds, events]);
   const editableCalendars = useMemo(() => calendars.filter((calendar) => canEditCalendarContent(calendar)), [calendars]);
-  const draftAccountCalendars = useMemo(
-    () => editableCalendars.filter((calendar) => calendar.accountId === draftAccountInfo?.id),
-    [draftAccountInfo?.id, editableCalendars],
-  );
   const selectableDraftAccounts = useMemo(
     () => accounts.filter((account) => editableCalendars.some((calendar) => calendar.accountId === account.id)),
     [accounts, editableCalendars],
@@ -5892,17 +5888,6 @@ function MainApp() {
     });
   };
 
-  const handleDraftCalendarChange = (calendarId) => {
-    const nextCalendar = editableCalendars.find((calendar) => calendar.id === calendarId);
-    if (!nextCalendar) return;
-    const nextAccount = accountMap[nextCalendar.accountId];
-
-    patchDraft({
-      calId: nextCalendar.id,
-      organizer: nextAccount?.email || nextCalendar.owner || '我',
-    });
-  };
-
   const setDraftMeetingProvider = (meetingProvider) => {
     setDraftForm((prev) => ({
       ...prev,
@@ -7308,9 +7293,9 @@ function MainApp() {
                           </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                        <div className="flex-1 overflow-y-auto px-4 pb-20 pt-4 sm:px-6">
                           <div className="mx-auto w-full max-w-[980px]">
-                          <div className="space-y-2.5 border-b border-slate-200 py-2.5">
+                          <div className="border-b border-slate-200 py-3">
                             <input
                               type="text"
                               value={draftForm.title}
@@ -7319,16 +7304,10 @@ function MainApp() {
                               className="min-w-0 w-full border-none bg-transparent py-1 text-2xl font-semibold text-slate-900 placeholder:text-slate-300 focus:outline-none"
                               autoFocus
                             />
-                            <textarea
-                              value={draftForm.description}
-                              onChange={(event) => patchDraft({ description: event.target.value })}
-                              className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                              placeholder="补充会议背景、目标、议程和会前准备..."
-                            ></textarea>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">时间</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">时间</div>
                             <div className="space-y-3">
                               <div className="grid gap-3 lg:grid-cols-[minmax(160px,1fr)_140px_minmax(160px,1fr)_140px]">
                                 <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
@@ -7388,8 +7367,8 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">必需</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">必需</div>
                             <div className="space-y-3">
                               {createDraftLargeAudience ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
@@ -7475,8 +7454,8 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">可选</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">可选</div>
                             <div className="space-y-3">
                               {createDraftLargeAudience ? (
                                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
@@ -7562,26 +7541,26 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">地点</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">地点 / 会议方式</div>
                             <div className="space-y-2.5">
-                              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                                <div className="flex min-h-[42px] items-center gap-3">
-                                  <MapPin size={15} className="shrink-0 text-slate-400" />
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="relative flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50">
+                                  <MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                   <input
                                     type="text"
                                     value={draftForm.location}
                                     onChange={(event) => patchDraft({ location: event.target.value })}
                                     placeholder="地点或会议室"
-                                    className="min-w-0 flex-1 border-none bg-transparent py-1 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                                    className="h-full min-w-0 flex-1 border-none bg-transparent py-2 pl-9 pr-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                                   />
-                                </div>
-                                <div className="relative">
-                                  <Calendar size={15} className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </label>
+                                <div className="relative flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50">
+                                  <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                   <select
                                     value={draftForm.meetingProvider}
                                     onChange={(event) => setDraftMeetingProvider(event.target.value)}
-                                    className="w-full appearance-none border-none bg-transparent py-1 pl-6 pr-6 text-sm font-medium text-slate-700 focus:outline-none"
+                                    className="h-[42px] w-full appearance-none border-none bg-transparent py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
                                   >
                                     {MEETING_PROVIDER_OPTIONS.map((option) => (
                                       <option key={option.id} value={option.id}>
@@ -7589,7 +7568,7 @@ function MainApp() {
                                       </option>
                                     ))}
                                   </select>
-                                  <ChevronDown size={14} className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-slate-400" />
+                                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 </div>
                               </div>
                               {draftForm.meetingProvider !== 'none' && draftForm.meetingProvider !== 'phone' && (
@@ -7620,27 +7599,8 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">写入到</div>
-                            <div className="relative">
-                              <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <select
-                                value={draftForm.calId}
-                                onChange={(event) => handleDraftCalendarChange(event.target.value)}
-                                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-medium text-slate-900 focus:outline-none"
-                              >
-                                {draftAccountCalendars.map((calendar) => (
-                                  <option key={calendar.id} value={calendar.id}>
-                                    {calendar.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">规则</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">规则</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
                                 <input
@@ -7693,8 +7653,8 @@ function MainApp() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-2.5 text-sm">
-                            <div className="pt-2 text-slate-500">显示</div>
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">显示</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <div className="relative">
                                 <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -7727,6 +7687,16 @@ function MainApp() {
                                 <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                               </div>
                             </div>
+                          </div>
+
+                          <div className="space-y-2.5 border-b border-slate-200 py-3 text-sm">
+                            <div className="font-medium text-slate-600">正文</div>
+                            <textarea
+                              value={draftForm.description}
+                              onChange={(event) => patchDraft({ description: event.target.value })}
+                              className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              placeholder="补充会议背景、目标、议程和会前准备..."
+                            ></textarea>
                           </div>
 
                           </div>
