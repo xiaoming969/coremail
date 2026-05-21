@@ -7485,32 +7485,16 @@ function MainApp() {
 
                 {currentScreen === 'create' && createPortal(
                   (
-                  <div className="fixed inset-0 z-[70] flex items-start justify-center px-4 py-4">
-                    <div className="max-h-[70vh] w-[min(1220px,calc(100vw-32px))] overflow-y-auto rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
-                      <div className="flex min-h-full w-full flex-col overflow-hidden bg-white">
+                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/10 p-0">
+                    <div className="h-[70vh] max-h-[calc(100vh-32px)] w-[70vw] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+                      <div className="flex h-full w-full flex-col overflow-hidden bg-white">
                         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="relative min-w-[220px] max-w-[320px]">
-                              <select
-                                value={draftAccountInfo?.id || ''}
-                                onChange={(event) => handleDraftAccountChange(event.target.value)}
-                                className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-4 pr-9 text-sm font-semibold text-slate-900 focus:outline-none"
-                              >
-                                {selectableDraftAccounts.map((account) => (
-                                  <option key={account.id} value={account.id}>
-                                    账户：{account.email || account.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-slate-900">
+                              {createDraft.mode === 'edit' ? '编辑日程' : '新建日程'}
                             </div>
-                            <div className="min-w-0">
-                              <div className="truncate font-semibold text-slate-900">
-                                {createDraft.mode === 'edit' ? '编辑日程' : '新建日程'}
-                              </div>
-                              <div className="mt-1 text-xs text-slate-400">
-                                {createWindowTimestamp} {createWindowSaveLabel}
-                              </div>
+                            <div className="mt-1 text-xs text-slate-400">
+                              {createWindowTimestamp} {createWindowSaveLabel}
                             </div>
                           </div>
                           <div className="ml-4 flex items-center gap-1 text-slate-400">
@@ -7534,110 +7518,39 @@ function MainApp() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-6">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() => saveDraft('send')}
-                              className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
-                              title="Cmd/Ctrl + Enter"
-                            >
-                              <Send size={15} />
-                              发送通知
-                            </button>
-                            <button
-                              onClick={() => saveDraft('draft')}
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                              title="Cmd/Ctrl + S"
-                            >
-                              <Save size={15} />
-                              仅保存不发送
-                            </button>
-                            <div className="relative">
-                              <Bell size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <select
-                                value={draftForm.reminder}
-                                onChange={(event) => patchDraft({ reminder: event.target.value })}
-                                className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
-                              >
-                                {REMINDER_OPTIONS.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              onClick={() =>
-                                triggerFeedback('L3', {
-                                  msg: createDraftParticipantCheckMessage,
-                                  icon: <Users size={16} />,
-                                  color: 'bg-gray-800',
-                                })
-                              }
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                            >
-                              <Users size={15} className="text-slate-400" />
-                              推荐依据
-                            </button>
-                            <div className="relative">
-                              <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <select
-                                value={draftForm.availability}
-                                onChange={(event) => patchDraft({ availability: event.target.value })}
-                                className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
-                              >
-                                {AVAILABILITY_OPTIONS.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <div className="relative">
-                              <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <select
-                                value={draftForm.visibility}
-                                onChange={(event) => patchDraft({ visibility: event.target.value })}
-                                className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
-                              >
-                                {VISIBILITY_OPTIONS.map((option) => (
-                                  <option key={option.id} value={option.id}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <button className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700" aria-label="更多操作">
-                              <MoreHorizontal size={16} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="border-b border-slate-200 px-4 sm:px-6">
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">标题</div>
-                            <div>
-                              <input
-                                type="text"
-                                value={draftForm.title}
-                                onChange={(event) => patchDraft({ title: event.target.value })}
-                                placeholder="标题"
-                                className="min-w-0 w-full border-none bg-transparent py-1 text-[28px] font-semibold tracking-tight text-slate-900 placeholder:text-slate-300 focus:outline-none"
-                                autoFocus
-                              />
-                            </div>
+                        <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+                          <div className="mx-auto w-full max-w-[980px]">
+                          <div className="border-b border-slate-200 py-3">
+                            <input
+                              type="text"
+                              value={draftForm.title}
+                              onChange={(event) => patchDraft({ title: event.target.value })}
+                              placeholder="标题"
+                              className="min-w-0 w-full border-none bg-transparent py-1 text-2xl font-semibold text-slate-900 placeholder:text-slate-300 focus:outline-none"
+                              autoFocus
+                            />
                           </div>
 
                           <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
                             <div className="pt-2 text-slate-500">写入到</div>
-                            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                              <div className="relative">
+                            <div className="space-y-2">
+                              <div className="grid gap-3 lg:grid-cols-2">
+                                <div className="relative">
+                                  <Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                  <select
+                                    value={draftAccountInfo?.id || ''}
+                                    onChange={(event) => handleDraftAccountChange(event.target.value)}
+                                    className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-9 text-sm font-medium text-slate-900 focus:outline-none"
+                                  >
+                                    {selectableDraftAccounts.map((account) => (
+                                      <option key={account.id} value={account.id}>
+                                        账户：{account.email || account.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                                <div className="relative">
                                 <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <select
                                   value={draftForm.calId}
@@ -7651,6 +7564,7 @@ function MainApp() {
                                   ))}
                                 </select>
                                 <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
                               </div>
                               <div className="flex flex-wrap items-center gap-2 text-xs">
                                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600">
@@ -8010,65 +7924,67 @@ function MainApp() {
                           </div>
 
                           <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">开始</div>
-                            <div className="grid gap-3 md:grid-cols-[188px_160px_minmax(0,1fr)] md:items-center">
-                              <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
-                                <Calendar size={15} className="shrink-0 text-slate-400" />
-                                <input
-                                  type="date"
-                                  value={formatDateLabel(draftForm.date)}
-                                  onChange={(event) => handleDraftDateChange(event.target.value)}
-                                  className="w-full border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
-                                />
-                              </label>
-                              <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
-                                <Clock size={15} className="shrink-0 text-slate-400" />
-                                <select
-                                  value={String(draftForm.startH)}
-                                  onChange={(event) => handleDraftStartTimeChange(event.target.value)}
-                                  className="w-full appearance-none border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
-                                >
-                                  {TIME_SELECT_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <div className="text-xs text-slate-400">组织者：{draftForm.organizer || createDraftAccountLabel}</div>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">结束</div>
-                            <div className="grid gap-3 md:grid-cols-[188px_160px_minmax(0,1fr)] md:items-center">
-                              <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
-                                <Calendar size={15} className="shrink-0 text-slate-400" />
-                                <input
-                                  type="date"
-                                  value={formatDateLabel(draftEndMeta.date)}
-                                  onChange={(event) => handleDraftEndDateChange(event.target.value, draftEndMeta.hour)}
-                                  className="w-full border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
-                                />
-                              </label>
-                              <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
-                                <Clock size={15} className="shrink-0 text-slate-400" />
-                                <select
-                                  value={String(draftEndMeta.hour)}
-                                  onChange={(event) => handleDraftEndTimeChange(event.target.value, draftEndMeta.date)}
-                                  className="w-full appearance-none border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
-                                >
-                                  {TIME_SELECT_END_OPTIONS.filter((option) => {
-                                    const optionValue = Number(option.value);
-                                    return sameDay(draftForm.date, draftEndMeta.date) ? optionValue > draftForm.startH : true;
-                                  }).map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                            <div className="pt-2 text-slate-500">时间</div>
+                            <div className="space-y-3">
+                              <div className="grid gap-3 lg:grid-cols-[minmax(160px,1fr)_140px_minmax(160px,1fr)_140px]">
+                                <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
+                                  <Calendar size={15} className="shrink-0 text-slate-400" />
+                                  <input
+                                    type="date"
+                                    value={formatDateLabel(draftForm.date)}
+                                    onChange={(event) => handleDraftDateChange(event.target.value)}
+                                    className="w-full border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
+                                    aria-label="开始日期"
+                                  />
+                                </label>
+                                <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
+                                  <Clock size={15} className="shrink-0 text-slate-400" />
+                                  <select
+                                    value={String(draftForm.startH)}
+                                    onChange={(event) => handleDraftStartTimeChange(event.target.value)}
+                                    className="w-full appearance-none border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
+                                    aria-label="开始时间"
+                                  >
+                                    {TIME_SELECT_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
+                                  <Calendar size={15} className="shrink-0 text-slate-400" />
+                                  <input
+                                    type="date"
+                                    value={formatDateLabel(draftEndMeta.date)}
+                                    onChange={(event) => handleDraftEndDateChange(event.target.value, draftEndMeta.hour)}
+                                    className="w-full border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
+                                    aria-label="结束日期"
+                                  />
+                                </label>
+                                <label className="flex min-h-[42px] items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
+                                  <Clock size={15} className="shrink-0 text-slate-400" />
+                                  <select
+                                    value={String(draftEndMeta.hour)}
+                                    onChange={(event) => handleDraftEndTimeChange(event.target.value, draftEndMeta.date)}
+                                    className="w-full appearance-none border-none bg-transparent py-1 text-sm font-medium text-slate-900 focus:outline-none"
+                                    aria-label="结束时间"
+                                  >
+                                    {TIME_SELECT_END_OPTIONS.filter((option) => {
+                                      const optionValue = Number(option.value);
+                                      return sameDay(draftForm.date, draftEndMeta.date) ? optionValue > draftForm.startH : true;
+                                    }).map((option) => (
+                                      <option key={option.value} value={option.value}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
                               <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-500">
+                                  组织者：{draftForm.organizer || createDraftAccountLabel}
+                                </span>
                                 <span className={`inline-flex items-center rounded-full border px-3 py-1 font-semibold ${createDraftScheduleTone}`}>
                                   {createDraftScheduleText}
                                 </span>
@@ -8100,7 +8016,7 @@ function MainApp() {
                           </div>
 
                           <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
-                            <div className="pt-2 text-slate-500">定期</div>
+                            <div className="pt-2 text-slate-500">规则</div>
                             <div className="flex flex-wrap items-center gap-3">
                               <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
                                 <input
@@ -8132,13 +8048,64 @@ function MainApp() {
                                   <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 </div>
                               )}
-	                              {draftForm.repeat !== 'does_not_repeat' && (
-	                                <div className="text-xs text-slate-400">{REPEAT_LABELS[draftForm.repeat] || '每周'}</div>
-	                              )}
+		                              {draftForm.repeat !== 'does_not_repeat' && (
+		                                <div className="text-xs text-slate-400">{REPEAT_LABELS[draftForm.repeat] || '每周'}</div>
+		                              )}
+                              <div className="relative">
+                                <Bell size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <select
+                                  value={draftForm.reminder}
+                                  onChange={(event) => patchDraft({ reminder: event.target.value })}
+                                  className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
+                                >
+                                  {REMINDER_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              </div>
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 py-3 text-sm">
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
+                            <div className="pt-2 text-slate-500">显示</div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="relative">
+                                <Calendar size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <select
+                                  value={draftForm.availability}
+                                  onChange={(event) => patchDraft({ availability: event.target.value })}
+                                  className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
+                                >
+                                  {AVAILABILITY_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              </div>
+                              <div className="relative">
+                                <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <select
+                                  value={draftForm.visibility}
+                                  onChange={(event) => patchDraft({ visibility: event.target.value })}
+                                  className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
+                                >
+                                  {VISIBILITY_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-slate-200 py-3 text-sm">
                             <div className="pt-2 text-slate-500">地点</div>
                             <div className="space-y-3">
                               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -8195,56 +8162,54 @@ function MainApp() {
                               </div>
                             </div>
                           </div>
+                          <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 py-3 text-sm">
+                            <div className="pt-2 text-slate-500">正文</div>
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center gap-1">
+                                <button
+                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                  onClick={() => handleEditorTool('agenda')}
+                                  aria-label="插入议程"
+                                >
+                                  <Type size={15} />
+                                </button>
+                                <button
+                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                  onClick={() => handleEditorTool('grid')}
+                                  aria-label="插入待办"
+                                >
+                                  <LayoutGrid size={15} />
+                                </button>
+                                <button
+                                  className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                  onClick={() => handleEditorTool('camera')}
+                                  aria-label="插入截图占位"
+                                >
+                                  <Camera size={15} />
+                                </button>
+                                <button
+                                  onClick={() => copyTextToClipboard(draftForm.meetingLink, '会议链接已复制')}
+                                  disabled={!draftForm.meetingLink}
+                                  className={`rounded-md p-2 transition ${
+                                    draftForm.meetingLink
+                                      ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                                      : 'cursor-not-allowed text-slate-300'
+                                  }`}
+                                  aria-label="复制会议链接"
+                                >
+                                  <Copy size={15} />
+                                </button>
+                              </div>
+                              <textarea
+                                value={draftForm.description}
+                                onChange={(event) => patchDraft({ description: event.target.value })}
+                                className="min-h-[160px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                placeholder="补充会议背景、目标、议程和会前准备..."
+                              ></textarea>
+                            </div>
+                          </div>
+                          </div>
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-3 py-2 sm:px-6">
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="撤回">
-                            <Reply size={15} />
-                          </button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="重做">
-                            <Forward size={15} />
-                          </button>
-                          <div className="mx-1 h-5 w-px bg-slate-200" />
-                          <button className="rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-800">正文</button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" onClick={() => handleEditorTool('agenda')} aria-label="插入议程">
-                            <Type size={15} />
-                          </button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" onClick={() => handleEditorTool('grid')} aria-label="插入待办">
-                            <LayoutGrid size={15} />
-                          </button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" onClick={() => handleEditorTool('camera')} aria-label="插入截图占位">
-                            <Camera size={15} />
-                          </button>
-                          <div className="mx-1 h-5 w-px bg-slate-200" />
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="正文布局">
-                            <AlignLeft size={15} />
-                          </button>
-                          <button
-                            onClick={() => copyTextToClipboard(draftForm.meetingLink, '会议链接已复制')}
-                            disabled={!draftForm.meetingLink}
-                            className={`rounded-md p-2 transition ${
-                              draftForm.meetingLink
-                                ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                                : 'cursor-not-allowed text-slate-300'
-                            }`}
-                            aria-label="复制会议链接"
-                          >
-                            <Copy size={15} />
-                          </button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="搜索">
-                            <Search size={15} />
-                          </button>
-                          <button className="rounded-md p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700" aria-label="插入时间信息">
-                            <Clock size={15} />
-                          </button>
-                        </div>
-
-                        <textarea
-                          value={draftForm.description}
-                          onChange={(event) => patchDraft({ description: event.target.value })}
-                          className="min-h-[420px] flex-1 resize-none border-none bg-white px-4 py-5 text-sm leading-7 text-slate-800 placeholder:text-slate-400 focus:outline-none sm:px-6"
-                          placeholder="补充会议背景、目标、议程和会前准备..."
-                        ></textarea>
 
                         <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
                           <div className="text-xs text-slate-500">
