@@ -1,4 +1,4 @@
-import { Archive, Calendar, FileText, Inbox, Mail, Send, Settings, Users } from 'lucide-react';
+import { AlertCircle, Archive, Calendar, FileText, Inbox, Mail, Send, Settings, Trash, Users } from 'lucide-react';
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const BASE_WEEK_START = new Date(2026, 0, 5);
@@ -30,7 +30,11 @@ export const MAIL_FOLDERS = [
   { id: 'inbox', label: '收件箱', icon: Inbox },
   { id: 'drafts', label: '草稿', icon: FileText },
   { id: 'sent', label: '已发送', icon: Send },
+  { id: 'deleted', label: '已删除邮件', icon: Trash },
+  { id: 'junk', label: '垃圾邮件', icon: AlertCircle },
+  { id: 'outbox', label: '发件箱', icon: Send },
   { id: 'archive', label: '存档', icon: Archive },
+  { id: 'conversation', label: '对话历史记录', icon: FileText },
 ];
 export const MAIL_CONTACTS = [
   { id: 'mc1', name: '产品经理', email: 'pm@calendarpro.io', scope: 'internal' },
@@ -119,7 +123,7 @@ export const EVENT_KIND_DEFAULTS = {
   event: {
     title: '',
     description: '',
-    reminder: '30m',
+    reminder: '15m',
     availability: 'busy',
     visibility: 'default',
   },
@@ -139,10 +143,13 @@ export const REPEAT_OPTIONS = [
 ];
 export const REMINDER_OPTIONS = [
   { id: 'none', label: '不提醒' },
-  { id: '10m', label: '提前 10 分钟' },
-  { id: '30m', label: '提前 30 分钟' },
-  { id: '1h', label: '提前 1 小时' },
-  { id: '1d', label: '提前 1 天' },
+  { id: '0m', label: '开始时' },
+  { id: '5m', label: '5 分钟前' },
+  { id: '10m', label: '10 分钟前' },
+  { id: '15m', label: '15 分钟前' },
+  { id: '30m', label: '30 分钟前' },
+  { id: '1h', label: '1 小时前' },
+  { id: '1d', label: '1 天前' },
 ];
 export const AVAILABILITY_OPTIONS = [
   { id: 'busy', label: '忙碌' },
@@ -486,14 +493,22 @@ export const canEditCalendarContent = (calendarOrPermission) => {
 };
 export const getAccountCheckboxTone = (color) => {
   if (color?.includes('orange')) return 'border-orange-500 bg-orange-500 text-white hover:border-orange-400';
+  if (color?.includes('sky')) return 'border-sky-500 bg-sky-500 text-white hover:border-sky-400';
+  if (color?.includes('green')) return 'border-green-500 bg-green-500 text-white hover:border-green-400';
   if (color?.includes('emerald')) return 'border-emerald-500 bg-emerald-500 text-white hover:border-emerald-400';
+  if (color?.includes('purple')) return 'border-purple-500 bg-purple-500 text-white hover:border-purple-400';
   if (color?.includes('violet')) return 'border-violet-500 bg-violet-500 text-white hover:border-violet-400';
   if (color?.includes('cyan')) return 'border-cyan-500 bg-cyan-500 text-white hover:border-cyan-400';
   if (color?.includes('teal')) return 'border-teal-500 bg-teal-500 text-white hover:border-teal-400';
   if (color?.includes('fuchsia')) return 'border-fuchsia-500 bg-fuchsia-500 text-white hover:border-fuchsia-400';
   if (color?.includes('amber')) return 'border-amber-500 bg-amber-500 text-white hover:border-amber-400';
+  if (color?.includes('yellow')) return 'border-yellow-500 bg-yellow-500 text-white hover:border-yellow-400';
   if (color?.includes('rose')) return 'border-rose-500 bg-rose-500 text-white hover:border-rose-400';
+  if (color?.includes('red')) return 'border-red-500 bg-red-500 text-white hover:border-red-400';
+  if (color?.includes('pink')) return 'border-pink-500 bg-pink-500 text-white hover:border-pink-400';
   if (color?.includes('indigo')) return 'border-indigo-500 bg-indigo-500 text-white hover:border-indigo-400';
+  if (color?.includes('gray')) return 'border-gray-500 bg-gray-500 text-white hover:border-gray-400';
+  if (color?.includes('zinc')) return 'border-zinc-500 bg-zinc-500 text-white hover:border-zinc-400';
   if (color?.includes('slate')) return 'border-slate-500 bg-slate-500 text-white hover:border-slate-400';
   return 'border-blue-600 bg-blue-600 text-white hover:border-blue-400';
 };
@@ -1201,7 +1216,7 @@ export const getVisibleEventTitle = (event, calendar) => {
   return event?.title || '无标题';
 };
 export const getCompactSourceLabel = (account, calendar) => {
-  const raw = account?.email || account?.name || calendar?.owner || calendar?.name || '';
+  const raw = getAccountPersonLabel(account) || calendar?.owner || calendar?.name || account?.email || '';
   if (!raw) return '';
   return raw.includes('@') ? raw.split('@')[0] : raw.replace(/[()（）]/g, '').slice(0, 6);
 };
@@ -1210,6 +1225,27 @@ export const getEventSecondaryLine = (event, calendar) => {
   const place = event.location || (event.meetingProvider && event.meetingProvider !== 'none' ? MEETING_PROVIDER_LABELS[event.meetingProvider] : '');
   const people = event.organizer || (event.attendees?.length ? `${event.attendees[0]}等 ${event.attendees.length} 人` : '');
   return [place, people].filter(Boolean).join(' · ');
+};
+
+const EVENT_TONE_BY_COLOR_CLASS = {
+  'bg-blue-500': { container: 'bg-blue-50 border-blue-200 text-slate-950', stripe: 'bg-blue-500' },
+  'bg-cyan-500': { container: 'bg-cyan-50 border-cyan-200 text-slate-950', stripe: 'bg-cyan-500' },
+  'bg-sky-500': { container: 'bg-sky-50 border-sky-200 text-slate-950', stripe: 'bg-sky-500' },
+  'bg-emerald-500': { container: 'bg-emerald-50 border-emerald-200 text-slate-950', stripe: 'bg-emerald-500' },
+  'bg-green-500': { container: 'bg-green-50 border-green-200 text-slate-950', stripe: 'bg-green-500' },
+  'bg-teal-500': { container: 'bg-teal-50 border-teal-200 text-slate-950', stripe: 'bg-teal-500' },
+  'bg-violet-500': { container: 'bg-violet-50 border-violet-200 text-slate-950', stripe: 'bg-violet-500' },
+  'bg-purple-500': { container: 'bg-purple-50 border-purple-200 text-slate-950', stripe: 'bg-purple-500' },
+  'bg-fuchsia-500': { container: 'bg-fuchsia-50 border-fuchsia-200 text-slate-950', stripe: 'bg-fuchsia-500' },
+  'bg-orange-500': { container: 'bg-orange-50 border-orange-200 text-slate-950', stripe: 'bg-orange-500' },
+  'bg-amber-500': { container: 'bg-amber-50 border-amber-200 text-slate-950', stripe: 'bg-amber-500' },
+  'bg-yellow-500': { container: 'bg-yellow-50 border-yellow-200 text-slate-950', stripe: 'bg-yellow-500' },
+  'bg-red-500': { container: 'bg-red-50 border-red-200 text-slate-950', stripe: 'bg-red-500' },
+  'bg-rose-500': { container: 'bg-rose-50 border-rose-200 text-slate-950', stripe: 'bg-rose-500' },
+  'bg-pink-500': { container: 'bg-pink-50 border-pink-200 text-slate-950', stripe: 'bg-pink-500' },
+  'bg-slate-500': { container: 'bg-slate-50 border-slate-300 text-slate-950', stripe: 'bg-slate-500' },
+  'bg-gray-500': { container: 'bg-gray-50 border-gray-300 text-slate-950', stripe: 'bg-gray-500' },
+  'bg-zinc-500': { container: 'bg-zinc-50 border-zinc-300 text-slate-950', stripe: 'bg-zinc-500' },
 };
 
 export const getToneClasses = (event, colorClass) => {
@@ -1246,12 +1282,7 @@ export const getToneClasses = (event, colorClass) => {
     };
   }
 
-  return {
-    container: `${colorClass.replace('bg-', 'bg-').replace('500', '100')} ${colorClass
-      .replace('bg-', 'border-')
-      .replace('500', '300')} ${colorClass.replace('bg-', 'text-').replace('500', '900')}`,
-    stripe: colorClass,
-  };
+  return EVENT_TONE_BY_COLOR_CLASS[colorClass] || EVENT_TONE_BY_COLOR_CLASS['bg-blue-500'];
 };
 
 export const getDefaultEditableCalendarId = (calendars, activeAccountIds, preferredAccountId = null) => {
@@ -1970,6 +2001,8 @@ export const createDemoAllDayEvents = (count = 18) =>
   Array.from({ length: count }, (_, index) => {
     const template = DEMO_EVENT_TEMPLATES[(index * 3) % DEMO_EVENT_TEMPLATES.length];
     const date = addDays(getWeekStart(TODAY_DATE), (Math.floor(index / 3) - 3) * 7 + (index % 5));
+    const showOngoingJoinDemo = index === 9;
+    const meetingProvider = showOngoingJoinDemo ? 'teams' : 'none';
 
     return {
       id: `demo-all-day-${String(index + 1).padStart(2, '0')}`,
@@ -1984,8 +2017,8 @@ export const createDemoAllDayEvents = (count = 18) =>
       description: `${template.title}相关材料集中准备与跨天占用。`,
       type: 'normal',
       attendees: template.attendees,
-      meetingProvider: 'none',
-      meetingLink: '',
+      meetingProvider,
+      meetingLink: meetingProvider === 'none' ? '' : `https://teams.microsoft.com/l/meetup-join/demo-all-day-${index + 1}`,
       repeat: 'does_not_repeat',
       reminder: '1d',
       availability: 'busy',

@@ -1,4 +1,5 @@
-import { Paperclip, Send, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Paperclip, Send, Sparkles, X } from 'lucide-react';
 
 export default function MailComposerModal({
   open,
@@ -13,10 +14,55 @@ export default function MailComposerModal({
   onSaveDraft,
   onSend,
 }) {
+  const [aiDraft, setAiDraft] = useState(null);
+  const bodySeed = draft?.body?.trim() || '请在这里输入邮件正文，AI 会基于当前内容生成建议。';
+  const aiActions = useMemo(
+    () => [
+      { id: 'polish', label: '润色表达', status: '已生成润色版本' },
+      { id: 'formal', label: '更正式', status: '已生成更正式版本' },
+      { id: 'friendly', label: '更友好', status: '已生成更友好版本' },
+      { id: 'shorten', label: '简化内容', status: '已生成简洁版本' },
+      { id: 'proofread', label: '检查错别字', status: '已完成错别字检查' },
+      { id: 'subject', label: '生成标题', status: '已生成标题建议' },
+    ],
+    [],
+  );
+
+  const buildAiSuggestion = (actionId) => {
+    if (actionId === 'subject') {
+      return draft?.subject?.trim() ? `建议标题：${draft.subject.trim()}` : '建议标题：关于材料评审安排的确认';
+    }
+
+    if (actionId === 'formal') {
+      return `您好，\n\n${bodySeed.replace(/[。！!]*$/, '。')}\n\n如有需要，我会继续补充相关信息。`;
+    }
+
+    if (actionId === 'friendly') {
+      return `你好，\n\n${bodySeed.replace(/[。！!]*$/, '。')} 我会继续跟进，有新进展再同步。`;
+    }
+
+    if (actionId === 'shorten') {
+      return bodySeed.split(/[。！？\n]/).filter(Boolean).slice(0, 2).join('。') || bodySeed;
+    }
+
+    if (actionId === 'proofread') {
+      return '未发现明显错别字。建议检查收件人、时间和附件是否完整。';
+    }
+
+    return `${bodySeed.replace(/[。！!]*$/, '。')}\n\n我会根据后续反馈继续调整。`;
+  };
+
+  const runAiAction = (action) => {
+    setAiDraft({
+      status: action.status,
+      suggestion: buildAiSuggestion(action.id),
+    });
+  };
+
   if (!open || !draft) return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 p-4" role="dialog" aria-modal="true" aria-label="写邮件">
       <div className="flex w-full max-w-[820px] max-h-[70vh] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
           <div className="text-lg font-black text-gray-900">写邮件</div>
@@ -126,6 +172,36 @@ export default function MailComposerModal({
               ))}
             </div>
           )}
+
+          <section className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-indigo-600" />
+                <div>
+                  <div className="text-sm font-black text-slate-900">AI 写作助手</div>
+                  <div className="mt-0.5 text-xs font-semibold text-indigo-500">先生成预览，确认后再应用到正文。</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {aiActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => runAiAction(action)}
+                    className="rounded-lg border border-indigo-100 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {aiDraft && (
+              <div className="mt-3 rounded-lg border border-indigo-100 bg-white px-4 py-3">
+                <div className="text-xs font-black text-indigo-700">{aiDraft.status}</div>
+                <div className="mt-2 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-600">{aiDraft.suggestion}</div>
+              </div>
+            )}
+          </section>
 
           <textarea
             value={draft.body}

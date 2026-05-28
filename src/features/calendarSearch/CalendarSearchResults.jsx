@@ -51,6 +51,7 @@ export default function CalendarSearchResults({
   onRenameColorCategory,
   results,
   onOpenEvent,
+  onJoinEvent,
 }) {
   const trimmedQuery = query.trim();
   const [selectedResultId, setSelectedResultId] = useState(null);
@@ -321,6 +322,7 @@ export default function CalendarSearchResults({
 
   const openMeetingLink = (event) => {
     if (!event.meetingLink) return;
+    onJoinEvent?.(event);
     window.open(event.meetingLink, '_blank', 'noopener,noreferrer');
   };
 

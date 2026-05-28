@@ -23,7 +23,9 @@ import {
   Lock,
   Mail,
   MapPin,
+  Maximize2,
   Minus,
+  Minimize2,
   MoreHorizontal,
   Palette,
   Paperclip,
@@ -35,12 +37,14 @@ import {
   Search,
   Send,
   Settings,
+  Sparkles,
   Square,
   SquarePen,
   Star,
   Trash,
   UserPlus,
   Users,
+  Video,
   X,
 } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -109,7 +113,6 @@ import {
   getCalendarPermissionId,
   getCalendarPermissionLabel,
   getCalendarPermissionOption,
-  getCalendarPermissionCapabilities,
   canEditCalendarContent,
   getAccountCheckboxTone,
   ACCOUNT_COLOR_OPTIONS,
@@ -175,6 +178,185 @@ import {
 const CalendarSearchResults = lazy(() => import('./features/calendarSearch/CalendarSearchResults.jsx'));
 const MailComposerModal = lazy(() => import('./features/mail/MailComposerModal.jsx'));
 
+const APP_SIDEBAR_WIDTH = 264;
+const APP_COLLAPSED_SIDEBAR_WIDTH = 88;
+const SHOW_CALENDAR_SEARCH_ENTRY = false;
+
+const DEFAULT_CALENDAR_REMINDER_SETTINGS = {
+  popupEnabled: true,
+  newEventDefaultReminder: '15m',
+  incomingReminderPolicy: 'follow_organizer',
+};
+
+const CALENDAR_REMINDER_SETTINGS_STORAGE_KEY = 'coremail.calendarReminderSettings';
+const REMINDER_DISMISS_ALL_SKIP_CONFIRM_STORAGE_KEY = 'coremail.reminderDismissAllSkipConfirm';
+
+const loadCalendarReminderSettings = () => {
+  if (typeof window === 'undefined') return DEFAULT_CALENDAR_REMINDER_SETTINGS;
+
+  try {
+    const raw = window.localStorage.getItem(CALENDAR_REMINDER_SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_CALENDAR_REMINDER_SETTINGS;
+
+    const parsed = JSON.parse(raw);
+    const incomingReminderPolicy =
+      parsed.incomingReminderPolicy && parsed.incomingReminderPolicy !== 'none'
+        ? parsed.incomingReminderPolicy
+        : DEFAULT_CALENDAR_REMINDER_SETTINGS.incomingReminderPolicy;
+    return {
+      ...DEFAULT_CALENDAR_REMINDER_SETTINGS,
+      ...parsed,
+      newEventDefaultReminder:
+        parsed.newEventDefaultReminder || parsed.defaultReminder || DEFAULT_CALENDAR_REMINDER_SETTINGS.newEventDefaultReminder,
+      incomingReminderPolicy,
+    };
+  } catch {
+    return DEFAULT_CALENDAR_REMINDER_SETTINGS;
+  }
+};
+
+const INCOMING_REMINDER_OPTIONS = [
+  { id: 'follow_organizer', label: '跟随组织者设置' },
+  ...REMINDER_OPTIONS.filter((option) => option.id !== 'none'),
+];
+
+const loadReminderDismissAllSkipConfirm = () => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.localStorage.getItem(REMINDER_DISMISS_ALL_SKIP_CONFIRM_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const REMINDER_OFFSET_MINUTES = {
+  '0m': 0,
+  '5m': 5,
+  '10m': 10,
+  '15m': 15,
+  '30m': 30,
+  '1h': 60,
+  '1d': 24 * 60,
+};
+
+const SNOOZE_OPTIONS = [
+  { id: '5m', label: '5 分钟后', minutes: 5 },
+  { id: '10m', label: '10 分钟后', minutes: 10 },
+  { id: '15m', label: '15 分钟后', minutes: 15 },
+  { id: '30m', label: '30 分钟后', minutes: 30 },
+  { id: '1h', label: '1 小时后', minutes: 60 },
+];
+
+const getReminderOffsetMinutes = (reminder) => {
+  if (!reminder || reminder === 'none') return null;
+  return REMINDER_OFFSET_MINUTES[reminder] ?? 15;
+};
+
+const formatRelativeMinutes = (minutes) => {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  if (safeMinutes < 60) return `${safeMinutes} 分钟`;
+  const hours = Math.floor(safeMinutes / 60);
+  const rest = safeMinutes % 60;
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+};
+
+const getReminderTimeMeta = (event, nowValue = TODAY_DATE.getTime()) => {
+  const startValue = getEventStartTimestamp(event);
+  const endValue = getEventEndTimestamp(event);
+
+  if (nowValue > endValue) {
+    return { state: 'ended', statusLabel: '已结束', detailLabel: '', startValue, endValue };
+  }
+
+  if (nowValue >= startValue) {
+    const elapsedMinutes = (nowValue - startValue) / (60 * 1000);
+    return {
+      state: 'ongoing',
+      statusLabel: '正在进行中',
+      detailLabel: `已开始 ${formatRelativeMinutes(elapsedMinutes)}`,
+      startValue,
+      endValue,
+    };
+  }
+
+  const remainingMinutes = (startValue - nowValue) / (60 * 1000);
+  return {
+    state: 'upcoming',
+    statusLabel: '即将开始',
+    detailLabel: `${formatRelativeMinutes(remainingMinutes)}后开始`,
+    startValue,
+    endValue,
+  };
+};
+
+const canJoinReminderEvent = (event, nowValue = TODAY_DATE.getTime()) => {
+  if (!event?.meetingLink) return false;
+  if (event.status === '已取消' || event.type === 'cancelled') return false;
+  return nowValue <= getEventEndTimestamp(event);
+};
+
+const getAvailableSnoozeOptions = (event, nowValue = TODAY_DATE.getTime()) => {
+  return SNOOZE_OPTIONS.map((option) => ({
+    ...option,
+    mode: 'from-now',
+    until: nowValue + option.minutes * 60 * 1000,
+  }));
+};
+
+const resolveSnoozeOption = (event, snoozeValue, nowValue = TODAY_DATE.getTime()) => {
+  const options = getAvailableSnoozeOptions(event, nowValue);
+  return options.find((option) => option.id === snoozeValue) || options[0] || null;
+};
+
+const normalizeReminderIdentity = (value) => String(value || '').trim().toLowerCase();
+
+const buildCurrentUserIdentitySet = (accounts = []) => {
+  const identities = new Set(['我']);
+  accounts.forEach((account) => {
+    [account.name, account.displayName, account.email].filter(Boolean).forEach((value) => identities.add(value));
+  });
+  return new Set(Array.from(identities).map(normalizeReminderIdentity).filter(Boolean));
+};
+
+const isIncomingReminderEvent = (event, currentUserIdentities) => {
+  const organizer = normalizeReminderIdentity(event?.organizer);
+  if (!organizer) return false;
+  if (currentUserIdentities.has(organizer)) return false;
+
+  const participants = [...(event.attendees || []), ...(event.optionalAttendees || [])].map(normalizeReminderIdentity);
+  return participants.some((person) => currentUserIdentities.has(person));
+};
+
+const getOrganizerReminder = (event) => event?.organizerReminder ?? event?.reminder ?? 'none';
+
+const getEffectiveEventReminder = (event, settings, currentUserIdentities) => {
+  if (!event) return 'none';
+  if (event.reminderOverride) return event.reminder ?? 'none';
+  if (!isIncomingReminderEvent(event, currentUserIdentities)) return event.reminder ?? 'none';
+
+  const policy = settings.incomingReminderPolicy || 'follow_organizer';
+  return policy === 'follow_organizer' ? getOrganizerReminder(event) : policy;
+};
+
+const MAIL_SIDEBAR_FOLDERS = [
+  ...MAIL_FOLDERS.filter((folder) => folder.id === 'inbox'),
+  { id: 'unread', label: '未读邮件', icon: Mail },
+  { id: 'flagged', label: '旗标邮件', icon: Star },
+  ...MAIL_FOLDERS.filter((folder) => folder.id !== 'inbox'),
+];
+
+const mailMatchesFolder = (mail, folderId) => {
+  if (folderId === 'unread') return mail.unread;
+  if (folderId === 'flagged') return mail.starred;
+  return mail.folder === folderId;
+};
+
+const getMailFolderLabel = (folderId) =>
+  MAIL_SIDEBAR_FOLDERS.find((folder) => folder.id === folderId)?.label ||
+  MAIL_FOLDERS.find((folder) => folder.id === folderId)?.label ||
+  '邮件';
+
 function ProductActiveIcon({ id, size = 20 }) {
   const commonProps = {
     width: size,
@@ -235,10 +417,12 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
         return (
           <button
             key={id}
+            data-product-tab={id}
             onClick={() => onSelect(id)}
+            aria-label={label}
             title={label}
             className={`${buttonSize} mx-auto flex items-center justify-center rounded-xl transition-colors duration-150 ${
-              selected ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+              selected ? 'text-slate-950' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             {selected ? (
@@ -249,6 +433,17 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function SidebarProductDock({ activeProduct, onSelectProduct, compact = false }) {
+  return (
+    <div
+      data-app-sidebar-product-dock="true"
+      className={`mt-auto shrink-0 ${compact ? 'p-3' : 'p-4'}`}
+    >
+      <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} compact={compact} vertical={compact} />
     </div>
   );
 }
@@ -278,19 +473,296 @@ function ModulePlaceholder({ moduleId, onBack }) {
   );
 }
 
+function CalendarReminderSettingsContent({ settings, onChange }) {
+  const selectClass =
+    'h-9 w-full appearance-none rounded-lg border border-slate-200 bg-[#fbfcfd] pl-3.5 pr-9 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white';
+  const rows = [
+    {
+      title: '日历提醒弹窗',
+      description: '会议未结束时，到点会弹出提醒。',
+      control: (
+        <button
+          type="button"
+          onClick={() => onChange({ popupEnabled: !settings.popupEnabled })}
+          className={`relative h-6 w-11 rounded-full transition ${
+            settings.popupEnabled ? 'bg-blue-600' : 'bg-slate-300'
+          }`}
+          aria-pressed={settings.popupEnabled}
+          aria-label="开启日历提醒弹窗"
+        >
+          <span
+            className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+              settings.popupEnabled ? 'left-6' : 'left-1'
+            }`}
+          />
+        </button>
+      ),
+    },
+    {
+      title: '我新建的日程默认提醒',
+      description: '只影响你之后新建的日程，已有日程不会改变。',
+      control: (
+        <div className="relative w-full max-w-52">
+          <select
+            value={settings.newEventDefaultReminder}
+            onChange={(event) => onChange({ newEventDefaultReminder: event.target.value })}
+            className={selectClass}
+            aria-label="新建日程的默认提醒时间"
+          >
+            {REMINDER_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        </div>
+      ),
+    },
+    {
+      title: '别人邀请我的会议提醒',
+      description: '默认按组织者设置提醒，也可以改成你自己的固定时间。',
+      control: (
+        <div className="relative w-full max-w-52">
+          <select
+            value={settings.incomingReminderPolicy}
+            onChange={(event) => onChange({ incomingReminderPolicy: event.target.value })}
+            className={selectClass}
+            aria-label="收到会议邀请时的提醒时间"
+          >
+            {INCOMING_REMINDER_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="h-full overflow-y-auto bg-[#f2f3f5] px-7 py-7">
+      <div className="max-w-[660px]">
+        <h2 className="text-lg font-black text-slate-950">日历提醒</h2>
+
+        <section className="mt-7">
+          <div className="mb-2.5">
+            <h3 className="text-sm font-bold text-slate-900">提醒设置</h3>
+          </div>
+          <div data-reminder-settings-card="true" className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            {rows.map((row, index) => (
+              <div
+                key={row.title}
+                className={`grid min-h-[64px] gap-3 px-4 py-3 text-sm lg:grid-cols-[minmax(0,1fr)_minmax(180px,208px)] lg:items-center ${
+                  index > 0 ? 'border-t border-slate-100' : ''
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-900">{row.title}</div>
+                  <div className="mt-1 text-xs font-medium leading-5 text-slate-500">{row.description}</div>
+                </div>
+                <div className="flex min-w-0 justify-start lg:justify-end">{row.control}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function CalendarReminderSettingsPage({ settings, onChange, onBack }) {
+  return (
+    <div className="flex-1 overflow-hidden bg-[#f1f3f5]">
+      <CalendarReminderSettingsContent settings={settings} onChange={onChange} />
+      <button type="button" onClick={onBack} className="sr-only">
+        返回日历模块
+      </button>
+    </div>
+  );
+}
+
+function SettingsCenterModal({ open, settings, onChange, onClose }) {
+  const [activeSection, setActiveSection] = useState('calendar');
+  const [activePanel, setActivePanel] = useState('calendar-reminders');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const primaryItems = [
+    { id: 'account', label: '账号', icon: Users },
+    { id: 'general', label: '常规', icon: Settings },
+    { id: 'mail', label: '邮件', icon: Mail },
+    { id: 'calendar', label: '日历', icon: Calendar },
+    { id: 'tools', label: '企业工具箱', icon: Archive },
+    { id: 'help', label: '帮助与反馈', icon: HelpCircle },
+    { id: 'about', label: '关于', icon: AlertCircle },
+  ];
+  const secondaryItems = {
+    account: [{ id: 'account-basic', label: '账号信息' }],
+    general: [{ id: 'general-basic', label: '基础设置' }],
+    mail: [
+      { id: 'mail-compose', label: '收发邮件设置' },
+      { id: 'mail-category', label: '来信分类' },
+    ],
+    calendar: [{ id: 'calendar-reminders', label: '日历提醒' }],
+    tools: [{ id: 'tools-basic', label: '工具箱设置' }],
+    help: [{ id: 'help-feedback', label: '帮助与反馈' }],
+    about: [{ id: 'about-version', label: '关于 Coremail' }],
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    setActiveSection('calendar');
+    setActivePanel('calendar-reminders');
+    setIsFullscreen(false);
+  }, [open]);
+
+  if (!open) return null;
+
+  const panels = secondaryItems[activeSection] || [];
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/20 ${isFullscreen ? 'p-3' : 'p-5'}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="设置中心"
+    >
+      <div
+        data-settings-center-window="true"
+        className={`flex overflow-hidden border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.20)] transition-[width,height,border-radius] duration-150 ${
+          isFullscreen
+            ? 'h-[calc(100vh-24px)] w-[calc(100vw-24px)] rounded-xl'
+            : 'h-[76vh] min-h-[520px] w-[920px] max-w-[calc(100vw-40px)] rounded-[18px]'
+        }`}
+      >
+        <aside className="flex w-52 shrink-0 flex-col border-r border-slate-200 bg-white">
+          <div className="flex h-14 items-center gap-2.5 px-5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+              <Settings size={17} />
+            </span>
+            <span className="text-sm font-black text-slate-900">设置中心</span>
+          </div>
+          <nav className="flex-1 space-y-1 px-4 py-3">
+            {primaryItems.map(({ id, label, icon: Icon }) => {
+              const selected = activeSection === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setActiveSection(id);
+                    setActivePanel((secondaryItems[id] || [])[0]?.id || '');
+                  }}
+                  className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition ${
+                    selected ? 'bg-blue-50 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon size={17} className={selected ? 'text-slate-950' : 'text-slate-500'} />
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <aside className="w-56 shrink-0 border-r border-slate-200 bg-white px-5 py-6">
+          <h1 className="mb-5 text-lg font-black text-slate-950">
+            {primaryItems.find((item) => item.id === activeSection)?.label || '设置'}
+          </h1>
+          <div className="space-y-1.5">
+            {panels.map((item) => {
+              const selected = activePanel === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActivePanel(item.id)}
+                  className={`h-10 w-full rounded-lg px-3 text-left text-sm font-bold transition ${
+                    selected ? 'bg-blue-50 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <main className="relative min-w-0 flex-1 bg-[#f1f3f5]">
+          <div className="absolute right-4 top-4 z-10 flex items-center gap-1 text-slate-700">
+            <button type="button" className="rounded-md p-1.5 transition hover:bg-white/70" aria-label="最小化">
+              <Minus size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="rounded-md p-1.5 transition hover:bg-white/70"
+              aria-label={isFullscreen ? '还原窗口' : '全屏显示'}
+              title={isFullscreen ? '还原窗口' : '全屏显示'}
+            >
+              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-md p-1.5 transition hover:bg-white/70" aria-label="关闭设置中心">
+              <X size={16} />
+            </button>
+          </div>
+          {activePanel === 'calendar-reminders' ? (
+            <CalendarReminderSettingsContent settings={settings} onChange={onChange} />
+          ) : (
+            <div className="flex h-full items-center justify-center px-8 text-sm font-semibold text-slate-400">
+              当前设置项暂未开放
+            </div>
+          )}
+        </main>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function AccountColorMenuItem({ colors, currentColor, onSelect }) {
+  return (
+    <div className="group/color relative">
+      <button
+        type="button"
+        className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
+      >
+        <Palette size={14} className="mr-2 text-gray-400" />
+        <span className="min-w-0 flex-1">颜色</span>
+        <ChevronRight size={14} className="ml-2 text-gray-400" />
+      </button>
+      <div className="absolute left-[calc(100%-4px)] top-0 z-[70] hidden w-64 rounded-[18px] border border-slate-200 bg-white p-3 shadow-lg group-hover/color:grid group-hover/color:grid-cols-6 group-hover/color:gap-2">
+        {colors.map((color) => (
+          <button
+            key={color}
+            type="button"
+            onClick={() => onSelect(color)}
+            className={`flex h-8 w-8 items-center justify-center rounded-full ${color} transition hover:scale-105 ${
+              currentColor === color ? 'ring-2 ring-slate-900 ring-offset-2' : 'ring-1 ring-black/5'
+            }`}
+            aria-label={`选择颜色 ${color}`}
+          >
+            {currentColor === color && <Check size={16} className="text-white drop-shadow" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function UtilitySidebar({ activeProduct, onSelectProduct }) {
   return (
     <aside
+      data-app-sidebar={activeProduct}
       className="relative z-10 hidden shrink-0 flex-col border-r border-slate-200 bg-[#f1f3f5] md:flex"
-      style={{ width: '252px' }}
+      style={{ width: APP_SIDEBAR_WIDTH }}
     >
       <div className="border-b border-slate-200 bg-[#f1f3f5] p-6">
         <div className="text-lg font-black text-gray-900">{MODULE_COPY[activeProduct]?.title || '模块'}</div>
       </div>
       <div className="flex-1 bg-[#f1f3f5] p-5"></div>
-      <div className="border-t border-slate-200 bg-[#f1f3f5] p-4">
-        <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
-      </div>
+      <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} />
     </aside>
   );
 }
@@ -299,111 +771,255 @@ function MailSidebar({
   accounts,
   mails,
   mailFolder,
+  selectedMailAccountId,
+  collapsed,
+  onToggleCollapsed,
   onSelectFolder,
   onCompose,
-  onToggleAccount,
-  onOpenMailboxPermissions,
   activeProduct,
   onSelectProduct,
 }) {
-  const ownAccounts = accounts.filter((account) => account.ownership === 'self');
-  const sharedAccounts = accounts.filter((account) => account.ownership === 'shared');
-  const activeAccountIds = new Set(accounts.filter((account) => account.checked).map((account) => account.id));
-  const folderCounts = MAIL_FOLDERS.reduce((accumulator, folder) => {
-    accumulator[folder.id] = mails.filter((mail) => mail.folder === folder.id && activeAccountIds.has(mail.accountId)).length;
-    return accumulator;
-  }, {});
-  const unreadByAccount = accounts.reduce((accumulator, account) => {
-    accumulator[account.id] = mails.filter((mail) => mail.accountId === account.id && mail.folder === 'inbox' && mail.unread).length;
-    return accumulator;
-  }, {});
+  const mailAccountIds = new Set(mails.map((mail) => mail.accountId));
+  const mailboxes = accounts.filter((account) => mailAccountIds.has(account.id));
+  const getFolderCount = (accountId, folderId) => mails.filter((mail) => mail.accountId === accountId && mailMatchesFolder(mail, folderId)).length;
+  const getAggregateFolderCount = (folderId) => mails.filter((mail) => mailMatchesFolder(mail, folderId)).length;
+  const favoriteRows = [
+    ...mailboxes.map((account) => ({
+      id: `inbox-${account.id}`,
+      label: `收件箱 · ${account.email}`,
+      icon: MAIL_FOLDERS.find((folder) => folder.id === 'inbox')?.icon || Mail,
+      count: getFolderCount(account.id, 'inbox'),
+      onClick: () => onSelectFolder('inbox', account.id),
+    })),
+    {
+      id: 'sent',
+      label: '已发送',
+      icon: Send,
+      count: getAggregateFolderCount('sent'),
+      onClick: () => onSelectFolder('sent', selectedMailAccountId),
+    },
+    {
+      id: 'drafts',
+      label: '草稿',
+      icon: FileText,
+      count: getAggregateFolderCount('drafts'),
+      onClick: () => onSelectFolder('drafts', selectedMailAccountId),
+    },
+    {
+      id: 'deleted',
+      label: '已删除',
+      icon: Trash,
+      count: getAggregateFolderCount('deleted'),
+      onClick: () => onSelectFolder('deleted', selectedMailAccountId),
+    },
+  ];
+
+  if (collapsed) {
+    return (
+      <aside
+        data-app-sidebar="mail"
+        className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
+        style={{ width: APP_COLLAPSED_SIDEBAR_WIDTH, zIndex: 20 }}
+      >
+        <div className="flex flex-col items-center border-b border-slate-200 px-3 py-4">
+          <button
+            onClick={onToggleCollapsed}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 transition hover:bg-white"
+            title="展开侧边栏"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        <div className="border-b border-slate-200 px-3 py-4">
+          <button
+            data-mail-sidebar-compose="true"
+            onClick={() => onCompose('new')}
+            className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-white shadow-sm transition hover:bg-slate-700 active:scale-95"
+            title="写邮件"
+          >
+            <SquarePen size={17} />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0"></div>
+        <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} compact />
+      </aside>
+    );
+  }
 
   return (
     <aside
+      data-app-sidebar="mail"
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
-      style={{ width: '252px', zIndex: 20 }}
+      style={{ width: APP_SIDEBAR_WIDTH, zIndex: 20 }}
     >
-      <div className="border-b border-slate-200 px-5 pt-6 pb-4">
+      <div className="px-5 pb-4 pt-5">
+        <div data-mail-sidebar-brand="true" className="flex items-center justify-between gap-3">
+          <div className="text-lg font-black text-gray-900">Coremail</div>
+          <button
+            onClick={onToggleCollapsed}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 transition hover:bg-white"
+            title="收起侧边栏"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        </div>
         <button
+          data-mail-sidebar-compose="true"
           onClick={() => onCompose('new')}
-          className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-3 font-bold text-white transition-colors hover:bg-blue-700"
+          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-base font-black text-blue-600 transition-colors hover:bg-slate-200"
         >
           <SquarePen size={18} className="mr-2" />
           写邮件
         </button>
       </div>
 
-      <div className="border-b border-slate-200 px-5 py-5">
-        <div className="text-xs font-black text-gray-400 uppercase mb-3">文件夹</div>
-        <div className="space-y-1">
-          {MAIL_FOLDERS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => onSelectFolder(id)}
-              className={`w-full flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-bold transition-all ${
-                mailFolder === id
-                  ? 'border-transparent bg-white/85 text-gray-900'
-                  : 'border-transparent bg-transparent text-gray-600 hover:bg-white/60'
-              }`}
+      <div className="flex-1 overflow-y-auto px-5 py-3">
+        <section data-mail-favorites="true" className="mb-6">
+          <button type="button" className="mb-2 flex w-full items-center justify-between px-2 py-1 text-sm font-medium text-slate-500">
+            收藏夹
+            <ChevronDown size={16} />
+          </button>
+          <div className="space-y-0.5">
+            {favoriteRows.map(({ id, label, icon: Icon, count, onClick }) => (
+              <button
+                key={id}
+                type="button"
+                data-mail-favorite={id}
+                onClick={onClick}
+                className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200/70 hover:text-slate-950"
+              >
+                <span className="flex min-w-0 items-center">
+                  <Icon size={17} className="mr-3 shrink-0 text-slate-500" />
+                  <span className="truncate">{label}</span>
+                </span>
+                {count > 0 && <span className="ml-3 shrink-0 text-xs font-semibold text-slate-500">{count}</span>}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="space-y-5">
+          {mailboxes.map((account) => (
+            <section
+              key={account.id}
+              data-mailbox-id={account.id}
+              className="px-1 py-0.5"
             >
-              <span className="flex items-center min-w-0">
-                <Icon size={16} className="mr-2 shrink-0" />
-                <span className="truncate">{label}</span>
-              </span>
-              <span className="ml-2 min-w-[22px] rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-gray-500">{folderCounts[id] || 0}</span>
-            </button>
+              <button
+                type="button"
+                data-mailbox-account={account.id}
+                onClick={() => onSelectFolder('inbox', account.id)}
+                className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200/70 hover:text-slate-900"
+              >
+                <span className="truncate">{account.email}</span>
+                <ChevronDown size={16} className="ml-2 shrink-0 text-slate-500" />
+              </button>
+
+              <div className="mt-1 space-y-0.5">
+                {MAIL_SIDEBAR_FOLDERS.map(({ id, label, icon: Icon }) => {
+                  const selected = selectedMailAccountId === account.id && mailFolder === id;
+                  const count = getFolderCount(account.id, id);
+                  return (
+                    <button
+                      key={id}
+                      data-mailbox-folder={id}
+                      type="button"
+                      onClick={() => onSelectFolder(id, account.id)}
+                      className={`flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-semibold transition ${
+                        selected ? 'bg-slate-200/80 text-slate-950' : 'text-slate-700 hover:bg-slate-200/60 hover:text-slate-950'
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center">
+                        <Icon size={17} className={`mr-3 shrink-0 ${selected ? 'text-slate-950' : 'text-slate-500'}`} />
+                        <span className="truncate">{label}</span>
+                      </span>
+                      {count > 0 && <span className="ml-3 shrink-0 text-xs font-semibold text-slate-500">{count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           ))}
+          {mailboxes.length === 0 && (
+            <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm font-semibold text-slate-400">
+              当前账号暂无邮箱
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f1f3f5] p-5 space-y-4">
-        {[{ title: '我的日历', items: ownAccounts }, { title: '共享日历', items: sharedAccounts }].map((group) => (
-          <div key={group.title}>
-            <div className="text-[11px] font-black text-gray-400 uppercase mb-3">{group.title}</div>
-            <div>
-              {group.items.map((account) => (
-                <div
-                  key={account.id}
-                  className="bg-transparent px-1 py-2 transition-all"
-                >
-                  <div className="flex items-start">
-                    <button onClick={() => onToggleAccount(account.id)} className="flex items-start flex-1 min-w-0 text-left" title={`${account.name} · ${account.email}`}>
-                      <div className={`w-2.5 h-2.5 rounded-full mt-1 ${account.color}`}></div>
-                      <div className="ml-3 min-w-0 flex-1">
-                        <div className="text-sm font-bold text-gray-900 truncate">{account.name}</div>
-                        <div className="text-xs text-gray-500 truncate mt-1">{account.email}</div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                          <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 font-bold whitespace-nowrap">
-                            未读 {unreadByAccount[account.id] || 0}
-                          </span>
-                          {account.checked && (
-                            <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-bold whitespace-nowrap">
-                              当前显示中
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => onOpenMailboxPermissions(account.id)}
-                      className="ml-3 rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-600 transition hover:bg-slate-200/80 shrink-0"
-                    >
-                      权限
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="border-t border-slate-200 bg-[#f1f3f5] p-4">
-        <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
-      </div>
+      <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} />
     </aside>
   );
 }
+
+const getMailAiInsight = (mail, linkedEvent = null) => {
+  if (!mail) {
+    return {
+      categoryLabel: '普通邮件',
+      categoryTone: 'bg-slate-100 text-slate-600',
+      summary: '选择邮件后，AI 会基于正文、附件和关联日程生成摘要。',
+      todos: [],
+      replies: [],
+    };
+  }
+
+  const source = `${mail.subject} ${mail.preview} ${mail.body}`;
+  const hasAction = /确认|请|需要|建议|回复|安排|补齐|同步|打印|装订/.test(source);
+  const isMeeting = Boolean(mail.linkedEventId || linkedEvent || /会议|日程|评审|拜访|午餐会|会面/.test(source));
+  const isImportant = Boolean(mail.starred || /张总|董事会|风险|明早|CFO|预算/.test(source));
+  const hasAttachment = mail.attachments.length > 0;
+
+  if (mail.id === 'm1') {
+    return {
+      categoryLabel: '重要待办',
+      categoryTone: 'bg-indigo-50 text-indigo-700',
+      summary: '评审材料已补齐预算和风险页，发件人建议明天下午一起过一遍，并会在确认后同步给张总和研发负责人。',
+      todos: ['确认明天下午是否可以一起评审材料', '查看附件 Q2_路线评审_v4.pptx', '确认后同步给张总和研发负责人'],
+      replies: ['确认明天下午一起过一遍', '我先看附件后反馈', '请先同步给相关负责人'],
+    };
+  }
+
+  if (mail.id === 'm2') {
+    return {
+      categoryLabel: '会议相关',
+      categoryTone: 'bg-blue-50 text-blue-700',
+      summary: '客户拜访时间调整到下周三上午，需要确认是否顺带安排午餐会，并判断是否提前锁定会议。',
+      todos: ['确认下周三上午拜访行程', '判断是否安排午餐会', '必要时提前锁定会议时间'],
+      replies: ['我来确认客户拜访行程', '可以顺带安排午餐会', '需要先确认客户时间'],
+    };
+  }
+
+  if (mail.id === 'm6') {
+    return {
+      categoryLabel: '高优先级',
+      categoryTone: 'bg-rose-50 text-rose-700',
+      summary: '董事会材料需在明早 8:30 前送达，需要确认打印份数并在今晚完成装订。',
+      todos: ['确认董事会材料打印份数', '今晚完成材料装订', '明早 8:30 前送达'],
+      replies: ['我会今晚完成装订', '请确认最终打印份数', '已收到，我会按时处理'],
+    };
+  }
+
+  return {
+    categoryLabel: isImportant ? '重要邮件' : isMeeting ? '会议相关' : hasAction ? '待处理' : '信息同步',
+    categoryTone: isImportant
+      ? 'bg-rose-50 text-rose-700'
+      : isMeeting
+        ? 'bg-blue-50 text-blue-700'
+        : hasAction
+          ? 'bg-amber-50 text-amber-700'
+          : 'bg-slate-100 text-slate-600',
+    summary: hasAction
+      ? `${mail.fromName} 提到：${mail.preview}`
+      : `${mail.fromName} 同步了这封邮件的主要信息：${mail.preview}`,
+    todos: [
+      ...(hasAction ? ['查看邮件内容并决定是否需要回复'] : []),
+      ...(hasAttachment ? [`查看附件 ${mail.attachments[0].name}`] : []),
+      ...(isMeeting ? ['确认是否需要生成或查看关联日程'] : []),
+    ],
+    replies: hasAction ? ['收到，我会处理', '我确认后回复你', '需要再补充一些信息'] : ['收到，谢谢同步', '我先看一下', '后续有问题再反馈'],
+  };
+};
 
 function MailWorkspace({
   accounts,
@@ -416,6 +1032,7 @@ function MailWorkspace({
   onToggleStar,
   onToggleRead,
   onArchiveMail,
+  onDeleteMail,
   onCompose,
   onEditDraft,
   onScheduleFromMail,
@@ -428,25 +1045,254 @@ function MailWorkspace({
   calendarMap,
   onOpenEvent,
 }) {
+  const [mailSearchQuery, setMailSearchQuery] = useState('');
+  const [readerMoreOpen, setReaderMoreOpen] = useState(false);
+  const readerMoreRef = useRef(null);
   const selectedLinkedEvent = selectedMail?.linkedEventId ? linkedEventLookup[selectedMail.linkedEventId] || null : null;
+  const selectedAccount = selectedMail ? accounts.find((item) => item.id === selectedMail.accountId) : null;
+  const folderLabel = getMailFolderLabel(mailFolder);
+  const unreadCount = mails.filter((mail) => mail.unread).length;
+  const selectedInitial = selectedMail?.fromName?.trim()?.[0] || selectedMail?.fromEmail?.trim()?.[0] || 'M';
+  const selectedAiInsight = getMailAiInsight(selectedMail, selectedLinkedEvent);
+  const normalizedMailSearchQuery = mailSearchQuery.trim().toLowerCase();
+  const visibleMails = normalizedMailSearchQuery
+    ? mails.filter((mail) =>
+        [mail.subject, mail.preview, mail.body, mail.fromName, mail.fromEmail]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(normalizedMailSearchQuery)),
+      )
+    : mails;
+
+  useEffect(() => {
+    setReaderMoreOpen(false);
+  }, [selectedMail?.id]);
+
+  useEffect(() => {
+    if (!readerMoreOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (readerMoreRef.current && !readerMoreRef.current.contains(event.target)) {
+        setReaderMoreOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setReaderMoreOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [readerMoreOpen]);
+
+  const renderReaderToolbar = () => {
+    if (!selectedMail) return null;
+
+    const toolbarButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950';
+    const toolbarPrimaryButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700';
+    const toolbarAccentButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-50';
+    const windowButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950';
+    const menuItemClass = 'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950';
+    const readerActions = [
+      ...(selectedMail.folder === 'drafts'
+        ? [
+            {
+              id: 'edit',
+              label: '继续编辑',
+              icon: SquarePen,
+              variant: 'primary',
+              onClick: () => onEditDraft(selectedMail.id),
+            },
+          ]
+        : [
+            {
+              id: 'reply',
+              label: '回复',
+              icon: Reply,
+              onClick: () => onCompose('reply', selectedMail.id),
+            },
+            {
+              id: 'replyAll',
+              label: '回复全部',
+              icon: ReplyAll,
+              onClick: () => onCompose('replyAll', selectedMail.id),
+            },
+            {
+              id: 'forward',
+              label: '转发',
+              icon: Forward,
+              onClick: () => onCompose('forward', selectedMail.id),
+            },
+          ]),
+      {
+        id: 'read',
+        label: selectedMail.unread ? '标为已读' : '标为未读',
+        icon: Mail,
+        onClick: () => onToggleRead(selectedMail.id),
+      },
+      {
+        id: 'star',
+        label: '标记旗标',
+        icon: Star,
+        onClick: () => onToggleStar(selectedMail.id),
+      },
+      {
+        id: 'delete',
+        label: '删除',
+        icon: Trash,
+        onClick: () => onDeleteMail(selectedMail.id),
+      },
+      {
+        id: 'move',
+        label: '移动',
+        icon: Archive,
+        onClick: () => onArchiveMail(selectedMail.id),
+      },
+      {
+        id: 'schedule',
+        label: '生成日程',
+        icon: Calendar,
+        variant: 'accent',
+        onClick: () => onScheduleFromMail(selectedMail.id),
+      },
+    ];
+    const getVisibleActionClass = (action) => {
+      if (action.variant === 'primary') return toolbarPrimaryButtonClass;
+      if (action.variant === 'accent') return toolbarAccentButtonClass;
+      return toolbarButtonClass;
+    };
+    const renderActionIcon = (action, size = 16, className = 'mr-1.5') => {
+      const Icon = action.icon;
+      return <Icon size={size} className={className} fill={action.id === 'star' && selectedMail.starred ? 'currentColor' : 'none'} />;
+    };
+
+    return (
+      <div data-mail-reader-toolbar="true" className="relative flex shrink-0 flex-nowrap items-center border-b border-slate-200 bg-white px-6 py-4">
+        <div data-mail-reader-toolbar-actions="true" className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-hidden whitespace-nowrap pr-2">
+          {readerActions.map((action) => (
+            <button key={action.id} onClick={action.onClick} className={getVisibleActionClass(action)}>
+              {renderActionIcon(action)}
+              {action.label}
+            </button>
+          ))}
+        </div>
+        <div ref={readerMoreRef} className="relative mr-2 shrink-0">
+          <button
+            type="button"
+            aria-label="更多邮件操作"
+            title="更多邮件操作"
+            aria-haspopup="menu"
+            aria-expanded={readerMoreOpen}
+            onClick={() => setReaderMoreOpen((prev) => !prev)}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+          {readerMoreOpen && (
+            <div
+              data-mail-reader-more-menu="true"
+              role="menu"
+              className="absolute right-0 top-[calc(100%+8px)] z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+            >
+              {readerActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setReaderMoreOpen(false);
+                    action.onClick();
+                  }}
+                  className={action.variant === 'accent' ? `${menuItemClass} text-blue-700 hover:bg-blue-50 hover:text-blue-800` : menuItemClass}
+                >
+                  {renderActionIcon(action, 16, 'shrink-0 text-slate-500')}
+                  <span className="min-w-0 flex-1 truncate">{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div data-mail-reader-window-controls="true" className="ml-auto flex shrink-0 items-center gap-1">
+          <button type="button" aria-label="客服帮助" title="客服帮助" className={windowButtonClass}>
+            <HelpCircle size={17} />
+          </button>
+          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <button type="button" aria-label="最小化窗口" title="最小化" className={windowButtonClass}>
+            <Minus size={17} />
+          </button>
+          <button type="button" aria-label="全屏窗口" title="全屏" className={windowButtonClass}>
+            <Maximize2 size={16} />
+          </button>
+          <button type="button" aria-label="关闭窗口" title="关闭" className={windowButtonClass}>
+            <X size={17} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-1 min-w-0 overflow-hidden bg-white">
-      <div className="w-[360px] min-w-0 border-r border-slate-200 bg-[#fcfcfb] flex flex-col">
-        <div className="border-b border-slate-200 bg-[#fcfcfb] px-5 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-lg font-black text-gray-900">邮件</div>
+      <div data-mail-workspace="true" className="flex min-w-0 flex-1 overflow-hidden bg-[#f6f7f9]">
+        <div className="flex w-[408px] min-w-0 flex-col border-r border-slate-200 bg-white">
+        <div className="border-b border-slate-200 bg-white px-5 pb-4 pt-5">
+          <div data-mail-list-toolbar="true" className="space-y-4">
+            <div className="flex h-10 items-center rounded-xl bg-slate-100 px-2">
+              <button type="button" className="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-slate-800 transition hover:bg-white">
+                全部
+                <ChevronDown size={14} className="ml-1 text-slate-500" />
+              </button>
+              <span className="mx-2 h-5 w-px bg-slate-300" />
+              <Search size={15} className="shrink-0 text-slate-400" />
+              <input
+                value={mailSearchQuery}
+                onChange={(event) => setMailSearchQuery(event.target.value)}
+                placeholder="搜索邮件"
+                className="ml-2 min-w-0 flex-1 border-none bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              <button type="button" className="ml-2 inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-slate-500 transition hover:bg-white hover:text-slate-800">
+                高级
+              </button>
             </div>
-            <button onClick={() => onCompose('new')} className="inline-flex items-center px-3 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold">
-              <SquarePen size={15} className="mr-2" />
-              写邮件
-            </button>
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-slate-950">{folderLabel}</h2>
+                <div className="mt-1 text-xs font-semibold text-slate-400">
+                  {mails.length} 封邮件，{unreadCount} 封未读
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button type="button" aria-label="刷新邮件" title="刷新邮件" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
+                  <RefreshCw size={16} />
+                </button>
+                <button type="button" aria-label="选择邮件" title="选择邮件" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
+                  <Square size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onToggleUnreadOnly}
+                  aria-label="筛选邮件"
+                  title="筛选邮件"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${
+                    unreadOnly ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <AlignLeft size={16} />
+                </button>
+                <button type="button" aria-label="邮件排序" title="邮件排序" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
+                  <MoreHorizontal size={17} />
+                </button>
+              </div>
+            </div>
           </div>
 
           {mailFolder === 'inbox' && (
-            <div className="mt-4 flex items-center gap-2">
-              <div className="flex items-center bg-gray-100 rounded-xl p-1">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-lg bg-slate-100 p-1">
                 {[
                   ['focused', '重点'],
                   ['other', '其他'],
@@ -454,8 +1300,8 @@ function MailWorkspace({
                   <button
                     key={id}
                     onClick={() => onSetMailFocusTab(id)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg ${
-                      mailFocusTab === id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+                    className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
+                      mailFocusTab === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     {label}
@@ -464,75 +1310,93 @@ function MailWorkspace({
               </div>
               <button
                 onClick={onToggleUnreadOnly}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold ${
-                  unreadOnly ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-600 border-gray-200'
+                className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                  unreadOnly ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 仅看未读
               </button>
             </div>
           )}
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2">
+            <Sparkles size={15} className="shrink-0 text-indigo-600" />
+            <div className="min-w-0">
+              <div className="text-xs font-black text-indigo-800">AI 智能分类</div>
+              <div className="mt-0.5 truncate text-[11px] font-semibold text-indigo-500">识别重要邮件、会议相关和待处理事项</div>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-white">
-          {mails.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-sm text-gray-400">当前筛选下没有邮件。</div>
+          {visibleMails.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">当前筛选下没有邮件</div>
           ) : (
-            mails.map((mail) => {
+            visibleMails.map((mail) => {
               const account = accounts.find((item) => item.id === mail.accountId);
               const selected = selectedMail?.id === mail.id;
               const linkedEvent = mail.linkedEventId ? linkedEventLookup[mail.linkedEventId] || null : null;
+              const senderInitial = mail.fromName?.trim()?.[0] || mail.fromEmail?.trim()?.[0] || 'M';
+              const aiInsight = getMailAiInsight(mail, linkedEvent);
               return (
                 <div
                   key={mail.id}
                   onClick={() => onSelectMail(mail.id)}
-                  className={`w-full text-left px-4 py-4 border-b border-slate-100/80 transition-colors cursor-pointer ${
-                    selected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  className={`w-full cursor-pointer border-b border-slate-100 px-4 py-3.5 text-left transition-colors ${
+                    selected ? 'bg-blue-50/70 shadow-[inset_3px_0_0_#2563eb]' : 'hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
+                      mail.unread ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {senderInitial}
+                    </span>
                     <button
                       onClick={(event) => {
                         event.stopPropagation();
                         onToggleStar(mail.id);
                       }}
-                      className={`mt-1 ${mail.starred ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500'}`}
+                      className={`mt-1 ${mail.starred ? 'text-amber-500' : 'text-slate-300 hover:text-slate-500'}`}
+                      aria-label={mail.starred ? '取消星标' : '添加星标'}
                     >
                       <Star size={16} fill={mail.starred ? 'currentColor' : 'none'} />
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className={`text-sm truncate ${mail.unread ? 'font-black text-gray-900' : 'font-bold text-gray-700'}`}>{mail.fromName}</div>
-                          <div className="text-[11px] text-gray-400 truncate mt-0.5">{account?.name}</div>
+                          <div className={`truncate text-sm ${mail.unread ? 'font-black text-slate-950' : 'font-bold text-slate-700'}`}>{mail.fromName}</div>
+                          <div className="mt-0.5 truncate text-[11px] font-semibold text-slate-400">{getAccountDisplayLabel(account)}</div>
                         </div>
-                        <div className="shrink-0 text-[11px] font-bold text-gray-400">{formatMailTime(mail.timestamp)}</div>
+                        <div className="shrink-0 text-[11px] font-bold text-slate-400">{formatMailTime(mail.timestamp)}</div>
                       </div>
-                      <div className={`mt-2 text-sm leading-snug ${mail.unread ? 'font-bold text-gray-900' : 'text-gray-700'}`} style={clampLinesStyle(1)}>
+                      <div className={`mt-2 text-sm leading-snug ${mail.unread ? 'font-black text-slate-950' : 'font-semibold text-slate-700'}`} style={clampLinesStyle(1)}>
                         {mail.subject}
                       </div>
-                      <div className="mt-1 text-xs text-gray-500 leading-snug" style={clampLinesStyle(2)}>
+                      <div className="mt-1 text-xs font-medium leading-snug text-slate-500" style={clampLinesStyle(2)}>
                         {mail.preview}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {mail.unread && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-black">未读</span>}
+                        {mail.unread && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700">未读</span>}
                         {mail.attachments.length > 0 && (
-                          <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-black">
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">
                             附件 {mail.attachments.length}
                           </span>
                         )}
                         {linkedEvent?.status === '已取消' && (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[11px] font-black">Cancel</span>
+                          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700">Cancel</span>
                         )}
                         {linkedEvent?.status === '草稿' && (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-black">草稿</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-700">草稿</span>
                         )}
                         {linkedEvent?.status === '待响应' && (
-                          <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 text-[11px] font-black">待响应</span>
+                          <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-black text-orange-700">待响应</span>
                         )}
                         {mail.linkedEventId && (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-black">关联日程</span>
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700">关联日程</span>
                         )}
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${aiInsight.categoryTone}`}>
+                          AI · {aiInsight.categoryLabel}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -543,125 +1407,137 @@ function MailWorkspace({
         </div>
       </div>
 
-      <div className="flex-1 min-w-0 bg-[#f8f8f7]">
+      <div className="min-w-0 flex-1 bg-[#f6f7f9]">
         {!selectedMail ? (
-          <div className="h-full flex items-center justify-center text-gray-400">未选择邮件</div>
+          <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">未选择邮件</div>
         ) : (
           <div className="h-full flex flex-col">
-            <div className="border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-3">
-                    <span className="px-2 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-bold">{MAIL_FOLDERS.find((item) => item.id === selectedMail.folder)?.label}</span>
-                    {selectedMail.unread && <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">未读</span>}
-                    {selectedLinkedEvent?.status === '已取消' && <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold">Cancel</span>}
-                    {selectedLinkedEvent?.status === '草稿' && <span className="px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">草稿</span>}
-                    {selectedMail.linkedEventId && (
-                      <button
-                        onClick={() => onOpenLinkedEvent(selectedMail.linkedEventId)}
-                        className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold"
-                      >
-                        查看关联日程
-                      </button>
-                    )}
-                  </div>
-                  <h2 className="text-2xl font-black text-gray-900 leading-tight">{selectedMail.subject}</h2>
-                  <div className="mt-4 text-sm text-gray-700">
-                    <div className="font-bold">{selectedMail.fromName} &lt;{selectedMail.fromEmail}&gt;</div>
-                    <div className="text-gray-500 mt-1">收件人：{joinRecipients(selectedMail.to)}</div>
-                    {selectedMail.cc.length > 0 && <div className="text-gray-500 mt-1">抄送：{joinRecipients(selectedMail.cc)}</div>}
-                    <div className="text-gray-400 mt-1">{formatMailTime(selectedMail.timestamp)}</div>
-                    {selectedLinkedEvent && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        日程状态：{selectedLinkedEvent.status || '已接受'} · {formatEventDateTime(selectedLinkedEvent)}
-                      </div>
-                    )}
+            {renderReaderToolbar()}
+            <div className="border-b border-slate-200 bg-white px-7 py-5">
+              <div className="max-w-[1040px]">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{MAIL_FOLDERS.find((item) => item.id === selectedMail.folder)?.label}</span>
+                  {selectedMail.unread && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">未读</span>}
+                  {selectedLinkedEvent?.status === '已取消' && <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">Cancel</span>}
+                  {selectedLinkedEvent?.status === '草稿' && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">草稿</span>}
+                  {selectedMail.linkedEventId && (
+                    <button
+                      onClick={() => onOpenLinkedEvent(selectedMail.linkedEventId)}
+                      className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      查看关联日程
+                    </button>
+                  )}
+                </div>
+                <h2 className="text-[28px] font-black leading-tight text-slate-950">{selectedMail.subject}</h2>
+                <div className="mt-4 flex min-w-0 items-start gap-3 text-sm">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-base font-black text-white">{selectedInitial}</span>
+                  <div className="min-w-0">
+                    <div className="font-black text-slate-900">{selectedMail.fromName} <span className="font-semibold text-slate-500">&lt;{selectedMail.fromEmail}&gt;</span></div>
+                    <div className="mt-1 text-slate-500">收件人：{joinRecipients(selectedMail.to)}</div>
+                    {selectedMail.cc.length > 0 && <div className="mt-1 text-slate-500">抄送：{joinRecipients(selectedMail.cc)}</div>}
+                    <div className="mt-1 text-slate-400">{formatMailTime(selectedMail.timestamp)} · {getAccountDisplayLabel(selectedAccount)}</div>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {selectedMail.folder === 'drafts' ? (
-                    <button onClick={() => onEditDraft(selectedMail.id)} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold">
-                      继续编辑
-                    </button>
-                  ) : (
-                    <>
-                      <button onClick={() => onCompose('reply', selectedMail.id)} className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700 inline-flex items-center">
-                        <Reply size={15} className="mr-2" />
-                        回复
-                      </button>
-                      <button onClick={() => onCompose('replyAll', selectedMail.id)} className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700 inline-flex items-center">
-                        <ReplyAll size={15} className="mr-2" />
-                        全部回复
-                      </button>
-                      <button onClick={() => onCompose('forward', selectedMail.id)} className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700 inline-flex items-center">
-                        <Forward size={15} className="mr-2" />
-                        转发
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => onToggleRead(selectedMail.id)}
-                    className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700"
-                  >
-                    {selectedMail.unread ? '标为已读' : '标为未读'}
-                  </button>
-                      <button onClick={() => onArchiveMail(selectedMail.id)} className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-bold text-gray-700 inline-flex items-center">
-                        <Archive size={15} className="mr-2" />
-                        存档
-                      </button>
-                      <button onClick={() => onScheduleFromMail(selectedMail.id)} className="px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-sm font-bold text-blue-700">
-                        生成日程
-                      </button>
-                    </div>
+                {selectedLinkedEvent && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-500">
+                    日程：{selectedLinkedEvent.status || '已接受'} · {formatEventDateTime(selectedLinkedEvent)}
                   </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {selectedLinkedEvent?.status === '已取消' && (
-                <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-rose-900">这场会议已经取消</div>
+            <div className="flex-1 overflow-y-auto px-7 py-6">
+              <section className="mb-5 max-w-[980px] overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <div className="flex items-center justify-between border-b border-indigo-50 bg-indigo-50/70 px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-indigo-600" />
+                    <h3 className="text-sm font-black text-slate-950">AI 邮件助手</h3>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${selectedAiInsight.categoryTone}`}>
+                    {selectedAiInsight.categoryLabel}
+                  </span>
+                </div>
+                <div className="grid gap-0 md:grid-cols-[1.15fr_1fr_1fr]">
+                  <div className="border-b border-slate-100 px-5 py-4 md:border-b-0 md:border-r">
+                    <div className="text-xs font-black text-indigo-700">AI 摘要</div>
+                    <p className="mt-2 text-sm font-medium leading-6 text-slate-600">{selectedAiInsight.summary}</p>
+                  </div>
+                  <div className="border-b border-slate-100 px-5 py-4 md:border-b-0 md:border-r">
+                    <div className="text-xs font-black text-indigo-700">待处理事项</div>
+                    <ul className="mt-2 space-y-2">
+                      {(selectedAiInsight.todos.length > 0 ? selectedAiInsight.todos : ['暂无明确待处理事项']).map((todo) => (
+                        <li key={todo} className="flex gap-2 text-sm font-medium leading-5 text-slate-600">
+                          <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                          <span>{todo}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="px-5 py-4">
+                    <div className="text-xs font-black text-indigo-700">快速回复建议</div>
+                    <div className="mt-2 space-y-2">
+                      {selectedAiInsight.replies.map((reply) => (
+                        <button
+                          key={reply}
+                          type="button"
+                          onClick={() => onCompose('reply', selectedMail.id)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
+                        >
+                          {reply}
+                        </button>
+                      ))}
                     </div>
+                  </div>
+                </div>
+              </section>
+
+              {selectedLinkedEvent?.status === '已取消' && (
+                <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-rose-900">这场会议已经取消</div>
                     <button
                       onClick={() => onOpenLinkedEvent(selectedLinkedEvent.id)}
                       className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100"
                     >
-                      打开日程
+                      查看详情
                     </button>
                   </div>
                 </div>
               )}
 
               {selectedMail.attachments.length > 0 && (
-                <div className="mb-6 flex flex-wrap gap-3">
-                  {selectedMail.attachments.map((attachment) => (
-                    <div key={attachment.name} className="px-3 py-2 rounded-xl border border-gray-200 bg-white inline-flex items-center">
-                      <Paperclip size={14} className="mr-2 text-gray-400" />
-                      <div>
-                        <div className="text-sm font-bold text-gray-800">{attachment.name}</div>
-                        <div className="text-xs text-gray-500">{attachment.size}</div>
+                <div className="mb-5">
+                  <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">附件</div>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedMail.attachments.map((attachment) => (
+                      <div key={attachment.name} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                        <Paperclip size={14} className="mr-2 text-slate-400" />
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">{attachment.name}</div>
+                          <div className="text-xs font-medium text-slate-400">{attachment.size}</div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="rounded-xl border border-slate-200 bg-white px-6 py-5 text-sm text-gray-700 whitespace-pre-wrap leading-7">
-                {selectedMail.body}
-              </div>
+              <article className="max-w-[980px] rounded-2xl border border-slate-200 bg-white px-7 py-6 text-[15px] leading-8 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <div className="whitespace-pre-wrap">{selectedMail.body}</div>
+              </article>
             </div>
           </div>
         )}
       </div>
 
-      <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 bg-[#fcfcfb] xl:flex xl:flex-col">
+      <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 bg-white 2xl:flex 2xl:flex-col">
         <div className="border-b border-slate-200 px-5 py-4">
-	          <div className="text-sm font-semibold text-slate-900">近期日程</div>
+          <div className="text-sm font-black text-slate-900">关联日程</div>
+          <div className="mt-1 text-xs font-semibold text-slate-400">从邮件快速跳转到近期会议</div>
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {upcomingEvents.slice(0, 8).map((event) => {
               const calendar = calendarMap[event.calId];
               const account = accountMap[calendar?.accountId];
@@ -671,14 +1547,13 @@ function MailWorkspace({
                   onClick={() => onOpenEvent(event.id)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-900">{event.title}</div>
-                      <div className="mt-1 truncate text-xs text-slate-500">
-                        {formatEventDateTime(event)} · {account?.email || account?.name || '未知账户'}
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-slate-900">{event.title}</div>
+                      <div className="mt-1 truncate text-xs font-semibold text-slate-500">{formatEventDateTime(event)}</div>
+                      <div className="mt-1 truncate text-xs font-medium text-slate-400">{getAccountDisplayLabel(account) || '未知账户'}</div>
                     </div>
-                    <span className={`h-2.5 w-2.5 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
                   </div>
                 </button>
               );
@@ -743,8 +1618,9 @@ function CalendarSidebar({
       if (collapsed) {
         return (
       <aside
+        data-app-sidebar="calendar"
         className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
-        style={{ width: '88px', zIndex: 20 }}
+        style={{ width: APP_COLLAPSED_SIDEBAR_WIDTH, zIndex: 20 }}
       >
         <div className="flex flex-col items-center border-b border-slate-200 px-3 py-4">
           <button
@@ -794,17 +1670,16 @@ function CalendarSidebar({
           </div>
         </div>
         <div className="flex-1 min-h-0"></div>
-        <div className="border-t border-slate-200 p-3">
-          <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} compact vertical />
-        </div>
+        <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} compact />
       </aside>
     );
   }
 
   return (
     <aside
+      data-app-sidebar="calendar"
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
-      style={{ width: '252px', zIndex: 20 }}
+      style={{ width: APP_SIDEBAR_WIDTH, zIndex: 20 }}
     >
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
@@ -977,18 +1852,26 @@ function CalendarSidebar({
 	                    className="group/account relative -mx-1 flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 transition-colors duration-120 hover:bg-white/65"
 	                    onContextMenu={(e) => onAccountContextMenu(e, account)}
 	                  >
-	                    {/* Checkbox - independent click zone */}
-	                    <button
-	                      onClick={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
-	                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-150 ${
-	                        account.checked
-	                          ? `border-transparent ${getAccountCheckboxTone(account.color)}`
-	                          : 'border-gray-300 bg-transparent text-transparent hover:border-blue-400 hover:bg-white/70'
-	                      }`}
-	                      title={account.checked ? '取消选中此日历' : '选中此日历'}
-	                    >
-	                      {account.checked && <Check size={12} strokeWidth={2.6} />}
-	                    </button>
+	                    <label className="relative flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center" title={account.checked ? '取消选中此日历' : '选中此日历'}>
+	                      <input
+	                        type="checkbox"
+	                        checked={account.checked}
+	                        onChange={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
+	                        onClick={(e) => e.stopPropagation()}
+	                        aria-label={`显示${displayName}`}
+	                        className="sr-only"
+	                      />
+	                      <span
+	                        data-calendar-account-checkbox={account.id}
+	                        className={`flex h-5 w-5 items-center justify-center rounded-md border-[1.5px] transition-all duration-150 ${
+	                          account.checked
+	                            ? getAccountCheckboxTone(account.color)
+	                            : 'border-gray-300 bg-white text-transparent hover:border-blue-400'
+	                        }`}
+	                      >
+	                        {account.checked && <Check size={13} strokeWidth={2.8} />}
+	                      </span>
+	                    </label>
 	                    {/* Content area - click to open details */}
 	                    <div
                         title={fullLabel}
@@ -1040,9 +1923,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="p-4">
-        <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} />
-      </div>
+      <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} />
     </aside>
   );
 }
@@ -1275,7 +2156,7 @@ function WeekView({
                                       onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                       onMouseLeave={() => onHidePreview(event.id)}
                                       title={title}
-                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:bg-white ${tones.container} ${
+                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
                                         flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                                       }`}
                                     >
@@ -1590,8 +2471,10 @@ function WeekView({
                       <div className="pointer-events-none absolute inset-0">
                         {pane.allDayEvents.map((event) => {
                           const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
-                          const account = accountMap[calendar.accountId];
-                          const tones = getToneClasses(event, calendar.color || 'bg-gray-500');
+                          const hiddenDetails = isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar);
+                          const displayEvent = hiddenDetails ? { ...event, type: 'busy_only' } : event;
+                          const tones = getToneClasses(displayEvent, calendar.color || 'bg-gray-500');
+                          const visibleTitle = getVisibleEventTitle(event, calendar);
                           const startDay = event.day || 0;
                           const endDay = Math.min(days.length - 1, startDay + Math.max(1, event.allDaySpan || 1) - 1);
                           const spanDays = endDay - startDay + 1;
@@ -1615,15 +2498,15 @@ function WeekView({
                               onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
-                              title={event.title}
-                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:bg-white ${tones.container} ${
+                              title={visibleTitle}
+                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
                                 flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                               }`}
                               style={{ left, width, top }}
                             >
                               <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${tones.stripe}`}></div>
                               <div className="pl-2 truncate">
-                                {event.title}
+                                {visibleTitle}
                                 {spanDays > 1 && <span className="ml-1 text-[10px] text-gray-400">跨{spanDays}天</span>}
                               </div>
                             </button>
@@ -2021,6 +2904,11 @@ function DayView({
                         .map((event) => {
                           const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: 'unknown' };
                           const account = accountMap[calendar.accountId];
+                          const hiddenDetails = isBusyOnlyEvent(event, calendar) || isPrivateLimitedEvent(event, calendar);
+                          const displayEvent = hiddenDetails ? { ...event, type: 'busy_only' } : event;
+                          const tones = getToneClasses(displayEvent, calendar.color || 'bg-gray-500');
+                          const visibleTitle = getVisibleEventTitle(event, calendar);
+                          const sourceLabel = showOverlayAccountLabel ? getCompactSourceLabel(account, calendar) : '';
                           return (
 	                            <button
 	                              key={event.id}
@@ -2036,18 +2924,19 @@ function DayView({
                               onMouseEnter={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
-                              title={`${event.title}${account ? ` · ${account.name}` : ''}`}
-                              className={`w-full text-left rounded-xl border px-3 py-2 bg-gray-50 hover:bg-white ${
+                              title={`${visibleTitle}${account ? ` · ${getAccountDisplayLabel(account)}` : ''}`}
+                              className={`relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
                                 flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                               }`}
                             >
-                              <div className="flex items-start">
-                                <div className={`w-2 h-2 rounded-full mr-2 ${calendar.color}`}></div>
+                              {!hiddenDetails && <div className={`absolute bottom-0 left-0 top-0 w-1 ${tones.stripe}`}></div>}
+                              <div className="flex min-w-0 items-start gap-2 pl-1">
+                                <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${tones.stripe}`}></div>
                                 <div className="min-w-0">
-                                  {showOverlayAccountLabel && account && (
-                                    <div className="mb-0.5 text-[10px] font-black text-gray-400 truncate">{account.name}</div>
+                                  {sourceLabel && (
+                                    <div className="mb-0.5 truncate text-[10px] font-black opacity-55">{sourceLabel}</div>
                                   )}
-                                  <span className="block text-xs font-bold text-gray-800 truncate">{event.title}</span>
+                                  <span className="block truncate text-xs font-bold">{visibleTitle}</span>
                                 </div>
                               </div>
                             </button>
@@ -2482,9 +3371,10 @@ function EventPreviewCard({
   const isBusyOnly = event.type === 'busy_only';
   const isCancelled = event.status === '已取消';
   const title = isBusyOnly ? '忙碌' : event.title || '无标题';
-  const organizer = !isBusyOnly ? event.organizer || account?.name || '' : '';
+  const organizer = !isBusyOnly ? event.organizer || getAccountDisplayLabel(account) || '' : '';
   const isRecurring = !isBusyOnly && event.repeat && event.repeat !== 'does_not_repeat';
   const joinable = !isBusyOnly && canJoinCalendarEvent(event);
+  const titleTone = getToneClasses(isBusyOnly ? { ...event, type: 'busy_only' } : event, calendar?.color || account?.color || 'bg-gray-500');
 
   return (
     <div
@@ -2496,13 +3386,14 @@ function EventPreviewCard({
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <div className="border-b border-slate-100 px-4 py-3">
+        <div className={`relative border-b px-4 py-3 ${titleTone.container}`}>
+          {!isBusyOnly && <div className={`absolute bottom-0 left-0 top-0 w-1 ${titleTone.stripe}`}></div>}
           {mode === 'drag' && label && (
             <div className="mb-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
               {label}
             </div>
           )}
-          <div className="flex min-w-0 items-start gap-2">
+          <div className="flex min-w-0 items-start gap-2 pl-1">
             <div className={`min-w-0 flex-1 text-sm font-black leading-snug ${isCancelled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
               {title}
             </div>
@@ -3204,7 +4095,7 @@ function AddSharedCalendarModal({
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-8 space-y-6">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
             {pendingInvitations.length > 0 && (
               <div>
                 <div className="mb-3 flex items-center gap-2 text-sm font-black text-gray-900">
@@ -3307,13 +4198,6 @@ function AddSharedCalendarModal({
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-6 py-4">
-            <div className="flex items-center justify-end gap-3">
-              <button onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-gray-300 px-4 text-sm font-bold text-gray-700 hover:bg-white">
-                取消
-              </button>
-            </div>
-          </div>
         </div>
       </div>
       {accountSuggestionLayer}
@@ -3326,11 +4210,8 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
 
   const permissionId = getCalendarPermissionId(calendar.receivedPermissionId || calendar.permission);
   const permissionOption = getCalendarPermissionOption(permissionId);
-  const capabilities = getCalendarPermissionCapabilities(permissionId);
-  const accountLabel = getAccountFullLabel(account);
   const sourceName = calendar.receivedFromName || calendar.owner || calendar.receivedFrom || '未知共享方';
   const sourceAccount = calendar.receivedFrom || calendar.ownerEmail || '未提供账号';
-  const enabledCapabilities = capabilities.filter((item) => item.enabled).slice(0, 2);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
@@ -3338,10 +4219,7 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className={`h-4 w-4 shrink-0 rounded-full ${calendar.color || account?.color || 'bg-gray-400'}`}></span>
-            <div className="min-w-0">
-              <div className="truncate text-lg font-black text-gray-900">查看权限</div>
-              <div className="mt-0.5 truncate text-sm text-gray-500">{accountLabel || calendar.name}</div>
-            </div>
+            <div className="truncate text-lg font-black text-gray-900">查看权限</div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X size={16} />
@@ -3360,16 +4238,6 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
             </div>
             <div className="mt-4 border-t border-slate-100 pt-4">
               <div className="text-sm font-medium leading-relaxed text-slate-500">{permissionOption.desc}</div>
-              {enabledCapabilities.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {enabledCapabilities.map((item) => (
-                    <span key={item.label} className="inline-flex items-center rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700">
-                      <Check size={13} className="mr-1.5" />
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -3378,108 +4246,440 @@ function SharedCalendarAccessModal({ calendar, account, onClose }) {
   );
 }
 
-function ReminderModal({ open, onClose, pendingEvents, upcomingEvents, accountMap, calendarMap, onOpenEvent, onRespond }) {
+const getReminderSharedCalendarName = (calendar, account) => {
+  if (calendar?.type !== 'shared' && account?.ownership !== 'shared') return '';
+  const name = getAccountDisplayLabel(account) || calendar?.receivedFromName || calendar?.owner || calendar?.name || '';
+  return name;
+};
+
+const REMINDER_NOTICE_TONES = {
+  invitation: {
+    border: 'border-l-indigo-500',
+    selectedBg: 'bg-indigo-50/60',
+    hoverBg: 'hover:bg-indigo-50/40',
+    badge: 'bg-indigo-50 text-indigo-700',
+    icon: 'bg-indigo-50 text-indigo-600',
+    action: 'bg-indigo-600 hover:bg-indigo-700',
+  },
+  shared: {
+    border: 'border-l-orange-500',
+    selectedBg: 'bg-orange-50/60',
+    hoverBg: 'hover:bg-orange-50/40',
+    badge: 'bg-orange-50 text-orange-700',
+    icon: 'bg-orange-50 text-orange-600',
+    action: 'bg-orange-600 hover:bg-orange-700',
+  },
+  update: {
+    border: 'border-l-cyan-500',
+    selectedBg: 'bg-cyan-50/60',
+    hoverBg: 'hover:bg-cyan-50/40',
+    badge: 'bg-cyan-50 text-cyan-700',
+    icon: 'bg-cyan-50 text-cyan-600',
+    action: 'bg-cyan-600 hover:bg-cyan-700',
+  },
+  sync: {
+    border: 'border-l-slate-500',
+    selectedBg: 'bg-slate-50',
+    hoverBg: 'hover:bg-slate-50/80',
+    badge: 'bg-slate-100 text-slate-700',
+    icon: 'bg-slate-100 text-slate-500',
+    action: 'bg-slate-700 hover:bg-slate-800',
+  },
+};
+
+const REMINDER_NOTICE_ICON_MAP = {
+  alert: AlertCircle,
+  calendar: Calendar,
+  refresh: RefreshCw,
+  userPlus: UserPlus,
+  users: Users,
+};
+
+const SUPPLEMENTAL_REMINDER_NOTIFICATIONS = [
+  {
+    id: 'notice-meeting-invitation',
+    kind: 'notification',
+    noticeType: 'invitation',
+    title: '王敏邀请你参加预算口径确认会',
+    typeLabel: '会议邀请',
+    summary: '今天 10:50 - 11:20 · 等待回复',
+    meta: [
+      { icon: 'users', label: '来自 王敏' },
+      { icon: 'calendar', label: '刚刚收到' },
+    ],
+    action: 'event_details',
+    actionLabel: '查看邀请',
+    eventId: 'q4-budget-sync',
+    reminderSortTime: TODAY_DATE.getTime() + 3 * 60 * 1000,
+  },
+  {
+    id: 'notice-shared-calendar',
+    kind: 'notification',
+    noticeType: 'shared',
+    title: '张三共享了日历',
+    typeLabel: '共享日历',
+    summary: '你获得“可编辑”权限，可查看并维护该共享日历。',
+    meta: [
+      { icon: 'calendar', label: '张三' },
+      { icon: 'userPlus', label: '刚刚加入' },
+    ],
+    action: 'shared_access',
+    actionLabel: '查看权限',
+    accountId: 'acc2',
+    reminderSortTime: TODAY_DATE.getTime() + 4 * 60 * 1000,
+  },
+  {
+    id: 'notice-event-updated',
+    kind: 'notification',
+    noticeType: 'update',
+    title: '渠道复盘与线索分配时间已更新',
+    typeLabel: '日程变更',
+    summary: '组织者将会议地点调整为销售区 2F。',
+    meta: [
+      { icon: 'alert', label: '来自销售团队' },
+      { icon: 'calendar', label: '5 分钟前更新' },
+    ],
+    action: 'event_details',
+    actionLabel: '查看变更',
+    eventId: 'q4-customer-budget',
+    reminderSortTime: TODAY_DATE.getTime() + 5 * 60 * 1000,
+  },
+  {
+    id: 'notice-sync-finished',
+    kind: 'notification',
+    noticeType: 'sync',
+    title: '日历同步完成',
+    typeLabel: '同步通知',
+    summary: '已同步企业日历和共享日历，发现 1 条权限变更。',
+    meta: [
+      { icon: 'refresh', label: '系统通知' },
+      { icon: 'calendar', label: '所有日历' },
+    ],
+    action: 'feedback',
+    actionLabel: '查看结果',
+    feedback: '日历已同步完成',
+    reminderSortTime: TODAY_DATE.getTime() + 6 * 60 * 1000,
+  },
+];
+
+function ReminderModal({
+  open,
+  onClose,
+  reminderEvents,
+  accountMap,
+  calendarMap,
+  onOpenEvent,
+  onJoinEvent,
+  onSnoozeEvent,
+  onDismissEvent,
+  onDismissAllEvents,
+  onOpenNotification,
+  onOpenSettings,
+  skipDismissAllConfirm = false,
+  onSetSkipDismissAllConfirm,
+}) {
+  const [snoozeValues, setSnoozeValues] = useState({});
+  const [selectedReminderId, setSelectedReminderId] = useState(null);
+  const [dismissAllConfirmOpen, setDismissAllConfirmOpen] = useState(false);
+  const [skipDismissAllNextTime, setSkipDismissAllNextTime] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setDismissAllConfirmOpen(false);
+      setSkipDismissAllNextTime(false);
+      return;
+    }
+    setSelectedReminderId((prev) => {
+      if (reminderEvents.some((item) => item.id === prev)) return prev;
+      return reminderEvents.find((item) => item.kind !== 'notification' && canJoinReminderEvent(item, TODAY_DATE.getTime()))?.id || reminderEvents[0]?.id || null;
+    });
+  }, [open, reminderEvents]);
+
   if (!open) return null;
+
+  const requestDismissAllEvents = () => {
+    if (reminderEvents.length === 0) return;
+    if (skipDismissAllConfirm) {
+      onDismissAllEvents();
+      return;
+    }
+    setSkipDismissAllNextTime(false);
+    setDismissAllConfirmOpen(true);
+  };
+
+  const confirmDismissAllEvents = () => {
+    if (skipDismissAllNextTime) onSetSkipDismissAllConfirm?.(true);
+    setDismissAllConfirmOpen(false);
+    onDismissAllEvents();
+  };
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
       <div
-        className="w-[720px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+        className="relative max-h-[74vh] w-[820px] max-w-[92vw] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-reminder-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
-	          <div className="text-lg font-black text-gray-900">近期提醒</div>
-          <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-5 py-4">
+          <div id="calendar-reminder-title" className="text-lg font-black text-gray-900">提醒</div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-slate-700" aria-label="关闭提醒窗口">
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(70vh-88px)] space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
-	              <div className="text-xs font-black text-orange-700 uppercase">待响应邀请</div>
-	              <div className="mt-2 text-2xl font-black text-orange-900">{pendingEvents.length}</div>
+        <div className="max-h-[calc(74vh-136px)] overflow-y-auto p-3">
+          {reminderEvents.length === 0 && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm font-semibold text-gray-500">
+              暂无待处理提醒
             </div>
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-	              <div className="text-xs font-black text-blue-700 uppercase">近期会议</div>
-	              <div className="mt-2 text-2xl font-black text-blue-900">{upcomingEvents.length}</div>
-            </div>
-          </div>
+          )}
 
-          <div>
-            <div className="text-sm font-black text-gray-900 mb-3">待响应</div>
-            <div className="space-y-3">
-              {pendingEvents.length === 0 && <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500">当前没有待处理邀请。</div>}
-              {pendingEvents.map((event) => {
-                const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: '' };
+          {reminderEvents.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              {reminderEvents.map((item, index) => {
+                if (item.kind === 'notification') {
+                  const noticeTone = REMINDER_NOTICE_TONES[item.noticeType] || REMINDER_NOTICE_TONES.sync;
+                  const NoticeIcon = REMINDER_NOTICE_ICON_MAP[item.meta?.[0]?.icon] || Bell;
+                  const selected = selectedReminderId === item.id;
+
+                  return (
+                    <div
+                      key={item.id}
+                      data-reminder-notice-id={item.id}
+                      className={`group border-l-[3px] transition ${
+                        selected ? `${noticeTone.border} ${noticeTone.selectedBg}` : `border-l-transparent ${noticeTone.hoverBg}`
+                      } ${
+                        index > 0 ? 'border-t border-slate-100' : ''
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+                        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${noticeTone.icon}`}>
+                          <NoticeIcon size={16} />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedReminderId(item.id)}
+                          onDoubleClick={() => onOpenNotification?.(item)}
+                          className="min-w-0 flex-1 text-left focus:outline-none"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="min-w-0 flex-1 truncate text-sm font-black text-gray-900">{item.title}</div>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${noticeTone.badge}`}>
+                              {item.typeLabel}
+                            </span>
+                          </div>
+                          <div className="mt-1 truncate text-xs font-semibold text-slate-500">{item.summary}</div>
+                          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                            {(item.meta || []).map((entry) => {
+                              const MetaIcon = REMINDER_NOTICE_ICON_MAP[entry.icon] || Bell;
+                              return (
+                                <span key={`${item.id}-${entry.label}`} className="inline-flex min-w-0 items-center gap-1.5">
+                                  <MetaIcon size={13} className="shrink-0 text-slate-400" />
+                                  <span className="truncate">{entry.label}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDismissEvent(item.id)}
+                          className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 ${
+                            selected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+                          }`}
+                          aria-label={`清除 ${item.title || '该通知'}`}
+                          title="清除此通知"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+
+                      {selected && (
+                        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-white/85 px-4 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenNotification?.(item)}
+                            className={`inline-flex h-8 items-center rounded-lg px-3 text-xs font-bold text-white transition ${noticeTone.action}`}
+                          >
+                            {item.actionLabel || '查看'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                const event = item;
+                const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: '', name: '日历' };
                 const account = accountMap[calendar.accountId];
+                const timeMeta = getReminderTimeMeta(event, TODAY_DATE.getTime());
+                const statusText = timeMeta.detailLabel || timeMeta.statusLabel;
+                const snoozeOptions = getAvailableSnoozeOptions(event, TODAY_DATE.getTime());
+                const snoozeOption = resolveSnoozeOption(event, snoozeValues[event.id], TODAY_DATE.getTime());
+                const snoozeValue = snoozeOption?.id || snoozeOptions[0]?.id || '5m';
+                const canJoin = canJoinReminderEvent(event, TODAY_DATE.getTime());
+                const selected = selectedReminderId === event.id;
+                const sharedCalendarName = getReminderSharedCalendarName(calendar, account);
+
                 return (
-                  <div key={event.id} className="rounded-xl border border-gray-200 px-4 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <button onClick={() => onOpenEvent(event.id)} className="text-left flex-1 min-w-0">
-                        <div className="flex items-center">
-                          <div className={`w-2.5 h-2.5 rounded-full ${calendar.color}`}></div>
-                          <div className="ml-2 text-sm font-black text-gray-900 truncate">{event.title}</div>
+                  <div
+                    key={event.id}
+                    data-reminder-event-id={event.id}
+                    className={`group border-l-[3px] transition ${
+                      selected ? 'border-l-blue-500 bg-blue-50/45' : 'border-l-transparent hover:bg-slate-50/80'
+                    } ${
+                      index > 0 ? 'border-t border-slate-100' : ''
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-4 px-5 py-4">
+                      <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${canJoin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {canJoin ? <Video size={23} fill="currentColor" strokeWidth={2.2} /> : <Calendar size={22} />}
+                      </span>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        title="双击查看详情"
+                        onClick={() => setSelectedReminderId(event.id)}
+                        onDoubleClick={() => onOpenEvent(event.id)}
+                        onKeyDown={(entry) => {
+                          if (entry.key === 'Enter') onOpenEvent(event.id);
+                        }}
+                        className="min-w-0 flex-1 cursor-pointer text-left focus:outline-none"
+                      >
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
+                          <div className="min-w-0 truncate text-sm font-black text-gray-900">{event.title || '无标题'}</div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${timeMeta.state === 'ongoing' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                            {statusText}
+                          </span>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500">
-                          {formatDateLabel(eventToDate(event))} · {event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}
+
+                        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                          <span className="inline-flex min-w-0 items-center gap-1.5">
+                            <Clock size={13} className="shrink-0 text-slate-400" />
+                            <span className="truncate">{formatDateLabel(eventToDate(event))} · {event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}</span>
+                          </span>
+                          {event.location && (
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <MapPin size={13} className="shrink-0 text-slate-400" />
+                              <span className="truncate">{event.location}</span>
+                            </span>
+                          )}
+                          {sharedCalendarName && (
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <Calendar size={13} className="shrink-0 text-slate-400" />
+                              <span className="truncate">{sharedCalendarName}</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-1 text-xs text-gray-500 truncate">{account?.name || '未知账户'}{event.location ? ` · ${event.location}` : ''}</div>
+                      </div>
+                      <div data-reminder-inline-actions="true" className="flex shrink-0 items-center gap-3">
+                        {canJoin && (
+                          <button
+                            type="button"
+                            onClick={() => onJoinEvent(event)}
+                            className="inline-flex h-11 items-center rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700"
+                          >
+                            加入会议
+                          </button>
+                        )}
+                        <div className="relative h-11 w-[120px]">
+                          <select
+                            value={snoozeValue}
+                            onChange={(entry) => {
+                              const nextValue = entry.target.value;
+                              setSnoozeValues((prev) => ({ ...prev, [event.id]: nextValue }));
+                              onSnoozeEvent(event, nextValue);
+                            }}
+                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                            aria-label={`${event.title || '无标题'} 稍后提醒时间`}
+                          >
+                            {snoozeOptions.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex h-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm">
+                            稍后提醒
+                            <ChevronDown size={14} className="text-slate-400" />
+                          </div>
+                        </div>
+                      <button
+                        type="button"
+                        onClick={() => onDismissEvent(event.id)}
+                        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 ${
+                          selected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+                        }`}
+                        aria-label={`清除 ${event.title || '该提醒'}`}
+                        title="清除此提醒"
+                      >
+                        <X size={15} />
                       </button>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => onRespond(event.id, 'reject')} className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700">
-                          拒绝
-                        </button>
-                        <button onClick={() => onRespond(event.id, 'accept')} className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold">
-                          接受
-                        </button>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
+        </div>
 
-          <div>
-            <div className="text-sm font-black text-gray-900 mb-3">近期日程</div>
-            <div className="space-y-3">
-              {upcomingEvents.length === 0 && <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500">当前没有近期日程。</div>}
-              {upcomingEvents.map((event) => {
-                const calendar = calendarMap[event.calId] || { color: 'bg-gray-500', accountId: '' };
-                const account = accountMap[calendar.accountId];
-                return (
-                  <button
-                    key={event.id}
-                    onClick={() => onOpenEvent(event.id)}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-4 text-left hover:border-blue-300 hover:bg-blue-50"
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-2.5 h-2.5 rounded-full ${calendar.color}`}></div>
-                      <div className="ml-2 text-sm font-black text-gray-900 truncate">{event.title}</div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                      <span className="inline-flex items-center">
-                        <Clock size={12} className="mr-1.5" />
-                        {formatDateLabel(eventToDate(event))} · {event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}
-                      </span>
-                      <span className="inline-flex items-center">
-                        <Calendar size={12} className="mr-1.5" />
-                        {account?.name || '未知账户'}
-                      </span>
-                      {event.location && (
-                        <span className="inline-flex items-center">
-                          <MapPin size={12} className="mr-1.5" />
-                          {event.location}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-500">
+            <span className="truncate">总是太早或太晚提醒？</span>
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="shrink-0 font-bold text-blue-600 transition hover:text-blue-700"
+            >
+              提醒设置
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={reminderEvents.length === 0}
+            onClick={requestDismissAllEvents}
+            className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            全部清除
+          </button>
+        </div>
+
+        {dismissAllConfirmOpen && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/20 px-5" role="dialog" aria-modal="true" aria-label="确认全部清除提醒">
+            <div className="w-[360px] max-w-full rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_46px_rgba(15,23,42,0.22)]">
+              <div className="text-base font-black text-slate-900">清除全部提醒？</div>
+              <div className="mt-2 text-sm font-medium leading-6 text-slate-500">当前提醒会全部关闭，本次不会再显示。</div>
+              <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={skipDismissAllNextTime}
+                  onChange={(event) => setSkipDismissAllNextTime(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                下次不再提示
+              </label>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDismissAllConfirmOpen(false)}
+                  className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDismissAllEvents}
+                  className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                >
+                  全部清除
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -3509,21 +4709,23 @@ function ShortcutHelpModal({ open, onClose }) {
         className="w-[560px] max-w-[92vw] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
-	          <div className="text-lg font-black text-gray-900">快捷键</div>
-          <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:bg-gray-100">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <div className="text-lg font-black text-gray-900">快捷键</div>
+            <div className="mt-1 text-sm font-semibold text-gray-500">用于快速处理日历、邮件和弹窗。</div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100" aria-label="关闭快捷键说明">
             <X size={18} />
           </button>
         </div>
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div className="grid gap-3 p-5 sm:grid-cols-2">
           {groups.map((group, index) => (
-            <div key={index} className="rounded-xl border border-gray-200 p-4 space-y-3">
-              {group.map(([shortcut, desc]) => (
-                <div key={shortcut} className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-bold text-gray-700">{desc}</span>
-                  <kbd className="px-2.5 py-1 rounded-lg bg-gray-100 border border-gray-200 text-xs font-black text-gray-800 whitespace-nowrap">
-                    {shortcut}
-                  </kbd>
+            <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              {group.map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between gap-3 border-b border-slate-200 py-2 last:border-b-0">
+                  <span className="text-sm font-semibold text-slate-600">{desc}</span>
+                  <kbd className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black text-slate-700">{key}</kbd>
                 </div>
               ))}
             </div>
@@ -3535,7 +4737,7 @@ function ShortcutHelpModal({ open, onClose }) {
 }
 
 function MainApp() {
-  const [activeProduct, setActiveProduct] = useState('calendar');
+  const [activeProduct, setActiveProduct] = useState('mail');
   const [currentScreen, setCurrentScreen] = useState('calendar');
   const [calendarReturnScreen, setCalendarReturnScreen] = useState('calendar');
   const [calendarLayout, setCalendarLayout] = useState('week');
@@ -3548,6 +4750,7 @@ function MainApp() {
   const [mails, setMails] = useState(MOCK_MAILS);
   const [focusDate, setFocusDate] = useState(stripTime(TODAY_DATE));
   const [calendarSidebarCollapsed, setCalendarSidebarCollapsed] = useState(false);
+  const [mailSidebarCollapsed, setMailSidebarCollapsed] = useState(false);
   const [focusedAccountId, setFocusedAccountId] = useState(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null);
   const [feedback, setFeedback] = useState({ type: null, payload: null });
@@ -3597,8 +4800,13 @@ function MainApp() {
   });
   const [shareInvitations, setShareInvitations] = useState(MOCK_SHARE_INVITATIONS);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [settingsCenterOpen, setSettingsCenterOpen] = useState(false);
+  const [calendarReminderSettings, setCalendarReminderSettings] = useState(loadCalendarReminderSettings);
+  const [skipReminderDismissAllConfirm, setSkipReminderDismissAllConfirm] = useState(loadReminderDismissAllSkipConfirm);
+  const [joinedReminderEventIds, setJoinedReminderEventIds] = useState([]);
+  const [dismissedReminderEventIds, setDismissedReminderEventIds] = useState([]);
+  const [snoozedReminderUntilById, setSnoozedReminderUntilById] = useState({});
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
-  const [calendarColorPicker, setCalendarColorPicker] = useState({ open: false, targetId: null, targetType: null });
   const [calendarRenameDialog, setCalendarRenameDialog] = useState({ open: false, targetId: null, name: '' });
   const [calendarDeleteConfirm, setCalendarDeleteConfirm] = useState({ open: false, targetId: null });
   const [calendarSyncReport, setCalendarSyncReport] = useState(null);
@@ -3608,6 +4816,7 @@ function MainApp() {
       .map((account) => account.id),
   );
   const [mailFolder, setMailFolder] = useState('inbox');
+  const [selectedMailAccountId, setSelectedMailAccountId] = useState(MOCK_MAILS[0]?.accountId || MOCK_ACCOUNTS[0]?.id || 'acc1');
   const [mailFocusTab, setMailFocusTab] = useState('focused');
   const [mailUnreadOnly, setMailUnreadOnly] = useState(false);
   const [selectedMailId, setSelectedMailId] = useState(MOCK_MAILS[0]?.id || null);
@@ -3654,8 +4863,25 @@ function MainApp() {
   const calendarMap = useMemo(() => Object.fromEntries(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
   const activeAccountIds = useMemo(() => accounts.filter((account) => account.checked).map((account) => account.id), [accounts]);
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
+  const currentUserIdentities = useMemo(() => buildCurrentUserIdentitySet(accounts), [accounts]);
   const normalizedCalendarSearch = calendarSearchQuery.trim().toLowerCase();
   const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ ...account, label: account.email || account.name })), [activeAccounts]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CALENDAR_REMINDER_SETTINGS_STORAGE_KEY, JSON.stringify(calendarReminderSettings));
+    } catch {
+      // Ignore private browsing or storage quota failures; in-memory settings still work.
+    }
+  }, [calendarReminderSettings]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(REMINDER_DISMISS_ALL_SKIP_CONFIRM_STORAGE_KEY, String(skipReminderDismissAllConfirm));
+    } catch {
+      // Ignore storage failures; the current session state still applies.
+    }
+  }, [skipReminderDismissAllConfirm]);
+
   useEffect(() => {
     if (!calendarSearchPopoverOpen) return undefined;
 
@@ -3713,15 +4939,15 @@ function MainApp() {
     () =>
       [...mails]
         .filter((mail) => {
-          const matchesFolder = mail.folder === mailFolder;
+          const matchesFolder = mailMatchesFolder(mail, mailFolder);
           const matchesFocus = mailFolder !== 'inbox' || mail.category === mailFocusTab;
           const matchesUnread = !mailUnreadOnly || mail.unread;
-          const matchesAccount = activeAccountIds.includes(mail.accountId);
+          const matchesAccount = mail.accountId === selectedMailAccountId;
 
           return matchesFolder && matchesFocus && matchesUnread && matchesAccount;
         })
         .sort((left, right) => right.timestamp - left.timestamp),
-    [activeAccountIds, mailFocusTab, mailFolder, mailUnreadOnly, mails],
+    [mailFocusTab, mailFolder, mailUnreadOnly, mails, selectedMailAccountId],
   );
 
   const rangeEvents = useMemo(
@@ -3802,7 +5028,9 @@ function MainApp() {
   const selectedEventRuleLabel = selectedEvent
     ? [
         selectedEvent.repeat && selectedEvent.repeat !== 'does_not_repeat' ? `循环：${REPEAT_LABELS[selectedEvent.repeat]}` : '不循环',
-        selectedEvent.reminder && selectedEvent.reminder !== 'none' ? `提醒：${REMINDER_LABELS[selectedEvent.reminder]}` : '不提醒',
+        getEffectiveEventReminder(selectedEvent, calendarReminderSettings, currentUserIdentities) !== 'none'
+          ? `提醒：${REMINDER_LABELS[getEffectiveEventReminder(selectedEvent, calendarReminderSettings, currentUserIdentities)]}`
+          : '不提醒',
       ].join(' · ')
     : '';
   const selectedEventParticipants = selectedEvent
@@ -3894,32 +5122,54 @@ function MainApp() {
   }, [activeEvents, calendarMap]);
   const showHuaweiWorkdayBadges = activeCalIds.includes(HUAWEI_CALENDAR_ID);
   const reminderEvents = useMemo(() => {
-    const now = TODAY_DATE.getTime();
+    const nowValue = TODAY_DATE.getTime();
+    const joinedIds = new Set(joinedReminderEventIds);
+    const dismissedIds = new Set(dismissedReminderEventIds);
     const visible = events
-      .filter((event) => activeCalIds.includes(event.calId) && event.status !== '已取消')
+      .filter((event) => {
+        if (!calendarReminderSettings.popupEnabled) return false;
+        if (!activeCalIds.includes(event.calId)) return false;
+        if (event.status === '已取消' || event.type === 'cancelled') return false;
+        const effectiveReminder = getEffectiveEventReminder(event, calendarReminderSettings, currentUserIdentities);
+        if (effectiveReminder === 'none') return false;
+        if (joinedIds.has(event.id) || dismissedIds.has(event.id)) return false;
+        if ((snoozedReminderUntilById[event.id] || 0) > nowValue) return false;
+
+        const offsetMinutes = getReminderOffsetMinutes(effectiveReminder);
+        if (offsetMinutes === null) return false;
+
+        const startTime = getEventStartTimestamp(event);
+        const endTime = getEventEndTimestamp(event);
+        const triggerTime = startTime - offsetMinutes * 60 * 1000;
+
+        return nowValue <= endTime && nowValue >= triggerTime;
+      })
       .map((event) => {
-        const startDate = eventToDate(event);
-        const startTime = event.isAllDay
-          ? stripTime(startDate).getTime()
-          : new Date(
-              startDate.getFullYear(),
-              startDate.getMonth(),
-              startDate.getDate(),
-              Math.floor(event.startH || WORK_START_HOUR),
-              (event.startH || WORK_START_HOUR) % 1 === 0.5 ? 30 : 0,
-            ).getTime();
-        const endTime = event.isAllDay
-          ? startTime + (event.allDaySpan || 1) * DAY_MS
-          : startTime + (event.durationH || 1) * 60 * 60 * 1000;
+        const startTime = getEventStartTimestamp(event);
+        const endTime = getEventEndTimestamp(event);
         return { ...event, reminderStartTime: startTime, reminderEndTime: endTime };
       })
       .sort((left, right) => left.reminderStartTime - right.reminderStartTime);
 
+    const activeItems = [...visible].sort((left, right) => {
+      const leftTime = left.reminderSortTime ?? left.reminderStartTime ?? 0;
+      const rightTime = right.reminderSortTime ?? right.reminderStartTime ?? 0;
+      return leftTime - rightTime;
+    });
+
     return {
-      pending: visible.filter((event) => event.status === '待响应').slice(0, 5),
-      upcoming: visible.filter((event) => event.reminderEndTime >= now - 2 * 60 * 60 * 1000).slice(0, 8),
+      active: activeItems.slice(0, 8),
     };
-  }, [activeCalIds, events]);
+  }, [
+    activeCalIds,
+    calendarReminderSettings.incomingReminderPolicy,
+    calendarReminderSettings.popupEnabled,
+    currentUserIdentities,
+    dismissedReminderEventIds,
+    events,
+    joinedReminderEventIds,
+    snoozedReminderUntilById,
+  ]);
   const editableCalendars = useMemo(() => calendars.filter((calendar) => canEditCalendarContent(calendar)), [calendars]);
   const selectableDraftAccounts = useMemo(
     () => accounts.filter((account) => editableCalendars.some((calendar) => calendar.accountId === account.id)),
@@ -4683,9 +5933,102 @@ function MainApp() {
     });
   };
 
+  const updateCalendarReminderSettings = (patch) => {
+    setCalendarReminderSettings((prev) => ({ ...prev, ...patch }));
+  };
+
   const handleOpenReminders = () => {
+    if (!calendarReminderSettings.popupEnabled) {
+      triggerFeedback('L3', {
+        msg: '日历提醒弹窗已关闭',
+        icon: <Bell size={16} />,
+        color: 'bg-slate-900',
+      });
+      return;
+    }
     setReminderDialogOpen(true);
     setContextMenu(null);
+  };
+
+  const markReminderJoined = (eventId) => {
+    setJoinedReminderEventIds((prev) => (prev.includes(eventId) ? prev : [...prev, eventId]));
+    setDismissedReminderEventIds((prev) => prev.filter((id) => id !== eventId));
+    setSnoozedReminderUntilById((prev) => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+  };
+
+  const handleJoinReminderEvent = (event) => {
+    if (!event?.id || !event.meetingLink) return;
+    markReminderJoined(event.id);
+    if (reminderEvents.active.length <= 1) {
+      setReminderDialogOpen(false);
+    }
+    openExternalLink(event.meetingLink, '已打开会议链接');
+  };
+
+  const handleSnoozeReminderEvent = (event, snoozeValue) => {
+    const option = resolveSnoozeOption(event, snoozeValue, TODAY_DATE.getTime());
+    if (!event?.id || !option) return;
+
+    setSnoozedReminderUntilById((prev) => ({
+      ...prev,
+      [event.id]: option.until,
+    }));
+    if (reminderEvents.active.length <= 1) {
+      setReminderDialogOpen(false);
+    }
+    triggerFeedback('L3', {
+      msg: `${option.label}重新提醒`,
+      icon: <Bell size={16} />,
+      color: 'bg-blue-600',
+    });
+  };
+
+  const handleDismissReminderEvent = (eventId) => {
+    setDismissedReminderEventIds((prev) => (prev.includes(eventId) ? prev : [...prev, eventId]));
+    setSnoozedReminderUntilById((prev) => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+    if (reminderEvents.active.length <= 1) {
+      setReminderDialogOpen(false);
+    }
+  };
+
+  const handleOpenReminderNotification = (notification) => {
+    if (!notification) return;
+    if (notification.action === 'shared_access' && notification.accountId) {
+      openSharedCalendarAccess(notification.accountId);
+      return;
+    }
+    if (notification.action === 'event_details' && notification.eventId) {
+      navTo('details', notification.eventId);
+      return;
+    }
+    triggerFeedback('L3', {
+      msg: notification.feedback || notification.title || '已查看通知',
+      icon: <Bell size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const handleDismissAllReminderEvents = () => {
+    const activeIds = reminderEvents.active.map((event) => event.id);
+    if (activeIds.length === 0) return;
+
+    setDismissedReminderEventIds((prev) => Array.from(new Set([...prev, ...activeIds])));
+    setSnoozedReminderUntilById((prev) => {
+      const next = { ...prev };
+      activeIds.forEach((id) => {
+        delete next[id];
+      });
+      return next;
+    });
+    setReminderDialogOpen(false);
   };
 
   const handleAddSharedCalendar = () => {
@@ -4704,7 +6047,7 @@ function MainApp() {
     });
   };
 
-  /* ===== 日历颜色选择器 ===== */
+  /* ===== 日历颜色 ===== */
   const CALENDAR_COLORS = [
     'bg-blue-500', 'bg-cyan-500', 'bg-sky-500',
     'bg-emerald-500', 'bg-green-500', 'bg-teal-500',
@@ -4713,30 +6056,6 @@ function MainApp() {
     'bg-red-500', 'bg-rose-500', 'bg-pink-500',
     'bg-slate-500', 'bg-gray-500', 'bg-zinc-500',
   ];
-
-  const openColorPicker = (targetId, targetType) => {
-    setCalendarColorPicker({ open: true, targetId, targetType });
-    setContextMenu(null);
-    closeAccountMenu();
-  };
-
-  const closeColorPicker = () => setCalendarColorPicker({ open: false, targetId: null, targetType: null });
-
-  const applyCalendarColor = (color) => {
-    const { targetId, targetType } = calendarColorPicker;
-    if (!targetId) return;
-    if (targetType === 'account') {
-      setAccounts((prev) => prev.map((a) => a.id === targetId ? { ...a, color } : a));
-      setCalendars((prev) => prev.map((c) => c.accountId === targetId ? { ...c, color } : c));
-    } else {
-      setCalendars((prev) => prev.map((c) => c.id === targetId ? { ...c, color } : c));
-      const targetCal = calendars.find((c) => c.id === targetId);
-      if (targetCal) {
-        setAccounts((prev) => prev.map((a) => a.id === targetCal.accountId ? { ...a, color } : a));
-      }
-    }
-    closeColorPicker();
-  };
 
   /* ===== 日历重命名 ===== */
   const openRenameDialog = (calendarId) => {
@@ -4903,6 +6222,7 @@ function MainApp() {
   const joinEventFromPreview = (event) => {
     if (!event?.meetingLink) return;
     hideEventPreview(event.id, { immediate: true });
+    markReminderJoined(event.id);
     openExternalLink(event.meetingLink, '已打开会议链接');
   };
 
@@ -5106,7 +6426,7 @@ function MainApp() {
   const openMailComposer = (mode = 'new', mailId = null) => {
     const sourceMail = mailId ? mails.find((mail) => mail.id === mailId) : null;
     const normalizedMode = sourceMail?.folder === 'drafts' && mode === 'new' ? 'editDraft' : mode;
-    const fallbackAccountId = sourceMail?.accountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
+    const fallbackAccountId = sourceMail?.accountId || selectedMailAccountId || activeAccountIds[0] || accounts[0]?.id || 'acc1';
     hideEventPreview();
     setMailComposer({
       open: true,
@@ -5217,6 +6537,7 @@ function MainApp() {
       }
       return [nextMail, ...prev];
     });
+    setSelectedMailAccountId(nextMail.accountId);
     setMailFolder(mode === 'send' ? 'sent' : 'drafts');
     setSelectedMailId(nextId);
     setActiveProduct('mail');
@@ -5229,8 +6550,24 @@ function MainApp() {
   };
 
   const handleSelectMail = (mailId) => {
+    const targetMail = mails.find((mail) => mail.id === mailId);
+    if (targetMail) setSelectedMailAccountId(targetMail.accountId);
     setSelectedMailId(mailId);
     setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, unread: false } : mail)));
+  };
+
+  const selectMailboxFolder = (folderId, accountId = selectedMailAccountId) => {
+    setSelectedMailAccountId(accountId);
+    setMailFolder(folderId);
+    const nextMail = [...mails]
+      .filter((mail) => {
+        const matchesFolder = mailMatchesFolder(mail, folderId);
+        const matchesFocus = folderId !== 'inbox' || mail.category === mailFocusTab;
+        const matchesUnread = !mailUnreadOnly || mail.unread;
+        return mail.accountId === accountId && matchesFolder && matchesFocus && matchesUnread;
+      })
+      .sort((left, right) => right.timestamp - left.timestamp)[0];
+    setSelectedMailId(nextMail?.id || null);
   };
 
   const toggleMailStar = (mailId) => {
@@ -5261,6 +6598,26 @@ function MainApp() {
     });
   };
 
+  const deleteMail = (mailId) => {
+    setMails((prev) =>
+      prev.map((mail) =>
+        mail.id === mailId
+          ? {
+              ...mail,
+              folder: 'deleted',
+              unread: false,
+            }
+          : mail,
+      ),
+    );
+    setMailFolder('deleted');
+    triggerFeedback('L3', {
+      msg: '邮件已删除',
+      icon: <Trash size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
   const createEventFromMail = (mailId) => {
     const mail = mails.find((item) => item.id === mailId);
     if (!mail) return;
@@ -5276,6 +6633,7 @@ function MainApp() {
     const optionalAttendees = Array.from(new Set(mail.cc || [])).filter(Boolean);
     setDraftForm({
       ...nextDraft,
+      reminder: calendarReminderSettings.newEventDefaultReminder,
       title: mail.subject,
       description: `来源邮件：${mail.subject}\n发件人：${mail.fromName} <${mail.fromEmail}>\n\n${mail.body}`,
       attendees: (mail.to || []).length ? Array.from(new Set([mail.fromEmail, ...(mail.to || [])].filter(Boolean))) : attendees.length ? attendees : nextDraft.attendees,
@@ -5712,7 +7070,7 @@ function MainApp() {
       activeAccountIds,
     });
 
-    setDraftForm(nextDraft);
+    setDraftForm(editingEvent ? nextDraft : { ...nextDraft, reminder: calendarReminderSettings.newEventDefaultReminder });
     setCreateDraft({
       isDirty: false,
       saveStatus: 'idle',
@@ -5833,9 +7191,18 @@ function MainApp() {
   }, [activeProduct, calendarLayout, currentScreen, focusDate, effectiveAccountDisplayMode]);
 
   const handleProductSelect = (productId) => {
+    if (productId === 'settings') {
+      setSettingsCenterOpen(true);
+      setContextMenu(null);
+      closeAccountMenu();
+      setHoverPreview(null);
+      return;
+    }
+
     const proceed = () => {
       setActiveProduct(productId);
       setContextMenu(null);
+      closeAccountMenu();
       clearTimeSelection();
       setHoverPreview(null);
       eventInteractionRef.current = null;
@@ -6181,6 +7548,11 @@ function MainApp() {
         ].filter(Boolean),
       ),
     );
+    const nextReminder = normalizedDraft.reminder || calendarReminderSettings.newEventDefaultReminder;
+    const previousEvent = normalizedDraft.eventId ? selectedEvent : null;
+    const previousIsIncoming = previousEvent ? isIncomingReminderEvent(previousEvent, currentUserIdentities) : false;
+    const previousOrganizerReminder = previousEvent ? getOrganizerReminder(previousEvent) : nextReminder;
+    const nextReminderOverride = previousIsIncoming ? Boolean(previousEvent?.reminderOverride) || nextReminder !== previousOrganizerReminder : false;
     const payload = {
       id: nextId,
       title: normalizedDraft.title.trim(),
@@ -6205,7 +7577,9 @@ function MainApp() {
       meetingLink: nextMeetingLink,
       optionalAttendees: normalizedDraft.optionalAttendees || [],
       repeat: normalizedDraft.repeat || 'does_not_repeat',
-      reminder: normalizedDraft.reminder || '30m',
+      reminder: nextReminder,
+      organizerReminder: previousIsIncoming ? previousOrganizerReminder : nextReminder,
+      reminderOverride: nextReminderOverride,
       availability: normalizedDraft.availability === 'out_of_office' ? 'busy' : normalizedDraft.availability || 'busy',
       visibility: normalizedDraft.visibility || 'default',
       attachments: (normalizedDraft.attachments || [])
@@ -6442,10 +7816,6 @@ function MainApp() {
           setShortcutHelpOpen(false);
           return;
         }
-        if (calendarColorPicker.open) {
-          closeColorPicker();
-          return;
-        }
         if (calendarRenameDialog.open) {
           closeRenameDialog();
           return;
@@ -6567,7 +7937,6 @@ function MainApp() {
     sharedCalendarDialog.open,
     reminderDialogOpen,
     shortcutHelpOpen,
-    calendarColorPicker.open,
     calendarRenameDialog.open,
     calendarDeleteConfirm.open,
   ]);
@@ -6646,10 +8015,11 @@ function MainApp() {
           accounts={accounts}
           mails={mails}
           mailFolder={mailFolder}
-          onSelectFolder={setMailFolder}
+          selectedMailAccountId={selectedMailAccountId}
+          collapsed={mailSidebarCollapsed}
+          onToggleCollapsed={() => setMailSidebarCollapsed((prev) => !prev)}
+          onSelectFolder={selectMailboxFolder}
           onCompose={openMailComposer}
-          onToggleAccount={toggleAccount}
-          onOpenMailboxPermissions={openMailboxPermissions}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
         />
@@ -6658,6 +8028,7 @@ function MainApp() {
       )}
 
       <div className="relative z-10 flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden bg-white">
+        {activeProduct !== 'mail' && (
         <header className="relative flex min-h-16 shrink-0 flex-row items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6" style={{ zIndex: 40 }}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {activeProduct === 'calendar' ? (
@@ -6671,104 +8042,106 @@ function MainApp() {
                     返回日历
                   </button>
                 )}
-                <div
-                  ref={calendarSearchBoxRef}
-                  className="relative min-w-0 shrink-0"
-                >
-                  <div className="flex h-10 w-[324px] items-center rounded-xl bg-black/5 px-3">
-                    <button
-                      onClick={() => executeCalendarSearch()}
-                      className="shrink-0 text-gray-400 transition hover:text-gray-600"
-                      title="搜索日程"
-                      aria-label="搜索日程"
-                    >
-                      <Search size={16} />
-                    </button>
-                    <input
-                      value={calendarSearchQuery}
-                      onFocus={() => setCalendarSearchPopoverOpen(true)}
-                      onClick={() => setCalendarSearchPopoverOpen(true)}
-                      onChange={(event) => {
-                        setCalendarSearchQuery(event.target.value);
-                        setCalendarSearchPopoverOpen(true);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault();
-                          executeCalendarSearch(event.currentTarget.value);
-                        }
-                      }}
-                      placeholder="搜索日程"
-                      className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none"
-                    />
-                    {calendarSearchQuery && (
+                {SHOW_CALENDAR_SEARCH_ENTRY && (
+                  <div
+                    ref={calendarSearchBoxRef}
+                    className="relative min-w-0 shrink-0"
+                  >
+                    <div className="flex h-10 w-[324px] items-center rounded-xl bg-black/5 px-3">
                       <button
-                        onClick={clearCalendarSearch}
-                        className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-black/10 hover:text-gray-600"
-                        title="清空搜索"
+                        onClick={() => executeCalendarSearch()}
+                        className="shrink-0 text-gray-400 transition hover:text-gray-600"
+                        title="搜索日程"
+                        aria-label="搜索日程"
                       >
-                        <X size={14} />
+                        <Search size={16} />
                       </button>
-                    )}
-                  </div>
-                  {calendarSearchPopoverOpen && (
-                    <div
-                      className="absolute left-0 top-0 z-[80] w-[792px] rounded-xl bg-white"
-                      style={{
-                        border: '0.5px solid rgba(0, 0, 0, 0.1)',
-                        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-                      }}
-                    >
-                      <div className="p-2">
-                        <div className="flex h-11 w-[776px] items-center rounded-lg bg-slate-50 px-3">
-                          <Search size={17} className="shrink-0 text-slate-400" />
-                          <input
-                            autoFocus
-                            value={calendarSearchQuery}
-                            onChange={(event) => setCalendarSearchQuery(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') {
-                                event.preventDefault();
-                                executeCalendarSearch(event.currentTarget.value);
-                              }
-                              if (event.key === 'Escape') {
-                                setCalendarSearchPopoverOpen(false);
-                              }
-                            }}
-                            placeholder="搜索日程"
-                            className="ml-2 min-w-0 flex-1 border-none bg-transparent text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                          />
-                          {calendarSearchQuery && (
-                            <button
-                              onClick={() => setCalendarSearchQuery('')}
-                              className="ml-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
-                              title="清空"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 px-1 pb-1">
-                          <div className="px-2 py-1 text-xs font-bold text-slate-400">近期搜索</div>
-                          {calendarRecentSearches.slice(0, 5).map((item) => (
-                            <button
-                              key={item}
-                              type="button"
-                              onClick={() => {
-                                setCalendarSearchQuery(item);
-                                executeCalendarSearch(item);
+                      <input
+                        value={calendarSearchQuery}
+                        onFocus={() => setCalendarSearchPopoverOpen(true)}
+                        onClick={() => setCalendarSearchPopoverOpen(true)}
+                        onChange={(event) => {
+                          setCalendarSearchQuery(event.target.value);
+                          setCalendarSearchPopoverOpen(true);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            executeCalendarSearch(event.currentTarget.value);
+                          }
+                        }}
+                        placeholder="搜索日程"
+                        className="ml-2 w-full border-none bg-transparent text-sm font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none"
+                      />
+                      {calendarSearchQuery && (
+                        <button
+                          onClick={clearCalendarSearch}
+                          className="ml-2 rounded-full p-1 text-gray-400 transition hover:bg-black/10 hover:text-gray-600"
+                          title="清空搜索"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {calendarSearchPopoverOpen && (
+                      <div
+                        className="absolute left-0 top-0 z-[80] w-[792px] rounded-xl bg-white"
+                        style={{
+                          border: '0.5px solid rgba(0, 0, 0, 0.1)',
+                          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+                        }}
+                      >
+                        <div className="p-2">
+                          <div className="flex h-11 w-[776px] items-center rounded-lg bg-slate-50 px-3">
+                            <Search size={17} className="shrink-0 text-slate-400" />
+                            <input
+                              autoFocus
+                              value={calendarSearchQuery}
+                              onChange={(event) => setCalendarSearchQuery(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.preventDefault();
+                                  executeCalendarSearch(event.currentTarget.value);
+                                }
+                                if (event.key === 'Escape') {
+                                  setCalendarSearchPopoverOpen(false);
+                                }
                               }}
-                              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                            >
-                              <Clock size={15} className="text-slate-400" />
-                              {item}
-                            </button>
-                          ))}
+                              placeholder="搜索日程"
+                              className="ml-2 min-w-0 flex-1 border-none bg-transparent text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                            />
+                            {calendarSearchQuery && (
+                              <button
+                                onClick={() => setCalendarSearchQuery('')}
+                                className="ml-2 rounded-full p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+                                title="清空"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-2 px-1 pb-1">
+                            <div className="px-2 py-1 text-xs font-bold text-slate-400">近期搜索</div>
+                            {calendarRecentSearches.slice(0, 5).map((item) => (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() => {
+                                  setCalendarSearchQuery(item);
+                                  executeCalendarSearch(item);
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                              >
+                                <Clock size={15} className="text-slate-400" />
+                                {item}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
                 {currentScreen !== 'search' && (
                   <>
                     <button
@@ -6830,6 +8203,7 @@ function MainApp() {
             </button>
           </div>
         </header>
+        )}
 
         <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden bg-white">
           {activeProduct === 'calendar' ? (
@@ -7034,6 +8408,7 @@ function MainApp() {
                       onRenameColorCategory={(id, label) => setColorCategoryLabels((prev) => ({ ...prev, [id]: label }))}
                       results={calendarSearchResults}
                       onOpenEvent={openEventDetails}
+                      onJoinEvent={(event) => markReminderJoined(event.id)}
                     />
                   </Suspense>
                 )}
@@ -7097,7 +8472,10 @@ function MainApp() {
                                 </div>
                                 {selectedEvent.meetingLink && (
                                   <button
-                                    onClick={() => openExternalLink(selectedEvent.meetingLink, '已打开会议链接')}
+                                    onClick={() => {
+                                      markReminderJoined(selectedEvent.id);
+                                      openExternalLink(selectedEvent.meetingLink, '已打开会议链接');
+                                    }}
                                     className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700"
                                   >
                                     <ArrowRight size={14} className="mr-2" />
@@ -7641,6 +9019,7 @@ function MainApp() {
                                   value={draftForm.reminder}
                                   onChange={(event) => patchDraft({ reminder: event.target.value })}
                                   className="appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-700 focus:outline-none"
+                                  aria-label="提醒"
                                 >
                                   {REMINDER_OPTIONS.map((option) => (
                                     <option key={option.id} value={option.id}>
@@ -7744,17 +9123,24 @@ function MainApp() {
               onToggleStar={toggleMailStar}
               onToggleRead={toggleMailRead}
               onArchiveMail={archiveMail}
+              onDeleteMail={deleteMail}
               onCompose={openMailComposer}
               onEditDraft={(mailId) => openMailComposer('editDraft', mailId)}
               onScheduleFromMail={createEventFromMail}
               onOpenLinkedEvent={(eventId) => navTo('details', eventId)}
               onToggleUnreadOnly={() => setMailUnreadOnly((prev) => !prev)}
               onSetMailFocusTab={setMailFocusTab}
-              upcomingEvents={reminderEvents.upcoming}
+              upcomingEvents={reminderEvents.active.filter((item) => item.kind !== 'notification')}
               linkedEventLookup={allEventLookup}
               accountMap={accountMap}
               calendarMap={calendarMap}
               onOpenEvent={(eventId) => navTo('details', eventId)}
+            />
+          ) : activeProduct === 'settings' ? (
+            <CalendarReminderSettingsPage
+              settings={calendarReminderSettings}
+              onChange={updateCalendarReminderSettings}
+              onBack={() => handleProductSelect('calendar')}
             />
           ) : (
             <ModulePlaceholder moduleId={activeProduct} onBack={() => handleProductSelect('calendar')} />
@@ -7793,42 +9179,34 @@ function MainApp() {
         onSetInvitationPermission={setShareInvitationPermission}
       />
 
+      <SettingsCenterModal
+        open={settingsCenterOpen}
+        settings={calendarReminderSettings}
+        onChange={updateCalendarReminderSettings}
+        onClose={() => setSettingsCenterOpen(false)}
+      />
+
       <ReminderModal
         open={reminderDialogOpen}
         onClose={() => setReminderDialogOpen(false)}
-        pendingEvents={reminderEvents.pending}
-        upcomingEvents={reminderEvents.upcoming}
+        reminderEvents={reminderEvents.active}
         accountMap={accountMap}
         calendarMap={calendarMap}
-        onOpenEvent={(id) => {
+        onOpenEvent={(id) => navTo('details', id)}
+        onJoinEvent={handleJoinReminderEvent}
+        onSnoozeEvent={handleSnoozeReminderEvent}
+        onDismissEvent={handleDismissReminderEvent}
+        onDismissAllEvents={handleDismissAllReminderEvents}
+        onOpenNotification={handleOpenReminderNotification}
+        onOpenSettings={() => {
           setReminderDialogOpen(false);
-          navTo('details', id);
+          setSettingsCenterOpen(true);
         }}
-        onRespond={(id, action) => {
-          handleRespondToEvent(id, action);
-        }}
+        skipDismissAllConfirm={skipReminderDismissAllConfirm}
+        onSetSkipDismissAllConfirm={setSkipReminderDismissAllConfirm}
       />
 
       <ShortcutHelpModal open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
-
-      {/* ===== 日历颜色选择器 ===== */}
-      {calendarColorPicker.open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={closeColorPicker}>
-          <div className="max-h-[70vh] w-72 overflow-y-auto rounded-2xl bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-3 text-sm font-bold text-gray-800">选择颜色</h3>
-            <div className="grid grid-cols-9 gap-2">
-              {CALENDAR_COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`h-8 w-8 rounded-full ${c} ring-offset-2 transition hover:scale-110 ${((calendarColorPicker.targetType === 'account' ? accounts.find(a => a.id === calendarColorPicker.targetId)?.color : calendars.find(c2 => c2.id === calendarColorPicker.targetId)?.color) === c) ? 'ring-2 ring-slate-800' : ''}`}
-                  onClick={() => applyCalendarColor(c)}
-                />
-              ))}
-            </div>
-            <button onClick={closeColorPicker} className="mt-4 w-full rounded-xl py-2 text-xs font-medium text-gray-500 transition hover:bg-slate-100">取消</button>
-          </div>
-        </div>
-      )}
 
       {/* ===== 日历重命名 ===== */}
       {calendarRenameDialog.open && (
@@ -8023,13 +9401,14 @@ function MainApp() {
             </>
           ) : (
             <>
-              <button
-                onClick={() => openColorPicker(contextMenu.account.id, 'account')}
-                className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
-              >
-                <Palette size={14} className="mr-2 text-gray-400" />
-                颜色
-              </button>
+              <AccountColorMenuItem
+                colors={CALENDAR_COLORS}
+                currentColor={contextMenu.account.color}
+                onSelect={(color) => {
+                  updateAccountColor(contextMenu.account.id, color);
+                  setContextMenu(null);
+                }}
+              />
               <button
                 onClick={() => { openSharedCalendarAccess(contextMenu.account.id); setContextMenu(null); }}
                 className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
@@ -8081,13 +9460,14 @@ function MainApp() {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => openColorPicker(accountMenuAnchor.account.id, 'account')}
-                  className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
-                >
-                  <Palette size={14} className="mr-2 text-gray-400" />
-                  颜色
-                </button>
+                <AccountColorMenuItem
+                  colors={CALENDAR_COLORS}
+                  currentColor={accountMenuAnchor.account.color}
+                  onSelect={(color) => {
+                    updateAccountColor(accountMenuAnchor.account.id, color);
+                    closeAccountMenu();
+                  }}
+                />
                 <button
                   onClick={() => { openSharedCalendarAccess(accountMenuAnchor.account.id); closeAccountMenu(); }}
                   className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-slate-50"
