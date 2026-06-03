@@ -2345,8 +2345,11 @@ function CalendarSidebar({
                 <ChevronLeft size={16} />
               </button>
             </div>
-            <span className="min-w-0 text-center text-sm font-bold text-gray-800">
-              {focusDate.getFullYear()}年 {focusDate.getMonth() + 1}月
+            <span
+              className="shrink-0 whitespace-nowrap px-1 text-center text-sm font-bold leading-none text-gray-800"
+              data-calendar-mini-month-label="true"
+            >
+              {focusDate.getFullYear()}年{focusDate.getMonth() + 1}月
             </span>
             <div className="flex items-center gap-1">
               <button className="rounded-lg p-1 text-gray-500 transition hover:bg-slate-100 hover:text-gray-700" onClick={() => onShiftMonth(1)} title="下一月">

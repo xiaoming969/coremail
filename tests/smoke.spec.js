@@ -18,8 +18,14 @@ test('calendar shell renders with search entry hidden', async ({ page }) => {
     .toBe('rgb(10, 89, 247)');
   await expect(page.locator('[data-calendar-account-color-dot="acc1"]')).toHaveCount(0);
   const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  const miniMonthLabel = page.locator('[data-calendar-mini-month-label="true"]');
   const calendarProductDock = calendarSidebar.locator('[data-app-sidebar-product-dock="true"]');
   await expect(calendarSidebar).toBeVisible();
+  await expect(miniMonthLabel).toHaveText('2026年1月');
+  await expect
+    .poll(() => miniMonthLabel.evaluate((node) => window.getComputedStyle(node).whiteSpace))
+    .toBe('nowrap');
+  await expect.poll(() => miniMonthLabel.evaluate((node) => node.getClientRects().length)).toBe(1);
   await expect(calendarProductDock).toBeVisible();
   await expect
     .poll(() => calendarSidebar.evaluate((node) => window.getComputedStyle(node.children[0]).paddingLeft))
@@ -67,6 +73,9 @@ test('workspace splitters resize calendar and mail panes', async ({ page }) => {
   await page.mouse.move(calendarSplitterBox.x - 40, calendarSplitterBox.y + calendarSplitterBox.height / 2);
   await page.mouse.up();
   await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBeLessThan(calendarWidthBefore - 20);
+  const miniMonthLabel = page.locator('[data-calendar-mini-month-label="true"]');
+  await expect(miniMonthLabel).toHaveText('2026年1月');
+  await expect.poll(() => miniMonthLabel.evaluate((node) => node.getClientRects().length)).toBe(1);
 
   await page.getByRole('button', { name: '邮件' }).click();
   const mailSidebar = page.locator('[data-app-sidebar="mail"]');
