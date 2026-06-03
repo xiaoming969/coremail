@@ -1250,18 +1250,21 @@ function MailWorkspace({
   const [selectedMailIds, setSelectedMailIds] = useState([]);
   const readerMoreRef = useRef(null);
   const mailFilterRef = useRef(null);
-  const selectedLinkedEvent = selectedMail?.linkedEventId ? linkedEventLookup[selectedMail.linkedEventId] || null : null;
   const folderLabel = getMailFolderLabel(mailFolder);
   const unreadCount = mails.filter((mail) => mail.unread).length;
-  const selectedAiInsight = getMailAiInsight(selectedMail, selectedLinkedEvent);
   const normalizedMailSearchQuery = mailSearchQuery.trim().toLowerCase();
   const visibleMails = normalizedMailSearchQuery
     ? mails.filter((mail) =>
-        [mail.subject, mail.preview, mail.body, mail.fromName, mail.fromEmail]
+        [mail.subject, mail.preview, mail.body, mail.quotedHistory, mail.fromName, mail.fromEmail, ...(mail.attachments || []).map((attachment) => attachment.name)]
           .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(normalizedMailSearchQuery)),
+          .some((value) => String(value).toLowerCase().includes(normalizedMailSearchQuery)),
       )
     : mails;
+  const effectiveSelectedMail = selectedMail && visibleMails.some((mail) => mail.id === selectedMail.id) ? selectedMail : visibleMails[0] || null;
+  const selectedLinkedEvent = effectiveSelectedMail?.linkedEventId ? linkedEventLookup[effectiveSelectedMail.linkedEventId] || null : null;
+  const selectedAiInsight = getMailAiInsight(effectiveSelectedMail, selectedLinkedEvent);
+  const isMailSearchActive = Boolean(normalizedMailSearchQuery);
+  const mailListSummary = isMailSearchActive ? `搜索到 ${visibleMails.length} 封邮件` : `${mails.length} 封邮件，${unreadCount} 封未读`;
   const activeMailFilter = MAIL_LIST_FILTER_OPTIONS.find((option) => option.id === mailListFilter) || MAIL_LIST_FILTER_OPTIONS[0];
   const mailTimelineRows = useMemo(() => {
     const rows = [];
@@ -1285,7 +1288,7 @@ function MailWorkspace({
     setReaderMoreOpen(false);
     setMailContextMenu(null);
     setMailFilterMenuOpen(false);
-  }, [selectedMail?.id]);
+  }, [effectiveSelectedMail?.id]);
 
   useEffect(() => {
     if (!readerMoreOpen) return undefined;
@@ -1370,7 +1373,7 @@ function MailWorkspace({
   };
 
   const enterMailSelectionMode = () => {
-    const fallbackMailId = selectedMail && visibleMails.some((mail) => mail.id === selectedMail.id) ? selectedMail.id : visibleMails[0]?.id;
+    const fallbackMailId = effectiveSelectedMail?.id || visibleMails[0]?.id;
     setMailSelectionMode(true);
     setSelectedMailIds((prev) => (prev.length > 0 ? prev : fallbackMailId ? [fallbackMailId] : []));
   };
@@ -1601,12 +1604,12 @@ function MailWorkspace({
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-lg font-black text-slate-950">{folderLabel}</h2>
-                  <div className="mt-1 text-xs font-semibold text-slate-400">
-                    {mails.length} 封邮件，{unreadCount} 封未读
-                  </div>
-                </div>
+	                <div className="min-w-0">
+	                  <h2 className="text-lg font-black text-slate-950">{folderLabel}</h2>
+	                  <div data-mail-list-summary="true" className="mt-1 text-xs font-semibold text-slate-400">
+	                    {mailListSummary}
+	                  </div>
+	                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {isMailReaderHidden && (
                     <button
@@ -1717,9 +1720,25 @@ function MailWorkspace({
               <span className="text-right">时间</span>
             </div>
           )}
-          {visibleMails.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">当前筛选下没有邮件</div>
-          ) : (
+	          {visibleMails.length === 0 ? (
+	            <div data-mail-empty-state="true" className="flex h-full items-center justify-center px-6 text-center">
+	              {isMailSearchActive ? (
+	                <div className="max-w-[360px]">
+	                  <div className="text-sm font-black text-slate-700">没有找到与“{mailSearchQuery.trim()}”相关的邮件</div>
+	                  <div className="mt-2 text-xs font-semibold leading-5 text-slate-500">请更换关键词，或清除搜索后查看当前文件夹邮件。</div>
+	                  <button
+	                    type="button"
+	                    onClick={() => setMailSearchQuery('')}
+	                    className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+	                  >
+	                    清除搜索
+	                  </button>
+	                </div>
+	              ) : (
+	                <div className="text-sm font-semibold text-slate-400">当前筛选下没有邮件</div>
+	              )}
+	            </div>
+	          ) : (
             mailTimelineRows.map((row) => {
               if (row.type === 'timeline') {
                 return (
@@ -1739,7 +1758,7 @@ function MailWorkspace({
               }
 
               const mail = row.mail;
-              const selected = selectedMail?.id === mail.id;
+	              const selected = effectiveSelectedMail?.id === mail.id;
               const selectedInBatch = selectedMailIds.includes(mail.id);
               if (isMailReaderHidden) {
                 return (
@@ -1943,12 +1962,12 @@ function MailWorkspace({
 	                        </div>
 	                        <div data-mail-sender-markers="true" className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 text-slate-500 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
 	                          {mail.starred && (
-	                            <span role="img" aria-label="旗标邮件" title="旗标邮件" className="text-red-500">
+	                            <span role="img" aria-label="旗标邮件" title="旗标邮件" className="inline-flex h-4 w-4 items-center justify-center text-red-500">
 	                              <Flag size={14} fill="currentColor" />
 	                            </span>
 	                          )}
 	                          {mail.attachments.length > 0 && (
-	                            <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className="text-slate-500">
+	                            <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className="inline-flex h-4 w-4 items-center justify-center text-slate-500">
 	                              <Paperclip size={14} />
 	                            </span>
 	                          )}
@@ -2116,10 +2135,10 @@ function MailWorkspace({
             </div>
           </div>
         ) : (
-          <MailReadingPane
-            mail={selectedMail}
-            state={selectedMail ? MAIL_READING_STATE_BY_MAIL_ID[selectedMail.id] : undefined}
-            folderLabel={selectedMail ? MAIL_FOLDERS.find((item) => item.id === selectedMail.folder)?.label : ''}
+	          <MailReadingPane
+	            mail={effectiveSelectedMail}
+	            state={effectiveSelectedMail ? MAIL_READING_STATE_BY_MAIL_ID[effectiveSelectedMail.id] : undefined}
+	            folderLabel={effectiveSelectedMail ? MAIL_FOLDERS.find((item) => item.id === effectiveSelectedMail.folder)?.label : ''}
             linkedEvent={
               selectedLinkedEvent
                 ? {
@@ -2129,28 +2148,28 @@ function MailWorkspace({
                   }
                 : null
             }
-            aiInsight={selectedAiInsight}
-            formatMailTime={formatMailTime}
-            onReply={() => selectedMail && onCompose('reply', selectedMail.id)}
-            onReplyAll={() => selectedMail && onCompose('replyAll', selectedMail.id)}
-            onForward={() => selectedMail && onCompose('forward', selectedMail.id)}
-            onArchive={() => selectedMail && onArchiveMail(selectedMail.id)}
-            onDelete={() => selectedMail && onDeleteMail(selectedMail.id)}
-            onMove={() => selectedMail && (onMoveMail || onArchiveMail)(selectedMail.id)}
-            onToggleRead={() => selectedMail && onToggleRead(selectedMail.id)}
-            onToggleFollowUp={() => selectedMail && onToggleStar(selectedMail.id)}
-            onCreateTask={() => selectedMail && onCreateTaskFromMail(selectedMail.id)}
-            onCreateEvent={() => selectedMail && onScheduleFromMail(selectedMail.id)}
-            onRetry={() => selectedMail && onReaderRetry(selectedMail.id)}
-            onBackToList={() => selectedMail && onSelectMail(selectedMail.id)}
-            onViewNext={() => selectedMail && selectNextVisibleMail(selectedMail.id)}
-            onMarkReadAfterViewing={() => selectedMail && onMarkReadAfterViewing(selectedMail.id)}
-            onPreviewAttachment={(attachment) => selectedMail && onPreviewAttachment(selectedMail.id, attachment)}
-            onDownloadAttachment={(attachment) => selectedMail && onDownloadAttachment(selectedMail.id, attachment)}
-            onQuickReplySend={(body) => selectedMail && onQuickReplySend(selectedMail.id, body)}
-            onSecurityAction={(action) => selectedMail && onReaderSecurityAction(selectedMail.id, action)}
-            onOpenLinkedEvent={() => selectedMail?.linkedEventId && onOpenLinkedEvent(selectedMail.linkedEventId)}
-          />
+	            aiInsight={selectedAiInsight}
+	            formatMailTime={formatMailTime}
+	            onReply={() => effectiveSelectedMail && onCompose('reply', effectiveSelectedMail.id)}
+	            onReplyAll={() => effectiveSelectedMail && onCompose('replyAll', effectiveSelectedMail.id)}
+	            onForward={() => effectiveSelectedMail && onCompose('forward', effectiveSelectedMail.id)}
+	            onArchive={() => effectiveSelectedMail && onArchiveMail(effectiveSelectedMail.id)}
+	            onDelete={() => effectiveSelectedMail && onDeleteMail(effectiveSelectedMail.id)}
+	            onMove={() => effectiveSelectedMail && (onMoveMail || onArchiveMail)(effectiveSelectedMail.id)}
+	            onToggleRead={() => effectiveSelectedMail && onToggleRead(effectiveSelectedMail.id)}
+	            onToggleFollowUp={() => effectiveSelectedMail && onToggleStar(effectiveSelectedMail.id)}
+	            onCreateTask={() => effectiveSelectedMail && onCreateTaskFromMail(effectiveSelectedMail.id)}
+	            onCreateEvent={() => effectiveSelectedMail && onScheduleFromMail(effectiveSelectedMail.id)}
+	            onRetry={() => effectiveSelectedMail && onReaderRetry(effectiveSelectedMail.id)}
+	            onBackToList={() => effectiveSelectedMail && onSelectMail(effectiveSelectedMail.id)}
+	            onViewNext={() => effectiveSelectedMail && selectNextVisibleMail(effectiveSelectedMail.id)}
+	            onMarkReadAfterViewing={() => effectiveSelectedMail && onMarkReadAfterViewing(effectiveSelectedMail.id)}
+	            onPreviewAttachment={(attachment) => effectiveSelectedMail && onPreviewAttachment(effectiveSelectedMail.id, attachment)}
+	            onDownloadAttachment={(attachment) => effectiveSelectedMail && onDownloadAttachment(effectiveSelectedMail.id, attachment)}
+	            onQuickReplySend={(body) => effectiveSelectedMail && onQuickReplySend(effectiveSelectedMail.id, body)}
+	            onSecurityAction={(action) => effectiveSelectedMail && onReaderSecurityAction(effectiveSelectedMail.id, action)}
+	            onOpenLinkedEvent={() => effectiveSelectedMail?.linkedEventId && onOpenLinkedEvent(effectiveSelectedMail.linkedEventId)}
+	          />
         )}
       </div>
       )}
@@ -7558,11 +7577,33 @@ function MainApp() {
   };
 
   const moveMail = (mailId) => {
-    archiveMail(mailId);
+    const previousMail = mails.find((mail) => mail.id === mailId);
+    if (!previousMail) return;
+    const nextMailId = getNextFilteredMailId(mailId);
+
+    setMails((prev) =>
+      prev.map((mail) =>
+        mail.id === mailId
+          ? {
+              ...mail,
+              folder: 'archive',
+              unread: false,
+            }
+          : mail,
+      ),
+    );
+    setSelectedMailId(nextMailId);
     triggerFeedback('L3', {
       msg: '邮件已移动到归档',
       icon: <Archive size={16} />,
       color: 'bg-slate-900',
+      actionText: '撤销',
+      actionLabel: '撤销移动邮件',
+      onAction: () => {
+        setMails((prev) => prev.map((mail) => (mail.id === mailId ? previousMail : mail)));
+        setSelectedMailId(mailId);
+        setFeedback({ type: null, payload: null });
+      },
     });
   };
 

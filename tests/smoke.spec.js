@@ -262,6 +262,20 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(mailView.getByRole('button', { name: '其他' })).toHaveCount(0);
   await expect(mailView.locator('[data-mail-ai-classifier="compact"]')).toHaveCount(0);
   await expect(mailView.getByText('智能标记已开启')).toHaveCount(0);
+  const mailSearchInput = mailView.getByPlaceholder('搜索邮件');
+  await mailSearchInput.fill('申诉截止时间');
+  await expect(mailView.locator('[data-mail-list-summary="true"]')).toContainText('搜索到 1 封邮件');
+  await expect(mailView.locator('[data-mail-list-card="m35"]')).toBeVisible();
+  await expect(mailView.locator('[data-mail-list-card="m1"]')).toHaveCount(0);
+  await expect(mailView.getByRole('heading', { name: '绩效考核结果公示' })).toBeVisible();
+  await mailSearchInput.fill('不存在的邮件关键词');
+  const mailEmptyState = mailView.locator('[data-mail-empty-state="true"]');
+  await expect(mailEmptyState).toContainText('没有找到与“不存在的邮件关键词”相关的邮件');
+  await expect(mailEmptyState.getByRole('button', { name: '清除搜索' })).toBeVisible();
+  await mailEmptyState.getByRole('button', { name: '清除搜索' }).click();
+  await expect(mailSearchInput).toHaveValue('');
+  await page.mouse.move(1, 1);
+  await expect(mailView.locator('[data-mail-list-card="m1"]')).toBeVisible();
   await mailView.getByRole('button', { name: '筛选邮件' }).click();
   const mailFilterMenu = mailView.locator('[data-mail-filter-menu="true"]');
   await expect(mailFilterMenu).toBeVisible();
@@ -287,6 +301,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(bulkReader.getByRole('button', { name: '批量标为已读' })).toBeVisible();
   await expect(bulkReader.getByRole('button', { name: '批量删除' })).toBeVisible();
   await mailView.getByRole('button', { name: '退出多选' }).click();
+  await page.mouse.move(1500, 120);
   await expect(mailView.locator('[data-mail-selection-bar="true"]')).toHaveCount(0);
   await expect(mailView.locator('[data-mail-bulk-reader="true"]')).toHaveCount(0);
   const firstMailCard = mailView.locator('[data-mail-list-card="m1"]');
@@ -428,9 +443,9 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(readerMoreMenu.getByRole('menuitem', { name: '转发' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '标为已读' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '标记旗标' })).toBeVisible();
-  await expect(readerMoreMenu.getByRole('menuitem', { name: '归档' })).toBeVisible();
+  await expect(readerMoreMenu.getByRole('menuitem', { name: '归档', exact: true })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '删除' })).toBeVisible();
-  await expect(readerMoreMenu.getByRole('menuitem', { name: '移动' })).toBeVisible();
+  await expect(readerMoreMenu.getByRole('menuitem', { name: '移动到归档' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '生成日程' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(readerMoreMenu).toHaveCount(0);
@@ -570,12 +585,25 @@ test('mail reading pane surfaces enterprise body states and interactions', async
 
   await mailView.locator('[data-mail-list-card="m35"]').scrollIntoViewIfNeeded();
   await mailView.locator('[data-mail-list-card="m35"]').click();
+  const warningAttachment = reader.locator('[data-mail-attachment-card="att-m35-warning-macro"]');
+  await expect(warningAttachment).toContainText('有风险');
+  await warningAttachment.getByRole('button', { name: '下载 绩效申诉材料宏.xlsm' }).click();
+  const warningDownloadDialog = page.getByRole('dialog', { name: '确认下载风险附件' });
+  await expect(warningDownloadDialog).toBeVisible();
+  await expect(warningDownloadDialog).toContainText('绩效申诉材料宏.xlsm');
+  await expect(page.getByText('附件下载中：绩效申诉材料宏.xlsm')).toHaveCount(0);
+  await warningDownloadDialog.getByRole('button', { name: '继续下载' }).click();
+  await expect(page.getByText('附件下载中：绩效申诉材料宏.xlsm')).toBeVisible();
   await expect(reader.getByRole('button', { name: '展开历史邮件' })).toBeVisible();
   await reader.getByRole('button', { name: '展开历史邮件' }).click();
   await expect(reader.locator('[data-mail-quoted-history="true"]')).toContainText('历史邮件');
 
   await mailView.locator('[data-mail-list-card="m40"]').scrollIntoViewIfNeeded();
   await mailView.locator('[data-mail-list-card="m40"]').click();
+  const systemMailActionBar = reader.locator('[data-mail-reader-action-bar="true"]');
+  await expect(systemMailActionBar.getByRole('button', { name: '回复', exact: true })).toBeDisabled();
+  await expect(systemMailActionBar.getByRole('button', { name: '回复全部' })).toBeDisabled();
+  await expect(systemMailActionBar.getByRole('button', { name: '转发' })).toBeEnabled();
   await expect(reader.locator('[data-mail-quick-reply-disabled="true"]')).toContainText('此邮件为系统通知，不支持直接回复。');
 
   await mailView.locator('[data-mail-list-card="m42"]').scrollIntoViewIfNeeded();

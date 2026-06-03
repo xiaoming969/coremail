@@ -2918,7 +2918,19 @@ export const MOCK_MAILS = [
     to: ["me@calendarpro.io"], cc: ["boss@calendarpro.io"],
     preview: '根据会议讨论结果，现整理相关材料。', body: '本周数据已汇总完成，核心指标如下：\n\n新增用户：+12.5%\n活跃度：提升 3.2pp\n转化率：稳定在 8.7%\n\n详细报告见附件。',
     quotedHistory: '历史邮件：\n周老师：上周口径已按人力系统数据调整。\n我：请补充绩效区间和申诉截止时间。\n\n--\n免责声明：本邮件仅供内部绩效沟通使用。',
-    attachments: [{"name": "项目进度表_2026Q1.xlsx", "size": "2.3 MB"}],
+    attachments: [
+      {"name": "项目进度表_2026Q1.xlsx", "size": "2.3 MB"},
+      {
+        id: 'att-m35-warning-macro',
+        name: '绩效申诉材料宏.xlsm',
+        type: 'XLSM',
+        size: '620 KB',
+        status: 'warning',
+        canPreview: true,
+        canDownload: true,
+        riskReason: '包含宏脚本，下载前请确认来源。',
+      },
+    ],
     timestamp: new Date(2026, 0, 8, 16, 55, 0).getTime(),
   },
   {

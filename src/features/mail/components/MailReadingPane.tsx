@@ -85,15 +85,25 @@ function MailActionBar({
   MailReaderActionHandlers,
   'onReply' | 'onReplyAll' | 'onForward' | 'onArchive' | 'onDelete' | 'onMove' | 'onToggleRead' | 'onToggleFollowUp' | 'onCreateTask' | 'onCreateEvent'
 >) {
-  const actions = [
-    { id: 'reply', label: '回复', icon: 'lucide:reply', onClick: onReply },
-    { id: 'replyAll', label: '回复全部', icon: 'lucide:reply-all', onClick: onReplyAll },
+  const systemReplyDisabled = Boolean(mail.isSystemMail);
+  const actions: Array<{
+    id: string;
+    label: string;
+    icon: string;
+    onClick?: () => void;
+    fill?: string;
+    menuOnly?: boolean;
+    accent?: boolean;
+    disabled?: boolean;
+  }> = [
+    { id: 'reply', label: '回复', icon: 'lucide:reply', onClick: onReply, disabled: systemReplyDisabled },
+    { id: 'replyAll', label: '回复全部', icon: 'lucide:reply-all', onClick: onReplyAll, disabled: systemReplyDisabled },
     { id: 'forward', label: '转发', icon: 'lucide:forward', onClick: onForward },
     { id: 'archive', label: '归档', icon: 'lucide:archive', onClick: onArchive },
     { id: 'delete', label: '删除', icon: 'lucide:trash', onClick: onDelete },
     { id: 'read', label: mail.unread ? '标为已读' : '标为未读', icon: 'lucide:mail', onClick: onToggleRead },
     { id: 'followUp', label: '标记旗标', icon: 'lucide:flag', onClick: onToggleFollowUp, fill: mail.starred || mail.hasFollowUp ? 'currentColor' : 'none' },
-    { id: 'move', label: '移动', icon: 'lucide:folder-input', onClick: onMove, menuOnly: true },
+    { id: 'move', label: '移动到归档', icon: 'lucide:folder-input', onClick: onMove, menuOnly: true },
     { id: 'schedule', label: '生成日程', icon: 'lucide:calendar', onClick: onCreateEvent, accent: true },
   ];
   const toolbarActions = actions.filter((action) => !action.menuOnly);
@@ -116,7 +126,7 @@ function MailActionBar({
             icon={action.icon}
             label={action.label}
             fill={action.fill}
-            disabled={disabled || !action.onClick}
+            disabled={disabled || action.disabled || !action.onClick}
             onClick={action.onClick}
             className={
               action.accent
@@ -151,7 +161,7 @@ function MailActionBar({
                 key={action.id}
                 type="button"
                 role="menuitem"
-                disabled={!action.onClick}
+                disabled={disabled || action.disabled || !action.onClick}
                 onClick={() => {
                   setMoreOpen(false);
                   action.onClick?.();
@@ -389,7 +399,19 @@ function AttachmentList({
   onRetry?: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [pendingDownload, setPendingDownload] = useState<MailAttachment | null>(null);
   const visibleAttachments = showAll ? attachments : attachments.slice(0, 3);
+  const requestDownload = (attachment: MailAttachment) => {
+    if (attachment.status === 'warning') {
+      setPendingDownload(attachment);
+      return;
+    }
+    onDownloadAttachment?.(attachment);
+  };
+
+  useEffect(() => {
+    setPendingDownload(null);
+  }, [attachments]);
 
   if (attachments.length === 0 && state !== 'attachmentError') return null;
 
@@ -410,67 +432,110 @@ function AttachmentList({
   }
 
   return (
-    <section data-mail-attachment-list="true" className="mb-5 max-w-[980px]">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs font-black uppercase tracking-wide text-slate-400">附件 {attachments.length}</div>
-        {attachments.length > 1 && (
-          <button type="button" onClick={() => onDownloadAttachment?.(attachments[0])} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-black text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]">
-            <AppIcon name="lucide:download" size={14} />
-            批量下载
-          </button>
-        )}
-      </div>
-      <div className="grid gap-3 xl:grid-cols-3">
-        {visibleAttachments.map((attachment) => {
-          const meta = attachmentStatusMeta[attachment.status];
-          const disabledDownload = !attachment.canDownload || attachment.status === 'scanning' || attachment.status === 'blocked' || attachment.status === 'unavailable';
-          return (
-            <div
-              key={attachment.id}
-              data-mail-attachment-card={attachment.id}
-              className="min-w-0 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-black text-slate-500">{attachment.type}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-black text-slate-800">{attachment.name}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
-                    <span>{attachment.size}</span>
-                    <span className={`rounded-full px-2 py-0.5 font-black ${meta.className}`}>{meta.label}</span>
+    <>
+      <section data-mail-attachment-list="true" className="mb-5 max-w-[980px]">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs font-black uppercase tracking-wide text-slate-400">附件 {attachments.length}</div>
+          {attachments.length > 1 && (
+            <button type="button" onClick={() => requestDownload(attachments[0])} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-black text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]">
+              <AppIcon name="lucide:download" size={14} />
+              批量下载
+            </button>
+          )}
+        </div>
+        <div className="grid gap-3 xl:grid-cols-3">
+          {visibleAttachments.map((attachment) => {
+            const meta = attachmentStatusMeta[attachment.status];
+            const disabledDownload = !attachment.canDownload || attachment.status === 'scanning' || attachment.status === 'blocked' || attachment.status === 'unavailable';
+            return (
+              <div
+                key={attachment.id}
+                data-mail-attachment-card={attachment.id}
+                className="min-w-0 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-black text-slate-500">{attachment.type}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-black text-slate-800">{attachment.name}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                      <span>{attachment.size}</span>
+                      <span className={`rounded-full px-2 py-0.5 font-black ${meta.className}`}>{meta.label}</span>
+                    </div>
+                    <div className="mt-1 text-xs font-medium text-slate-500">{attachment.riskReason || meta.desc}</div>
                   </div>
-                  <div className="mt-1 text-xs font-medium text-slate-500">{attachment.riskReason || meta.desc}</div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-label={`预览 ${attachment.name}`}
+                    disabled={!attachment.canPreview}
+                    onClick={() => onPreviewAttachment?.(attachment)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    预览
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`下载 ${attachment.name}`}
+                    disabled={disabledDownload}
+                    onClick={() => requestDownload(attachment)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    下载
+                  </button>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  aria-label={`预览 ${attachment.name}`}
-                  disabled={!attachment.canPreview}
-                  onClick={() => onPreviewAttachment?.(attachment)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  预览
-                </button>
-                <button
-                  type="button"
-                  aria-label={`下载 ${attachment.name}`}
-                  disabled={disabledDownload}
-                  onClick={() => onDownloadAttachment?.(attachment)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  下载
-                </button>
+            );
+          })}
+        </div>
+        {attachments.length > 3 && (
+          <button type="button" onClick={() => setShowAll((value) => !value)} className="mt-3 rounded-lg px-3 py-2 text-sm font-black text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]">
+            {showAll ? '收起附件' : `查看全部 ${attachments.length} 个附件`}
+          </button>
+        )}
+      </section>
+
+      {pendingDownload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 px-4 py-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="确认下载风险附件"
+            data-mail-attachment-download-confirm="true"
+            className="w-full max-w-[420px] rounded-lg border border-amber-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.18)]"
+          >
+            <div className="border-b border-amber-100 bg-amber-50 px-5 py-4">
+              <div className="flex items-center gap-2 text-sm font-black text-amber-950">
+                <AppIcon name="lucide:triangle-alert" size={17} className="shrink-0 text-amber-600" />
+                确认下载风险附件
+              </div>
+              <div className="mt-2 text-sm font-semibold leading-6 text-amber-900">
+                {pendingDownload.name}：{pendingDownload.riskReason || attachmentStatusMeta.warning.desc}
               </div>
             </div>
-          );
-        })}
-      </div>
-      {attachments.length > 3 && (
-        <button type="button" onClick={() => setShowAll((value) => !value)} className="mt-3 rounded-lg px-3 py-2 text-sm font-black text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]">
-          {showAll ? '收起附件' : `查看全部 ${attachments.length} 个附件`}
-        </button>
+            <div className="flex justify-end gap-2 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setPendingDownload(null)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDownloadAttachment?.(pendingDownload);
+                  setPendingDownload(null);
+                }}
+                className="rounded-lg bg-[#0A59F7] px-3 py-2 text-sm font-black text-white transition hover:bg-[#084DDB]"
+              >
+                继续下载
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </section>
+    </>
   );
 }
 
