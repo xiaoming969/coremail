@@ -11,13 +11,33 @@ test('calendar shell renders with search entry hidden', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: '显示小华' })).toBeChecked();
   await expect(page.getByRole('checkbox', { name: '显示张三' })).toBeChecked();
   await expect(page.locator('[data-calendar-account-checkbox="acc1"]')).toHaveClass(/rounded-md/);
-  await expect(page.locator('[data-calendar-account-checkbox="acc1"]')).toHaveClass(/bg-blue-600/);
+  await expect
+    .poll(() =>
+      page.locator('[data-calendar-account-checkbox="acc1"]').evaluate((node) => window.getComputedStyle(node).backgroundColor),
+    )
+    .toBe('rgb(10, 89, 247)');
   await expect(page.locator('[data-calendar-account-color-dot="acc1"]')).toHaveCount(0);
   const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
   const calendarProductDock = calendarSidebar.locator('[data-app-sidebar-product-dock="true"]');
   await expect(calendarSidebar).toBeVisible();
   await expect(calendarProductDock).toBeVisible();
-  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(264);
+  await expect
+    .poll(() => calendarSidebar.evaluate((node) => window.getComputedStyle(node.children[0]).paddingLeft))
+    .toBe('24px');
+  await expect
+    .poll(() =>
+      calendarSidebar.evaluate((node) => {
+        const scrollPanel = Array.from(node.children).find((child) => child.className.includes('overflow-y-auto'));
+        return window.getComputedStyle(scrollPanel).paddingLeft;
+      }),
+    )
+    .toBe('24px');
+  await expect
+    .poll(async () => Math.round((await calendarSidebar.boundingBox()).width))
+    .toBeGreaterThanOrEqual(240);
+  await expect
+    .poll(async () => Math.round((await calendarSidebar.boundingBox()).width))
+    .toBeLessThanOrEqual(320);
   await expect.poll(() => calendarProductDock.evaluate((node) => window.getComputedStyle(node).borderTopWidth)).toBe('0px');
   await expect
     .poll(async () => {
@@ -28,7 +48,144 @@ test('calendar shell renders with search entry hidden', async ({ page }) => {
     .toBe(0);
 });
 
+test('workspace splitters resize calendar and mail panes', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '日历' }).click();
+
+  const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  const calendarSplitter = page.locator('[data-layout-resizer="calendar-a"]');
+  await expect(calendarSidebar).toBeVisible();
+  await expect(calendarSplitter).toBeVisible();
+  await expect.poll(() => calendarSplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(276);
+
+  const calendarWidthBefore = Math.round((await calendarSidebar.boundingBox()).width);
+  const calendarSplitterBox = await calendarSplitter.boundingBox();
+  await page.mouse.move(calendarSplitterBox.x + calendarSplitterBox.width / 2, calendarSplitterBox.y + calendarSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(calendarSplitterBox.x - 40, calendarSplitterBox.y + calendarSplitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBeLessThan(calendarWidthBefore - 20);
+
+  await page.getByRole('button', { name: '邮件' }).click();
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const mailListPane = page.locator('[data-mail-list-pane="true"]');
+  const mailASplitter = page.locator('[data-layout-resizer="mail-a"]');
+  const mailBSplitter = page.locator('[data-layout-resizer="mail-b"]');
+  await expect(mailSidebar).toBeVisible();
+  await expect(mailListPane).toBeVisible();
+  await expect(mailASplitter).toBeVisible();
+  await expect(mailBSplitter).toBeVisible();
+  await expect.poll(() => mailASplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
+  await expect.poll(() => mailBSplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(320);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBe(544);
+
+  const mailSidebarWidthBefore = Math.round((await mailSidebar.boundingBox()).width);
+  const mailASplitterBox = await mailASplitter.boundingBox();
+  await page.mouse.move(mailASplitterBox.x + mailASplitterBox.width / 2, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailASplitterBox.x - 44, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeLessThan(mailSidebarWidthBefore - 20);
+
+  const mailListWidthBefore = Math.round((await mailListPane.boundingBox()).width);
+  const mailBSplitterBox = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBSplitterBox.x + mailBSplitterBox.width / 2, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailBSplitterBox.x + 72, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(mailListWidthBefore + 40);
+  await expect(page.locator('[data-mail-reading-pane="true"]')).toBeVisible();
+});
+
+test('mail layout switches between ABC and AB reading modes', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const mailListPane = page.locator('[data-mail-list-pane="true"]');
+  const mailReaderPane = page.locator('[data-mail-reader-region="true"]');
+  const mailBSplitter = page.locator('[data-layout-resizer="mail-b"]');
+
+  await expect(mailView).toBeVisible();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(320);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBe(544);
+  await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBe(864);
+
+  const mailBSplitterBox = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBSplitterBox.x + mailBSplitterBox.width / 2, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailBSplitterBox.x + 260, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.up();
+
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
+  await expect(mailReaderPane).toHaveCount(0);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(1200);
+  await expect(mailListPane).toHaveAttribute('data-mail-list-mode', 'table');
+  await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toBeVisible();
+  const firstWideRow = mailView.locator('[data-mail-list-card="m1"]');
+  await expect(firstWideRow).toHaveAttribute('data-mail-row-mode', 'table');
+  await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).toContainText('产品经理');
+  await expect(firstWideRow.locator('[data-mail-wide-column="subject"]')).toContainText('Q2 路线评审材料已更新');
+  await expect(firstWideRow.locator('[data-mail-wide-column="status"]')).toContainText('附件 1');
+  await expect(firstWideRow.locator('[data-mail-wide-column="status"]')).toContainText('关联日程');
+  await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
+  await expect(mailView.getByRole('button', { name: '显示阅读区' })).toBeVisible();
+  await mailView.getByRole('button', { name: '显示阅读区' }).click();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect(mailReaderPane).toBeVisible();
+  await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBeGreaterThanOrEqual(720);
+});
+
+test('mail layout keeps reader width by collapsing A column on narrow desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1159, height: 860 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const mailListPane = page.locator('[data-mail-list-pane="true"]');
+  const mailReaderPane = page.locator('[data-mail-reader-region="true"]');
+
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThanOrEqual(360);
+  await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBeGreaterThanOrEqual(720);
+  await expect(page.locator('[data-layout-resizer="mail-a"]')).toHaveCount(0);
+  await expect(page.locator('[data-layout-resizer="mail-b"]')).toBeVisible();
+});
+
+test('mail A column expands from auto-collapsed narrow desktop into pure list mode', async ({ page }) => {
+  await page.setViewportSize({ width: 1159, height: 860 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const mailListPane = page.locator('[data-mail-list-pane="true"]');
+  const mailReaderPane = page.locator('[data-mail-reader-region="true"]');
+
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+  await mailSidebar.getByRole('button', { name: '展开侧边栏' }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
+  await expect(mailReaderPane).toHaveCount(0);
+  await expect(mailListPane).toHaveAttribute('data-mail-list-mode', 'table');
+  await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toBeVisible();
+  await expect(page.locator('[data-layout-resizer="mail-a"]')).toBeVisible();
+  await expect(mailView.locator('[data-mail-list-card="m1"]')).toHaveAttribute('data-mail-row-mode', 'table');
+
+  await mailSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect(mailReaderPane).toBeVisible();
+  await expect(mailListPane).toHaveAttribute('data-mail-list-mode', 'compact');
+});
+
 test('mail workspace uses a focused inbox layout', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');
 
   const mailView = page.locator('[data-mail-workspace="true"]');
@@ -41,7 +198,18 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   const mailProductDock = mailSidebar.locator('[data-app-sidebar-product-dock="true"]');
   await expect(mailSidebar).toBeVisible();
   await expect(mailProductDock).toBeVisible();
-  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(264);
+  await expect
+    .poll(() => page.locator('[data-mail-sidebar-brand="true"]').evaluate((node) => window.getComputedStyle(node.parentElement).paddingLeft))
+    .toBe('24px');
+  await expect
+    .poll(() => page.locator('[data-mail-list-toolbar="true"]').evaluate((node) => window.getComputedStyle(node.parentElement).paddingLeft))
+    .toBe('24px');
+  await expect
+    .poll(async () => Math.round((await mailSidebar.boundingBox()).width))
+    .toBeGreaterThanOrEqual(240);
+  await expect
+    .poll(async () => Math.round((await mailSidebar.boundingBox()).width))
+    .toBeLessThanOrEqual(320);
   await expect.poll(() => mailProductDock.evaluate((node) => window.getComputedStyle(node).borderTopWidth)).toBe('0px');
   await expect
     .poll(async () => {
@@ -78,8 +246,152 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(mailView.getByPlaceholder('搜索邮件')).toBeVisible();
   await expect(mailView.getByRole('button', { name: '高级' })).toBeVisible();
   await expect(mailView.getByRole('button', { name: '刷新邮件' })).toBeVisible();
+  await expect(mailView.getByRole('button', { name: '多选邮件' })).toBeVisible();
   await expect(mailView.getByRole('button', { name: '筛选邮件' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '邮件排序' })).toBeVisible();
+  await expect(mailView.getByRole('button', { name: '邮件排序' })).toHaveCount(0);
+  await expect(mailView.getByRole('button', { name: '重点' })).toHaveCount(0);
+  await expect(mailView.getByRole('button', { name: '其他' })).toHaveCount(0);
+  await expect(mailView.locator('[data-mail-ai-classifier="compact"]')).toHaveCount(0);
+  await expect(mailView.getByText('智能标记已开启')).toHaveCount(0);
+  await mailView.getByRole('button', { name: '筛选邮件' }).click();
+  const mailFilterMenu = mailView.locator('[data-mail-filter-menu="true"]');
+  await expect(mailFilterMenu).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '全部' })).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '未读' })).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '已标记' })).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '带附件' })).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '高重要性' })).toBeVisible();
+  await expect(mailFilterMenu.getByRole('menuitemradio', { name: '日期：从新到旧' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await mailView.getByRole('button', { name: '多选邮件' }).click();
+  await expect(mailView.locator('[data-mail-selection-bar="true"]')).toContainText('已选中 1 封邮件');
+  await expect(mailView.locator('[data-mail-list-card="m1"]').getByRole('checkbox', { name: '选择邮件：Q2 路线评审材料已更新' })).toBeChecked();
+  const secondBatchCard = mailView.locator('[data-mail-list-card="m35"]');
+  await secondBatchCard.scrollIntoViewIfNeeded();
+  await secondBatchCard.getByRole('checkbox', { name: '选择邮件：绩效考核结果公示' }).click();
+  await expect(mailView.locator('[data-mail-selection-bar="true"]')).toContainText('已选中 2 封邮件');
+  const bulkReader = mailView.locator('[data-mail-bulk-reader="true"]');
+  await expect(bulkReader).toBeVisible();
+  await expect(bulkReader.locator('[data-mail-stack-card="true"]')).toHaveCount(2);
+  await expect(bulkReader.getByText('Q2 路线评审材料已更新')).toBeVisible();
+  await expect(bulkReader.getByText('绩效考核结果公示')).toBeVisible();
+  await expect(bulkReader.getByRole('button', { name: '批量标为已读' })).toBeVisible();
+  await expect(bulkReader.getByRole('button', { name: '批量删除' })).toBeVisible();
+  await mailView.getByRole('button', { name: '退出多选' }).click();
+  await expect(mailView.locator('[data-mail-selection-bar="true"]')).toHaveCount(0);
+  await expect(mailView.locator('[data-mail-bulk-reader="true"]')).toHaveCount(0);
+  const firstMailCard = mailView.locator('[data-mail-list-card="m1"]');
+  await expect(firstMailCard).toBeVisible();
+  await expect
+    .poll(() =>
+      firstMailCard.evaluate(
+        (card) => card.className.includes('bg-[#0A59F7]/10') && card.className.includes('ring-[#0A59F7]/30'),
+      ),
+    )
+    .toBe(true);
+  await expect.poll(async () => Math.round((await firstMailCard.boundingBox()).height)).toBeLessThan(84);
+  await expect(firstMailCard.locator('[data-mail-account-inline="true"]')).toHaveCount(0);
+  const todayTimelineLabel = mailView.locator('[data-mail-timeline-label="true"]').filter({ hasText: '今天' }).first();
+  await expect(todayTimelineLabel).toBeVisible();
+  await expect(mailView.locator('[data-mail-timeline-label="true"]').filter({ hasText: '昨天' })).toHaveCount(1);
+  await expect.poll(() => todayTimelineLabel.evaluate((node) => window.getComputedStyle(node).fontSize)).toBe('14px');
+  await expect.poll(() => todayTimelineLabel.evaluate((node) => node.className.includes('text-slate-600'))).toBe(true);
+  await expect(firstMailCard.locator('[data-mail-avatar-image="true"]')).toHaveCount(0);
+  await expect(firstMailCard.locator('[data-mail-row-content="true"]')).toBeVisible();
+  await expect(firstMailCard.locator('[data-mail-read-state="unread"]')).toBeVisible();
+  await expect
+    .poll(() =>
+      firstMailCard.locator('[data-mail-read-state="unread"]').evaluate((node) => window.getComputedStyle(node).backgroundColor),
+    )
+    .toBe('rgb(10, 89, 247)');
+  await expect
+    .poll(() =>
+      firstMailCard.evaluate((card) => {
+        const readState = card.querySelector('[data-mail-read-state="unread"]');
+        const content = card.querySelector('[data-mail-row-content="true"]');
+        return readState.getBoundingClientRect().right < content.getBoundingClientRect().left;
+      }),
+    )
+    .toBe(true);
+  const senderMarkers = firstMailCard.locator('[data-mail-sender-markers="true"]');
+  await expect(senderMarkers.getByLabel('旗标邮件')).toBeVisible();
+  await expect(senderMarkers.getByLabel('含 1 个附件')).toBeVisible();
+  await expect(senderMarkers.getByLabel('关联日程')).toHaveCount(0);
+  await expect(senderMarkers).not.toContainText('重要');
+  await expect(senderMarkers).not.toContainText('附件');
+  await expect(firstMailCard.locator('[data-mail-title-time="true"]').getByLabel('关联日程')).toBeVisible();
+  await expect(firstMailCard.locator('[data-mail-title-time="true"]').getByText('01/09 09:20')).toHaveCount(0);
+  await expect(firstMailCard.locator('[data-mail-timestamp="true"]')).toHaveText('09:20');
+  await expect.poll(() => firstMailCard.locator('[data-mail-timestamp="true"]').evaluate((node) => window.getComputedStyle(node).fontSize)).toBe('12px');
+  await expect.poll(() => firstMailCard.locator('[data-mail-timestamp="true"]').evaluate((node) => node.className.includes('text-slate-500'))).toBe(true);
+  await expect(firstMailCard.locator('[data-mail-preview="true"]')).toBeVisible();
+  await expect
+    .poll(() =>
+      firstMailCard.evaluate((card) => {
+        const content = card.querySelector('[data-mail-row-content="true"]');
+        const preview = card.querySelector('[data-mail-preview="true"]');
+        return Math.round(content.getBoundingClientRect().right - preview.getBoundingClientRect().right);
+      }),
+    )
+    .toBeLessThanOrEqual(1);
+  await expect
+    .poll(() =>
+      firstMailCard.evaluate((card) => {
+        const timestamp = card.querySelector('[data-mail-timestamp="true"]');
+        return Math.round(card.getBoundingClientRect().right - timestamp.getBoundingClientRect().right);
+      }),
+    )
+    .toBeLessThanOrEqual(16);
+  await expect(firstMailCard.locator('[data-mail-list-tags="true"]')).toHaveCount(0);
+  const readMailCard = mailView.locator('[data-mail-list-card="m35"]');
+  await readMailCard.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      readMailCard.evaluate((card) => {
+        const sender = card.querySelector('[data-mail-sender-name="true"]');
+        const title = card.querySelector('[data-mail-title-text="true"]');
+        const senderStyle = window.getComputedStyle(sender);
+        const titleStyle = window.getComputedStyle(title);
+        return senderStyle.color === titleStyle.color && senderStyle.fontWeight === titleStyle.fontWeight;
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      readMailCard.locator('[data-mail-sender-name="true"]').evaluate((node) => window.getComputedStyle(node).fontWeight),
+    )
+    .toBe('900');
+  await firstMailCard.scrollIntoViewIfNeeded();
+  await firstMailCard.hover();
+  await expect
+    .poll(() =>
+      firstMailCard.locator('[data-mail-hover-actions="true"]').evaluate((node) => window.getComputedStyle(node).opacity),
+    )
+    .toBe('1');
+  await expect
+    .poll(() =>
+      firstMailCard.locator('[data-mail-hover-actions="true"]').evaluate((node) => window.getComputedStyle(node).backgroundColor),
+    )
+    .toBe('rgb(255, 255, 255)');
+  await expect
+    .poll(() =>
+      firstMailCard.getByRole('button', { name: '删除邮件' }).evaluate((node) => node.className.includes('text-slate-900')),
+    )
+    .toBe(true);
+  await expect(firstMailCard.getByRole('button', { name: '删除邮件' })).toBeVisible();
+  await expect(firstMailCard.getByRole('button', { name: '取消旗标' })).toBeVisible();
+  await expect(firstMailCard.getByRole('button', { name: '标为已读' })).toBeVisible();
+  await firstMailCard.click({ button: 'right' });
+  const mailContextMenu = mailView.locator('[data-mail-context-menu="true"]');
+  await expect(mailContextMenu).toBeVisible();
+  await expect(mailContextMenu.getByRole('menuitem', { name: '删除邮件' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await firstMailCard.hover();
+  await firstMailCard.getByRole('button', { name: '删除邮件' }).click();
+  await expect(mailView.locator('[data-mail-list-card="m1"]')).toHaveCount(0);
+  await expect(page.getByText('邮件已删除')).toBeVisible();
+  await page.getByRole('button', { name: '撤销删除邮件' }).click();
+  await expect(mailView.locator('[data-mail-list-card="m1"]')).toBeVisible();
   const readerToolbar = mailView.locator('[data-mail-reader-toolbar="true"]');
   const readerToolbarActions = readerToolbar.locator('[data-mail-reader-toolbar-actions="true"]');
   await expect(readerToolbar).toBeVisible();
@@ -107,27 +419,35 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(readerMoreMenu.getByRole('menuitem', { name: '转发' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '标为已读' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '标记旗标' })).toBeVisible();
+  await expect(readerMoreMenu.getByRole('menuitem', { name: '归档' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '删除' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '移动' })).toBeVisible();
   await expect(readerMoreMenu.getByRole('menuitem', { name: '生成日程' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(readerMoreMenu).toHaveCount(0);
-  await expect(mailView.getByRole('button', { name: '回复', exact: true })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '回复全部' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '转发' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '标为已读' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '标记旗标' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '删除' })).toBeVisible();
-  await expect(mailView.getByRole('button', { name: '移动' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '回复', exact: true })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '回复全部' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '转发' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '归档' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '标为已读' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '标记旗标' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '删除' })).toBeVisible();
+  await expect(readerToolbarActions.getByRole('button', { name: '移动' })).toHaveCount(0);
   await expect(mailView.getByRole('heading', { name: 'Q2 路线评审材料已更新' })).toBeVisible();
+  const readerSenderMeta = mailView.locator('[data-mail-reader-sender-meta="true"]');
+  await expect(readerSenderMeta).toContainText('产品经理');
+  await expect(readerSenderMeta).toContainText('01/09 09:20');
+  await expect(readerSenderMeta).not.toContainText('小华');
+  await expect(readerSenderMeta.locator('[data-mail-avatar-image="true"]')).toHaveCount(0);
   await expect(mailView.getByText('Q2_路线评审_v4.pptx', { exact: true })).toBeVisible();
 });
 
-test('mail AI assistant supports classification, summary, todos and writing tools', async ({ page }) => {
+test('mail AI assistant supports message insights and a create-event style composer', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');
 
   const mailView = page.locator('[data-mail-workspace="true"]');
-  await expect(mailView.getByText('AI 智能分类')).toBeVisible();
+  await expect(mailView.locator('[data-mail-ai-classifier="compact"]')).toHaveCount(0);
   await expect(mailView.getByText('AI 邮件助手')).toBeVisible();
   await expect(mailView.getByText('AI 摘要')).toBeVisible();
   await expect(mailView.getByText('待处理事项', { exact: true })).toBeVisible();
@@ -137,13 +457,130 @@ test('mail AI assistant supports classification, summary, todos and writing tool
   await page.locator('[data-mail-sidebar-compose="true"]').click();
   const composer = page.getByRole('dialog', { name: '写邮件' });
   await expect(composer).toBeVisible();
+  const composerWindow = composer.locator('[data-mail-composer-window="true"]');
+  await expect(composerWindow).toBeVisible();
+  await expect.poll(async () => (await composerWindow.boundingBox()).width).toBeGreaterThan(900);
+  await expect(composer.locator('[data-mail-composer-actionbar="true"]')).toBeVisible();
+  await expect(composer.getByRole('button', { name: '发送' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '保存' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '附件' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '加密' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '检查收件人' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '签名' })).toBeVisible();
+  await expect(composer.locator('[data-mail-composer-format-toolbar="true"]')).toBeVisible();
+  await expect(composer.getByLabel('发件邮箱')).toBeVisible();
+  await expect(composer.getByText('自动保存')).toBeVisible();
+  await expect(composer.getByPlaceholder('主题')).toBeVisible();
+  await expect(composer.getByText('收件人', { exact: true })).toBeVisible();
+  await composer.getByPlaceholder('输入收件人邮箱，按 Enter 添加').fill('reviewer@calendarpro.io');
+  await composer.getByPlaceholder('输入收件人邮箱，按 Enter 添加').press('Enter');
+  await expect(composer.getByText('reviewer@calendarpro.io')).toBeVisible();
+  await expect(composer.getByText('常用联系人', { exact: true })).toHaveCount(0);
   await expect(composer.getByText('AI 写作助手')).toBeVisible();
+  await expect(composer.getByText('基于正文生成')).toBeVisible();
   await expect(composer.getByRole('button', { name: '润色表达' })).toBeVisible();
   await expect(composer.getByRole('button', { name: '更正式' })).toBeVisible();
   await expect(composer.getByRole('button', { name: '生成标题' })).toBeVisible();
+  await composer.getByRole('button', { name: '附件' }).click();
+  await expect(composer.locator('[data-mail-attachment-menu="true"]')).toBeVisible();
+  await expect(composer.getByRole('menuitem', { name: '添加本地附件' })).toBeVisible();
+  await expect(composer.getByRole('menuitem', { name: '添加云空间附件' })).toBeVisible();
+  await expect(composer.getByRole('menuitem', { name: '大附件管理' })).toBeVisible();
+  await composer.getByRole('menuitem', { name: '添加本地附件' }).click();
+  await expect(composer.getByText('附件_1.pdf')).toBeVisible();
+  await composer.getByRole('button', { name: '重要性 普通' }).click();
+  await expect(composer.locator('[data-mail-importance-menu="true"]')).toBeVisible();
+  await composer.getByRole('menuitemradio', { name: '高' }).click();
+  await expect(composer.getByRole('button', { name: '重要性 高' })).toBeVisible();
+  await composer.getByRole('button', { name: '更多写信设置' }).click();
+  await expect(composer.locator('[data-mail-composer-more-menu="true"]')).toBeVisible();
+  await expect(composer.getByRole('menuitem', { name: '定时发送' })).toBeVisible();
+  await expect(composer.getByRole('menuitem', { name: '标头栏设置' })).toBeVisible();
+  await composer.getByRole('menuitem', { name: '密送' }).click();
+  await expect(composer.getByText('密送', { exact: true })).toBeVisible();
   await composer.getByPlaceholder('输入邮件正文...').fill('明天下午可以，一起过一下材料。');
   await composer.getByRole('button', { name: '更正式' }).click();
   await expect(composer.getByText('已生成更正式版本')).toBeVisible();
+  await composer.getByRole('button', { name: '替换正文' }).click();
+  await expect(composer.getByPlaceholder('输入邮件正文...')).toHaveValue(/您好/);
+  await expect(composer.getByRole('button', { name: '保存' })).toBeVisible();
+  await expect(composer.getByRole('button', { name: '发送' })).toBeVisible();
+});
+
+test('mail reading pane surfaces enterprise body states and interactions', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const reader = mailView.locator('[data-mail-reading-pane="true"]');
+  await expect(reader).toBeVisible();
+  await expect(reader.locator('[data-mail-reader-action-bar="true"]')).toBeVisible();
+  await expect(reader.locator('[data-mail-reader-header="true"]')).toContainText('产品经理');
+  await expect(reader.locator('[data-mail-recipient-summary="true"]')).toContainText('发给我');
+  await expect(reader.locator('[data-mail-attachment-list="true"]')).toContainText('Q2_路线评审_v4.pptx');
+  await expect(reader.locator('[data-mail-quick-reply="true"]')).toBeVisible();
+  await expect(reader.locator('[data-mail-reader-action-bar="true"]').getByRole('button', { name: '归档' })).toBeVisible();
+  await expect(reader.locator('[data-mail-reader-action-bar="true"]').getByRole('button', { name: '移动' })).toHaveCount(0);
+  await expect.poll(() => reader.getByRole('heading', { name: 'Q2 路线评审材料已更新' }).evaluate((node) => window.getComputedStyle(node).fontSize)).toBe('24px');
+  await expect.poll(() => reader.locator('[data-mail-body="true"]').evaluate((node) => window.getComputedStyle(node).fontSize)).toBe('14px');
+  await expect
+    .poll(() =>
+      reader.evaluate((node) => {
+        const attachment = node.querySelector('[data-mail-attachment-list="true"]');
+        const body = node.querySelector('[data-mail-body="true"]');
+        const assistant = node.querySelector('[data-mail-ai-assistant="true"]');
+        if (!attachment || !body || !assistant) return false;
+        return (
+          attachment.getBoundingClientRect().top < assistant.getBoundingClientRect().top &&
+          body.getBoundingClientRect().top < assistant.getBoundingClientRect().top
+        );
+      }),
+    )
+    .toBe(true);
+
+  await reader.getByRole('button', { name: '查看收件人明细' }).click();
+  await expect(reader.locator('[data-mail-recipient-details="true"]')).toContainText('To');
+  await expect(reader.locator('[data-mail-recipient-details="true"]')).toContainText('Cc');
+
+  await mailView.locator('[data-mail-list-card="m7"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m7"]').click();
+  await expect(reader.locator('[data-mail-external-sender-badge="true"]')).toContainText('外部发件人');
+  await expect(reader.locator('[data-mail-security-notice="true"]')).toContainText('邮件包含外部链接或敏感附件');
+  await expect(reader.locator('[data-mail-attachment-card="att-m7-risk-html"]')).toContainText('高风险附件');
+  await expect(reader.locator('[data-mail-attachment-card="att-m7-risk-html"]').getByRole('button', { name: '下载 代码审查报告.html' })).toBeDisabled();
+  await expect
+    .poll(() =>
+      reader.evaluate((node) => {
+        const attachment = node.querySelector('[data-mail-attachment-list="true"]');
+        const security = node.querySelector('[data-mail-security-notice="true"]');
+        if (!attachment || !security) return false;
+        return attachment.getBoundingClientRect().top < security.getBoundingClientRect().top;
+      }),
+    )
+    .toBe(true);
+
+  await mailView.locator('[data-mail-list-card="m35"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m35"]').click();
+  await expect(reader.getByRole('button', { name: '展开历史邮件' })).toBeVisible();
+  await reader.getByRole('button', { name: '展开历史邮件' }).click();
+  await expect(reader.locator('[data-mail-quoted-history="true"]')).toContainText('历史邮件');
+
+  await mailView.locator('[data-mail-list-card="m40"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m40"]').click();
+  await expect(reader.locator('[data-mail-quick-reply-disabled="true"]')).toContainText('此邮件为系统通知，不支持直接回复。');
+
+  await mailView.locator('[data-mail-list-card="m42"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m42"]').click();
+  await expect(reader.locator('[data-mail-state-view="permissionDenied"]')).toContainText('你暂无权限查看此邮件内容');
+
+  await mailView.locator('[data-mail-list-card="m50"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m50"]').click();
+  await expect(reader.locator('[data-mail-state-view="loading"]')).toContainText('邮件内容加载中');
+
+  await page.locator('[data-mailbox-id="acc1"] [data-mailbox-folder="archive"]').click();
+  await mailView.locator('[data-mail-list-card="m56"]').scrollIntoViewIfNeeded();
+  await mailView.locator('[data-mail-list-card="m56"]').click();
+  await expect(reader.locator('[data-mail-state-view="deleted"]')).toContainText('该邮件已被删除');
 });
 
 test('calendar reminder modal clears events after joining', async ({ page }) => {

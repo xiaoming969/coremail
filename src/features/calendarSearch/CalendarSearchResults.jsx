@@ -1,17 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  ArrowRight,
-  Calendar,
-  ChevronDown,
-  Clock,
-  FileText,
-  Mail,
-  MapPin,
-  Paperclip,
-  RefreshCw,
-  Search,
-  Users,
-} from 'lucide-react';
+import AppIcon from '../../components/AppIcon';
 import {
   DAY_MS,
   HUAWEI_CALENDAR_ID,
@@ -40,6 +28,23 @@ import {
   stripTime,
   tokenizeKeywordQuery,
 } from '../../domain/appModel.js';
+
+const createLucideIcon = (name) =>
+  function LucideIcon({ size = 20, className, 'aria-label': ariaLabel, ...props }) {
+    return <AppIcon name={`lucide:${name}`} size={size} className={className} ariaLabel={ariaLabel} {...props} />;
+  };
+
+const ArrowRight = createLucideIcon('arrow-right');
+const Calendar = createLucideIcon('calendar');
+const ChevronDown = createLucideIcon('chevron-down');
+const Clock = createLucideIcon('clock');
+const FileText = createLucideIcon('file-text');
+const Mail = createLucideIcon('mail');
+const MapPin = createLucideIcon('map-pin');
+const Paperclip = createLucideIcon('paperclip');
+const RefreshCw = createLucideIcon('refresh-cw');
+const Search = createLucideIcon('search');
+const Users = createLucideIcon('users');
 
 export default function CalendarSearchResults({
   query,
@@ -226,7 +231,7 @@ export default function CalendarSearchResults({
       end.setHours(Math.floor(endH), Math.round((endH % 1) * 60), 0, 0);
 
       if (TODAY_DATE >= start && TODAY_DATE <= end) {
-        return { label: '进行中', className: 'border-blue-200 bg-blue-50 text-blue-700' };
+        return { label: '进行中', className: 'border-[#0A59F7]/25 bg-[#0A59F7]/[0.08] text-[#0A59F7]' };
       }
 
       const diffMinutes = Math.round((start.getTime() - TODAY_DATE.getTime()) / (60 * 1000));
@@ -235,7 +240,7 @@ export default function CalendarSearchResults({
           label: `${diffMinutes} 分钟后开始`,
           className:
             diffMinutes <= 15
-              ? 'border-blue-200 bg-blue-50 text-blue-700'
+              ? 'border-[#0A59F7]/25 bg-[#0A59F7]/[0.08] text-[#0A59F7]'
               : 'border-orange-200 bg-orange-50 text-orange-700',
         };
       }
@@ -250,7 +255,7 @@ export default function CalendarSearchResults({
     }
 
     if (diffDays < 0) return null;
-    if (diffDays === 0) return { label: '今天', className: 'border-blue-200 bg-blue-50 text-blue-700' };
+    if (diffDays === 0) return { label: '今天', className: 'border-[#0A59F7]/25 bg-[#0A59F7]/[0.08] text-[#0A59F7]' };
     if (diffDays <= 7) return { label: `${diffDays} 天后`, className: 'bg-slate-100 text-slate-600' };
     return null;
   };
@@ -383,7 +388,7 @@ export default function CalendarSearchResults({
   const visibleResults = rankedResults.slice(0, visibleResultCount);
 
   const filterSelectClass =
-    'h-9 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm font-black text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
+    'h-9 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm font-black text-slate-700 shadow-sm outline-none transition hover:border-slate-300 focus:border-[#0A59F7] focus:ring-2 focus:ring-[#0A59F7]/20';
   const filterShellClass = 'relative shrink-0';
   const renderFilterSelect = ({ value, onChange, options, className = 'w-[180px]' }) => (
     <div className={`${filterShellClass} ${className}`}>
@@ -498,7 +503,7 @@ export default function CalendarSearchResults({
               openMeetingLink(event);
             }}
             onDoubleClick={(entry) => entry.stopPropagation()}
-            className={`${isCard ? 'h-9 flex-1 justify-center px-3' : 'h-8 px-2.5'} inline-flex shrink-0 items-center rounded-lg bg-blue-600 text-xs font-bold text-white transition hover:bg-blue-700`}
+            className={`${isCard ? 'h-9 flex-1 justify-center px-3' : 'h-8 px-2.5'} inline-flex shrink-0 items-center rounded-lg bg-[#0A59F7] text-xs font-bold text-white transition hover:bg-[#084DDB]`}
           >
             <ArrowRight size={14} className="mr-1" />
             一键入会
@@ -539,9 +544,9 @@ export default function CalendarSearchResults({
               onOpenEvent(event.id);
             }
           }}
-          className={`group flex min-h-[286px] flex-col rounded-xl border px-4 py-4 text-left outline-none transition ${
+          className={`group flex min-h-[286px] flex-col rounded-lg border px-4 py-4 text-left outline-none transition ${
             isSelected
-              ? 'border-blue-200 bg-blue-50/70 shadow-sm'
+              ? 'border-[#0A59F7]/25 bg-[#0A59F7]/[0.06] shadow-sm'
               : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50/70'
           }`}
         >
@@ -615,7 +620,7 @@ export default function CalendarSearchResults({
             (() => {
               const SnippetIcon = snippet.icon;
               return (
-                <div className="mt-4 flex min-w-0 items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-sm font-semibold text-slate-600">
+                <div className="mt-4 flex min-w-0 items-start gap-2 rounded-lg border border-[#0A59F7]/15 bg-[#0A59F7]/[0.05] px-3 py-2 text-sm font-semibold text-slate-600">
                   <SnippetIcon size={14} className="mt-0.5 shrink-0 text-slate-400" />
                   <span className="min-w-0 truncate">{renderHighlighted(snippet.text)}</span>
                 </div>
@@ -646,7 +651,7 @@ export default function CalendarSearchResults({
           }
         }}
         className={`group grid w-full grid-cols-1 items-start gap-2.5 border-b border-slate-100 px-3 py-2.5 text-left outline-none transition last:border-b-0 sm:px-4 lg:grid-cols-[206px_minmax(0,1fr)_max-content] lg:items-center xl:grid-cols-[190px_minmax(220px,1.35fr)_140px_minmax(150px,0.9fr)_140px_minmax(150px,1fr)_max-content] ${
-          isSelected ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50'
+          isSelected ? 'bg-[#0A59F7]/[0.06]' : 'bg-white hover:bg-slate-50'
         }`}
       >
         <div className="min-w-0 text-sm font-bold text-slate-600">
@@ -794,7 +799,7 @@ export default function CalendarSearchResults({
         </div>
         <div
           className={
-            variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'
+            variant === 'cards' ? 'grid gap-4' : 'overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm'
           }
         >
           {variant !== 'cards' && (
@@ -816,14 +821,14 @@ export default function CalendarSearchResults({
                 <button
                   type="button"
                   onClick={() => setVisibleResultCount((prev) => Math.min(prev + 20, totalCount))}
-                  className="text-xs font-black text-blue-600 transition hover:text-blue-700"
+                  className="text-xs font-black text-[#0A59F7] transition hover:text-[#084DDB]"
                 >
                   继续显示 20 条
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisibleResultCount(totalCount)}
-                  className="text-xs font-black text-blue-600 transition hover:text-blue-700"
+                  className="text-xs font-black text-[#0A59F7] transition hover:text-[#084DDB]"
                 >
                   显示全部 {totalCount} 条
                 </button>
@@ -869,7 +874,7 @@ export default function CalendarSearchResults({
                 更多筛选{secondaryFilterCount > 0 ? ` · ${secondaryFilterCount}` : ''}
                 <ChevronDown size={15} className="text-slate-500" />
               </summary>
-              <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg sm:left-auto sm:right-0 md:grid-cols-3">
+              <div className="absolute left-0 top-[calc(100%+6px)] z-30 grid w-[min(720px,calc(100vw-48px))] gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-lg sm:left-auto sm:right-0 md:grid-cols-3">
                 {renderFilterSelect({
                   value: filters.person || 'all',
                   onChange: (value) => onChangeFilters({ person: value }),
@@ -910,7 +915,7 @@ export default function CalendarSearchResults({
                   {filterSummary.map((item) => (
                     <span
                       key={item}
-                      className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700"
+                      className="rounded-full border border-[#0A59F7]/15 bg-[#0A59F7]/[0.08] px-2.5 py-1 text-xs font-bold text-[#0A59F7]"
                     >
                       {item}
                     </span>
@@ -927,7 +932,7 @@ export default function CalendarSearchResults({
               type="button"
               onClick={resetFilters}
               className={`h-9 shrink-0 rounded-lg px-3 text-sm font-bold transition ${
-                hasActiveFilters ? 'text-blue-600 hover:bg-blue-50' : 'text-slate-400 hover:bg-slate-50'
+                hasActiveFilters ? 'text-[#0A59F7] hover:bg-[#0A59F7]/[0.08]' : 'text-slate-400 hover:bg-slate-50'
               }`}
             >
               清除筛选

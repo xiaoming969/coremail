@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
@@ -13,7 +14,7 @@
     "test:smoke": "playwright test --config=playwright.config.js"
   },
   "dependencies": {
-    "lucide-react": "^1.7.0",
+    "@iconify/react": "^6.0.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "stratis-ui-icons": "^1.5.2"
@@ -22,6 +23,8 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -29,6 +32,7 @@
     "globals": "^17.6.0",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
     "vite": "^8.0.3"
   }
 }

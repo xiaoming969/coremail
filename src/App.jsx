@@ -1,53 +1,9 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  AlertCircle,
-  AlignLeft,
-  Archive,
-  ArrowRight,
-  Bell,
-  Calendar,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Clock,
-  Copy,
-  Edit,
-  Eye,
-  FileText,
-  Forward,
-  HelpCircle,
-  Lock,
-  Mail,
-  MapPin,
-  Maximize2,
-  Minus,
-  Minimize2,
-  MoreHorizontal,
-  Palette,
-  Paperclip,
-  Plus,
-  RefreshCw,
-  Reply,
-  ReplyAll,
-  Save,
-  Search,
-  Send,
-  Settings,
-  Sparkles,
-  Square,
-  SquarePen,
-  Star,
-  Trash,
-  UserPlus,
-  Users,
-  Video,
-  X,
-} from 'lucide-react';
+import AppIcon from './components/AppIcon';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import MailReadingPane from './features/mail/components/MailReadingPane';
+import { MAIL_READING_STATE_BY_MAIL_ID } from './features/mail/data/mockMailReadingStates';
 import {
   DAY_MS,
   TODAY_DATE,
@@ -175,12 +131,199 @@ import {
   buildMailDraft,
 } from './domain/appModel.js';
 
+const createIconifyIcon = (name) =>
+  function IconifyIcon({ size = 20, className, 'aria-label': ariaLabel, ...props }) {
+    return <AppIcon name={name} size={size} className={className} ariaLabel={ariaLabel} {...props} />;
+  };
+
+const createLucideIcon = (name) => createIconifyIcon(`lucide:${name}`);
+const resolveIconComponent = (icon) => (typeof icon === 'string' ? createIconifyIcon(icon) : icon);
+
+const AlertCircle = createLucideIcon('circle-alert');
+const AlignLeft = createLucideIcon('align-left');
+const Archive = createLucideIcon('archive');
+const ArrowRight = createLucideIcon('arrow-right');
+const Bell = createLucideIcon('bell');
+const Calendar = createLucideIcon('calendar');
+const Check = createLucideIcon('check');
+const ChevronDown = createLucideIcon('chevron-down');
+const ChevronLeft = createLucideIcon('chevron-left');
+const ChevronRight = createLucideIcon('chevron-right');
+const ChevronsLeft = createLucideIcon('chevrons-left');
+const ChevronsRight = createLucideIcon('chevrons-right');
+const Clock = createLucideIcon('clock');
+const Copy = createLucideIcon('copy');
+const Edit = createLucideIcon('pencil');
+const Eye = createLucideIcon('eye');
+const FileText = createLucideIcon('file-text');
+const Flag = createLucideIcon('flag');
+const Forward = createLucideIcon('forward');
+const Funnel = createLucideIcon('funnel');
+const HelpCircle = createLucideIcon('circle-help');
+const ListFilter = createLucideIcon('list-filter');
+const Lock = createLucideIcon('lock');
+const Mail = createLucideIcon('mail');
+const MapPin = createLucideIcon('map-pin');
+const Maximize2 = createLucideIcon('maximize-2');
+const Minus = createLucideIcon('minus');
+const Minimize2 = createLucideIcon('minimize-2');
+const MoreHorizontal = createLucideIcon('more-horizontal');
+const Palette = createLucideIcon('palette');
+const Paperclip = createLucideIcon('paperclip');
+const PanelRightOpen = createLucideIcon('panel-right-open');
+const Plus = createLucideIcon('plus');
+const RefreshCw = createLucideIcon('refresh-cw');
+const Reply = createLucideIcon('reply');
+const ReplyAll = createLucideIcon('reply-all');
+const Save = createLucideIcon('save');
+const Search = createLucideIcon('search');
+const Send = createLucideIcon('send');
+const Settings = createLucideIcon('settings');
+const Sparkles = createLucideIcon('sparkles');
+const Square = createLucideIcon('square');
+const SquareCheck = createLucideIcon('square-check');
+const SquarePen = createLucideIcon('square-pen');
+const Trash = createLucideIcon('trash');
+const UserPlus = createLucideIcon('user-plus');
+const Users = createLucideIcon('users');
+const Video = createLucideIcon('video');
+const X = createLucideIcon('x');
+
 const CalendarSearchResults = lazy(() => import('./features/calendarSearch/CalendarSearchResults.jsx'));
 const MailComposerModal = lazy(() => import('./features/mail/MailComposerModal.jsx'));
 
-const APP_SIDEBAR_WIDTH = 264;
-const APP_COLLAPSED_SIDEBAR_WIDTH = 88;
+const APP_SIDEBAR_WIDTH = 'clamp(240px, 18.52vw, 320px)';
+const APP_SIDEBAR_MIN_WIDTH = 240;
+const APP_SIDEBAR_MAX_WIDTH = 320;
+const CALENDAR_SIDEBAR_DEFAULT_WIDTH = 276;
+const MAIL_SIDEBAR_DEFAULT_WIDTH = 320;
+const MAIL_LIST_DEFAULT_WIDTH = 544;
+const MAIL_LIST_MIN_WIDTH = 360;
+const MAIL_READER_DEFAULT_WIDTH = 864;
+const MAIL_READER_MIN_WIDTH = 720;
+const MAIL_READER_HIDE_THRESHOLD = 640;
+const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
+const MAIL_LAYOUT_MODE_ABC = 'ABC';
+const MAIL_LAYOUT_MODE_AB = 'AB';
+const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
+const MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH = 1320;
+const MAIL_LAYOUT_AB_WIDTH = 1144;
 const SHOW_CALENDAR_SEARCH_ENTRY = false;
+
+const getViewportWidth = () => (typeof window === 'undefined' ? 1280 : window.innerWidth);
+
+const getDefaultAppSidebarWidth = (viewportWidth = getViewportWidth()) =>
+  clampNumber(Math.round(viewportWidth * 0.1852), APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+
+const getDefaultMailSidebarWidth = (viewportWidth = getViewportWidth()) =>
+  clampNumber(viewportWidth >= 1600 ? MAIL_SIDEBAR_DEFAULT_WIDTH : Math.round(viewportWidth * 0.1852), APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+
+const getCalendarSidebarBounds = (viewportWidth = getViewportWidth()) => {
+  const max = clampNumber(Math.round(viewportWidth * 0.28), 248, APP_SIDEBAR_MAX_WIDTH);
+  return {
+    min: Math.min(APP_SIDEBAR_MIN_WIDTH, max),
+    max,
+  };
+};
+
+const getDefaultCalendarSidebarWidth = (viewportWidth = getViewportWidth()) => {
+  const bounds = getCalendarSidebarBounds(viewportWidth);
+  return clampNumber(CALENDAR_SIDEBAR_DEFAULT_WIDTH, bounds.min, bounds.max);
+};
+
+const getMailListBounds = (viewportWidth = getViewportWidth(), sidebarWidth = getDefaultMailSidebarWidth(viewportWidth), layoutMode = MAIL_LAYOUT_MODE_ABC) => {
+  const availableWidth = Math.max(MAIL_LIST_MIN_WIDTH, viewportWidth - sidebarWidth);
+  if (layoutMode === MAIL_LAYOUT_MODE_AB) {
+    return {
+      min: MAIL_LIST_MIN_WIDTH,
+      max: availableWidth,
+    };
+  }
+
+  const maxByReader = availableWidth - MAIL_READER_MIN_WIDTH;
+  return {
+    min: MAIL_LIST_MIN_WIDTH,
+    max: Math.max(MAIL_LIST_MIN_WIDTH, maxByReader),
+  };
+};
+
+const getDefaultMailListWidth = (viewportWidth = getViewportWidth(), sidebarWidth = getDefaultMailSidebarWidth(viewportWidth), layoutMode = MAIL_LAYOUT_MODE_ABC) => {
+  const bounds = getMailListBounds(viewportWidth, sidebarWidth, layoutMode);
+  return clampNumber(MAIL_LIST_DEFAULT_WIDTH, bounds.min, bounds.max);
+};
+
+const getMailReaderWidth = (viewportWidth, sidebarWidth, listWidth) =>
+  Math.max(0, Math.round(viewportWidth - sidebarWidth - listWidth));
+
+const persistMailLayoutPreference = ({ layoutMode, sidebarWidth, listWidth, readerWidth = null, isACollapsed = false }, viewportWidth = getViewportWidth()) => {
+  if (typeof window === 'undefined') return;
+
+  const nextLayoutMode = layoutMode === MAIL_LAYOUT_MODE_AB ? MAIL_LAYOUT_MODE_AB : MAIL_LAYOUT_MODE_ABC;
+  const nextSidebarWidth = Math.round(clampNumber(sidebarWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH));
+  const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, nextLayoutMode);
+  const nextListWidth = Math.round(clampNumber(listWidth, nextListBounds.min, nextListBounds.max));
+  const nextReaderWidth = readerWidth === null ? getMailReaderWidth(viewportWidth, nextSidebarWidth, nextListWidth) : Math.max(0, Math.round(readerWidth));
+
+  try {
+    window.localStorage.setItem(
+      MAIL_LAYOUT_STORAGE_KEY,
+      JSON.stringify({
+        layoutMode: nextLayoutMode,
+        aWidth: nextSidebarWidth,
+        bWidth: nextListWidth,
+        cWidth: nextReaderWidth,
+        isACollapsed,
+        isCHidden: nextLayoutMode === MAIL_LAYOUT_MODE_AB,
+        updatedAt: Date.now(),
+      }),
+    );
+  } catch {
+    // Ignore storage failures; drag state still applies for the current session.
+  }
+};
+
+const loadMailLayoutPreferences = () => {
+  const viewportWidth = getViewportWidth();
+  const defaultSidebarWidth = getDefaultMailSidebarWidth(viewportWidth);
+  const defaultListWidth = getDefaultMailListWidth(viewportWidth, defaultSidebarWidth);
+
+  if (typeof window === 'undefined') {
+    return {
+      layoutMode: MAIL_LAYOUT_MODE_ABC,
+      sidebarWidth: defaultSidebarWidth,
+      listWidth: defaultListWidth,
+    };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MAIL_LAYOUT_STORAGE_KEY);
+    if (!raw) {
+      return {
+        layoutMode: MAIL_LAYOUT_MODE_ABC,
+        sidebarWidth: defaultSidebarWidth,
+        listWidth: defaultListWidth,
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    const layoutMode = parsed.layoutMode === MAIL_LAYOUT_MODE_AB || parsed.isCHidden ? MAIL_LAYOUT_MODE_AB : MAIL_LAYOUT_MODE_ABC;
+    const sidebarWidth = clampNumber(Number(parsed.aWidth) || defaultSidebarWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+    const listBounds = getMailListBounds(viewportWidth, sidebarWidth, layoutMode);
+    const listWidth = clampNumber(Number(parsed.bWidth) || defaultListWidth, listBounds.min, listBounds.max);
+
+    return {
+      layoutMode,
+      sidebarWidth,
+      listWidth,
+    };
+  } catch {
+    return {
+      layoutMode: MAIL_LAYOUT_MODE_ABC,
+      sidebarWidth: defaultSidebarWidth,
+      listWidth: defaultListWidth,
+    };
+  }
+};
 
 const DEFAULT_CALENDAR_REMINDER_SETTINGS = {
   popupEnabled: true,
@@ -340,10 +483,10 @@ const getEffectiveEventReminder = (event, settings, currentUserIdentities) => {
 };
 
 const MAIL_SIDEBAR_FOLDERS = [
-  ...MAIL_FOLDERS.filter((folder) => folder.id === 'inbox'),
+  ...MAIL_FOLDERS.filter((folder) => folder.id === 'inbox').map((folder) => ({ ...folder, icon: resolveIconComponent(folder.icon) })),
   { id: 'unread', label: '未读邮件', icon: Mail },
-  { id: 'flagged', label: '旗标邮件', icon: Star },
-  ...MAIL_FOLDERS.filter((folder) => folder.id !== 'inbox'),
+  { id: 'flagged', label: '旗标邮件', icon: Flag },
+  ...MAIL_FOLDERS.filter((folder) => folder.id !== 'inbox').map((folder) => ({ ...folder, icon: resolveIconComponent(folder.icon) })),
 ];
 
 const mailMatchesFolder = (mail, folderId) => {
@@ -357,62 +500,52 @@ const getMailFolderLabel = (folderId) =>
   MAIL_FOLDERS.find((folder) => folder.id === folderId)?.label ||
   '邮件';
 
-function ProductActiveIcon({ id, size = 20 }) {
-  const commonProps = {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    xmlns: 'http://www.w3.org/2000/svg',
-    'aria-hidden': true,
+const getMailSmartSignals = (mail) => {
+  const text = `${mail.subject || ''} ${mail.preview || ''} ${mail.body || ''}`;
+  const todo = /确认|安排|同步|反馈|处理|建议|需要|请/.test(text);
+  const important = mail.starred || /紧急|风险|评审|确认|变更|预算|高潜/.test(text);
+
+  return {
+    important,
+    meeting: Boolean(mail.linkedEventId),
+    todo,
   };
+};
 
-  if (id === 'mail') {
-    return (
-      <svg {...commonProps}>
-        <path
-          fill="currentColor"
-          d="M4.75 5.5h14.5c1.38 0 2.5 1.12 2.5 2.5v8.5c0 1.38-1.12 2.5-2.5 2.5H4.75a2.5 2.5 0 0 1-2.5-2.5V8c0-1.38 1.12-2.5 2.5-2.5Zm.66 2.1a.75.75 0 0 0-.84 1.24l6.1 4.13c.8.54 1.86.54 2.66 0l6.1-4.13a.75.75 0 1 0-.84-1.24L12.5 11.72a.9.9 0 0 1-1 0L5.41 7.6Z"
-        />
-      </svg>
-    );
-  }
+const MAIL_LIST_FILTER_OPTIONS = [
+  { id: 'all', label: '全部', icon: Mail },
+  { id: 'unread', label: '未读', icon: Mail },
+  { id: 'flagged', label: '已标记', icon: Flag },
+  { id: 'attachment', label: '带附件', icon: Paperclip },
+  { id: 'important', label: '高重要性', icon: AlertCircle },
+];
 
-  if (id === 'calendar') {
-    return (
-      <svg {...commonProps}>
-        <path fill="currentColor" d="M6.7 2.1a1 1 0 0 1 1 1v1.75h8.6V3.1a1 1 0 1 1 2 0v1.75h.35a2.9 2.9 0 0 1 2.9 2.9v10.5a2.9 2.9 0 0 1-2.9 2.9H5.35a2.9 2.9 0 0 1-2.9-2.9V7.75a2.9 2.9 0 0 1 2.9-2.9h.35V3.1a1 1 0 0 1 1-1Z" />
-        <path fill="white" fillOpacity=".94" d="M4.8 9.1h14.4v8.9c0 .47-.38.85-.85.85H5.65A.85.85 0 0 1 4.8 18V9.1Z" />
-        <path fill="currentColor" fillOpacity=".9" d="M7 11.25h2.3v2.3H7v-2.3Zm3.85 0h2.3v2.3h-2.3v-2.3Zm3.85 0H17v2.3h-2.3v-2.3ZM7 15.1h2.3v2.3H7v-2.3Zm3.85 0h2.3v2.3h-2.3v-2.3Z" />
-      </svg>
-    );
-  }
+const MAIL_SORT_OPTIONS = [
+  { id: 'newest', label: '日期：从新到旧' },
+  { id: 'oldest', label: '日期：从旧到新' },
+];
 
-  if (id === 'contacts') {
-    return (
-      <svg {...commonProps}>
-        <path fill="currentColor" d="M9.25 11.25a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Zm0 1.75c-3.34 0-6.25 1.88-6.25 4.48v1.02c0 .97.78 1.75 1.75 1.75h9c.97 0 1.75-.78 1.75-1.75v-1.02c0-2.6-2.91-4.48-6.25-4.48Zm7.45-2.16a3.45 3.45 0 1 0-.04-6.89 5.72 5.72 0 0 1-.24 6.9l.28-.01Zm.6 2.02a6.67 6.67 0 0 0-1.88.27 5.86 5.86 0 0 1 2.08 4.35v.77h1.75c.97 0 1.75-.78 1.75-1.75v-.35c0-1.98-1.71-3.29-3.7-3.29Z" />
-      </svg>
-    );
-  }
+const PRODUCT_ACTIVE_ICONS = {
+  mail: 'mdi:email',
+  calendar: 'mdi:calendar-today',
+  contacts: 'mdi:account-group',
+  settings: 'mdi:cog',
+};
 
-  return (
-    <svg {...commonProps}>
-      <path
-        fill="currentColor"
-        d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.3 7.3 0 0 0-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.5.42l-.38 2.65c-.61.24-1.18.56-1.69.98l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.02.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.13.23.4.32.6.22l2.49-1c.51.4 1.08.74 1.69.98l.38 2.65c.05.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.61-.24 1.18-.56 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65Z"
-      />
-      <path fill="white" fillOpacity=".92" d="M12 15.6a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2Z" />
-    </svg>
-  );
+function ProductActiveIcon({ id, size = 20, className }) {
+  const iconName = PRODUCT_ACTIVE_ICONS[id] || PRODUCT_ACTIVE_ICONS.settings;
+
+  return <AppIcon name={iconName} size={size} className={className} />;
 }
 
 function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = false }) {
   const buttonSize = compact ? 'h-10 w-10' : 'h-11 w-11';
+  const iconBoxSize = compact ? 'h-5 w-5' : 'h-6 w-6';
+  const iconSize = compact ? 20 : 22;
 
   return (
     <div className={`${vertical ? 'grid grid-cols-1' : 'grid grid-cols-4'} ${compact ? 'gap-1.5' : 'gap-2'}`}>
-      {PRODUCT_TABS.map(({ id, label, icon: Icon }) => {
+      {PRODUCT_TABS.map(({ id, label, icon }) => {
         const selected = activeProduct === id;
         return (
           <button
@@ -425,11 +558,13 @@ function ProductTabsBar({ activeProduct, onSelect, compact = false, vertical = f
               selected ? 'text-slate-950' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {selected ? (
-              <ProductActiveIcon id={id} size={compact ? 20 : 23} />
-            ) : (
-              <Icon size={compact ? 18 : 21} strokeWidth={2.1} />
-            )}
+            <span className={`${iconBoxSize} inline-flex items-center justify-center`}>
+              {selected ? (
+                <ProductActiveIcon id={id} size={iconSize} />
+              ) : (
+                <AppIcon name={icon} size={iconSize} />
+              )}
+            </span>
           </button>
         );
       })}
@@ -444,6 +579,38 @@ function SidebarProductDock({ activeProduct, onSelectProduct, compact = false })
       className={`mt-auto shrink-0 ${compact ? 'p-3' : 'p-4'}`}
     >
       <ProductTabsBar activeProduct={activeProduct} onSelect={onSelectProduct} compact={compact} vertical={compact} />
+    </div>
+  );
+}
+
+function LayoutResizeHandle({ id, label, value, min, max, active = false, onStart, onStep }) {
+  const handleKeyDown = (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    onStep(event.key === 'ArrowRight' ? 16 : -16);
+  };
+
+  return (
+    <div
+      data-layout-resizer={id}
+      role="separator"
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(value)}
+      tabIndex={0}
+      onMouseDown={onStart}
+      onKeyDown={handleKeyDown}
+      className={`group/resize relative z-30 -mx-1 hidden w-2 shrink-0 cursor-col-resize select-none md:block focus:outline-none ${
+        active ? 'bg-[#0A59F7]/[0.04]' : ''
+      }`}
+    >
+      <span
+        className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition ${
+          active ? 'bg-[#0A59F7]' : 'bg-slate-200 group-hover/resize:bg-[#0A59F7] group-focus/resize:bg-[#0A59F7]'
+        }`}
+      />
     </div>
   );
 }
@@ -463,7 +630,7 @@ function ModulePlaceholder({ moduleId, onBack }) {
         {copy.desc && <p className="text-gray-600 leading-relaxed mb-8">{copy.desc}</p>}
         <button
           onClick={onBack}
-          className="inline-flex items-center px-5 py-3 rounded-xl bg-blue-600 text-white font-bold shadow-md"
+          className="inline-flex items-center px-5 py-3 rounded-xl bg-[#0A59F7] text-white font-bold shadow-md"
         >
           返回日历模块
           <ArrowRight size={16} className="ml-2" />
@@ -475,7 +642,7 @@ function ModulePlaceholder({ moduleId, onBack }) {
 
 function CalendarReminderSettingsContent({ settings, onChange }) {
   const selectClass =
-    'h-9 w-full appearance-none rounded-lg border border-slate-200 bg-[#fbfcfd] pl-3.5 pr-9 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:bg-white';
+    'h-9 w-full appearance-none rounded-lg border border-slate-200 bg-[#fbfcfd] pl-3.5 pr-9 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#0A59F7]/40 focus:bg-white';
   const rows = [
     {
       title: '日历提醒弹窗',
@@ -485,7 +652,7 @@ function CalendarReminderSettingsContent({ settings, onChange }) {
           type="button"
           onClick={() => onChange({ popupEnabled: !settings.popupEnabled })}
           className={`relative h-6 w-11 rounded-full transition ${
-            settings.popupEnabled ? 'bg-blue-600' : 'bg-slate-300'
+            settings.popupEnabled ? 'bg-[#0A59F7]' : 'bg-slate-300'
           }`}
           aria-pressed={settings.popupEnabled}
           aria-label="开启日历提醒弹窗"
@@ -638,7 +805,7 @@ function SettingsCenterModal({ open, settings, onChange, onClose }) {
       >
         <aside className="flex w-52 shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="flex h-14 items-center gap-2.5 px-5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0A59F7] text-white shadow-sm">
               <Settings size={17} />
             </span>
             <span className="text-sm font-black text-slate-900">设置中心</span>
@@ -655,7 +822,7 @@ function SettingsCenterModal({ open, settings, onChange, onClose }) {
                     setActivePanel((secondaryItems[id] || [])[0]?.id || '');
                   }}
                   className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition ${
-                    selected ? 'bg-blue-50 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    selected ? 'bg-[#0A59F7]/[0.08] text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   <Icon size={17} className={selected ? 'text-slate-950' : 'text-slate-500'} />
@@ -679,7 +846,7 @@ function SettingsCenterModal({ open, settings, onChange, onClose }) {
                   type="button"
                   onClick={() => setActivePanel(item.id)}
                   className={`h-10 w-full rounded-lg px-3 text-left text-sm font-bold transition ${
-                    selected ? 'bg-blue-50 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    selected ? 'bg-[#0A59F7]/[0.08] text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   {item.label}
@@ -773,6 +940,7 @@ function MailSidebar({
   mailFolder,
   selectedMailAccountId,
   collapsed,
+  width = APP_SIDEBAR_WIDTH,
   onToggleCollapsed,
   onSelectFolder,
   onCompose,
@@ -787,7 +955,7 @@ function MailSidebar({
     ...mailboxes.map((account) => ({
       id: `inbox-${account.id}`,
       label: `收件箱 · ${account.email}`,
-      icon: MAIL_FOLDERS.find((folder) => folder.id === 'inbox')?.icon || Mail,
+      icon: resolveIconComponent(MAIL_FOLDERS.find((folder) => folder.id === 'inbox')?.icon) || Mail,
       count: getFolderCount(account.id, 'inbox'),
       onClick: () => onSelectFolder('inbox', account.id),
     })),
@@ -850,9 +1018,9 @@ function MailSidebar({
     <aside
       data-app-sidebar="mail"
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
-      style={{ width: APP_SIDEBAR_WIDTH, zIndex: 20 }}
+      style={{ width, zIndex: 20 }}
     >
-      <div className="px-5 pb-4 pt-5">
+      <div className="px-6 pb-4 pt-6">
         <div data-mail-sidebar-brand="true" className="flex items-center justify-between gap-3">
           <div className="text-lg font-black text-gray-900">Coremail</div>
           <button
@@ -866,14 +1034,14 @@ function MailSidebar({
         <button
           data-mail-sidebar-compose="true"
           onClick={() => onCompose('new')}
-          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-base font-black text-blue-600 transition-colors hover:bg-slate-200"
+          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-base font-black text-[#0A59F7] transition-colors hover:bg-slate-200"
         >
           <SquarePen size={18} className="mr-2" />
           写邮件
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-3">
+      <div className="flex-1 overflow-y-auto px-6 py-3">
         <section data-mail-favorites="true" className="mb-6">
           <button type="button" className="mb-2 flex w-full items-center justify-between px-2 py-1 text-sm font-medium text-slate-500">
             收藏夹
@@ -983,7 +1151,7 @@ const getMailAiInsight = (mail, linkedEvent = null) => {
   if (mail.id === 'm2') {
     return {
       categoryLabel: '会议相关',
-      categoryTone: 'bg-blue-50 text-blue-700',
+      categoryTone: 'bg-[#0A59F7]/[0.08] text-[#0A59F7]',
       summary: '客户拜访时间调整到下周三上午，需要确认是否顺带安排午餐会，并判断是否提前锁定会议。',
       todos: ['确认下周三上午拜访行程', '判断是否安排午餐会', '必要时提前锁定会议时间'],
       replies: ['我来确认客户拜访行程', '可以顺带安排午餐会', '需要先确认客户时间'],
@@ -1005,7 +1173,7 @@ const getMailAiInsight = (mail, linkedEvent = null) => {
     categoryTone: isImportant
       ? 'bg-rose-50 text-rose-700'
       : isMeeting
-        ? 'bg-blue-50 text-blue-700'
+        ? 'bg-[#0A59F7]/[0.08] text-[#0A59F7]'
         : hasAction
           ? 'bg-amber-50 text-amber-700'
           : 'bg-slate-100 text-slate-600',
@@ -1021,38 +1189,70 @@ const getMailAiInsight = (mail, linkedEvent = null) => {
   };
 };
 
+const getMailTimelineKey = (timestamp) => {
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+};
+
+const getMailTimelineLabel = (timestamp) => {
+  const date = new Date(timestamp);
+  if (sameDay(date, TODAY_DATE)) return '今天';
+  if (sameDay(date, addDays(TODAY_DATE, -1))) return '昨天';
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  return `${String(date.getMonth() + 1).padStart(2, '0')}月${String(date.getDate()).padStart(2, '0')}日 ${weekdays[date.getDay()]}`;
+};
+
+const formatMailListTime = (timestamp) => {
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
 function MailWorkspace({
   accounts,
   mails,
   mailFolder,
-  mailFocusTab,
-  unreadOnly,
+  mailListFilter,
+  mailSortOrder,
   selectedMail,
   onSelectMail,
   onToggleStar,
   onToggleRead,
   onArchiveMail,
   onDeleteMail,
+  onMoveMail,
   onCompose,
   onEditDraft,
   onScheduleFromMail,
+  onMarkReadAfterViewing,
+  onCreateTaskFromMail,
+  onPreviewAttachment,
+  onDownloadAttachment,
+  onQuickReplySend,
+  onReaderRetry,
+  onReaderSecurityAction,
   onOpenLinkedEvent,
-  onToggleUnreadOnly,
-  onSetMailFocusTab,
-  upcomingEvents,
+  onSetMailListFilter,
+  onSetMailSortOrder,
   linkedEventLookup,
-  accountMap,
-  calendarMap,
-  onOpenEvent,
+  mailListWidth,
+  mailListBounds,
+  mailLayoutMode,
+  activeLayoutResize,
+  onStartLayoutResize,
+  onStepLayoutResize,
+  onRestoreMailReader,
 }) {
   const [mailSearchQuery, setMailSearchQuery] = useState('');
   const [readerMoreOpen, setReaderMoreOpen] = useState(false);
+  const [mailContextMenu, setMailContextMenu] = useState(null);
+  const [mailFilterMenuOpen, setMailFilterMenuOpen] = useState(false);
+  const [mailSelectionMode, setMailSelectionMode] = useState(false);
+  const [selectedMailIds, setSelectedMailIds] = useState([]);
   const readerMoreRef = useRef(null);
+  const mailFilterRef = useRef(null);
   const selectedLinkedEvent = selectedMail?.linkedEventId ? linkedEventLookup[selectedMail.linkedEventId] || null : null;
-  const selectedAccount = selectedMail ? accounts.find((item) => item.id === selectedMail.accountId) : null;
   const folderLabel = getMailFolderLabel(mailFolder);
   const unreadCount = mails.filter((mail) => mail.unread).length;
-  const selectedInitial = selectedMail?.fromName?.trim()?.[0] || selectedMail?.fromEmail?.trim()?.[0] || 'M';
   const selectedAiInsight = getMailAiInsight(selectedMail, selectedLinkedEvent);
   const normalizedMailSearchQuery = mailSearchQuery.trim().toLowerCase();
   const visibleMails = normalizedMailSearchQuery
@@ -1062,9 +1262,29 @@ function MailWorkspace({
           .some((value) => value.toLowerCase().includes(normalizedMailSearchQuery)),
       )
     : mails;
+  const activeMailFilter = MAIL_LIST_FILTER_OPTIONS.find((option) => option.id === mailListFilter) || MAIL_LIST_FILTER_OPTIONS[0];
+  const mailTimelineRows = useMemo(() => {
+    const rows = [];
+    let previousTimelineKey = '';
+    visibleMails.forEach((mail) => {
+      const timelineKey = getMailTimelineKey(mail.timestamp);
+      if (timelineKey !== previousTimelineKey) {
+        rows.push({
+          type: 'timeline',
+          key: `timeline-${timelineKey}`,
+          label: getMailTimelineLabel(mail.timestamp),
+        });
+        previousTimelineKey = timelineKey;
+      }
+      rows.push({ type: 'mail', key: mail.id, mail });
+    });
+    return rows;
+  }, [visibleMails]);
 
   useEffect(() => {
     setReaderMoreOpen(false);
+    setMailContextMenu(null);
+    setMailFilterMenuOpen(false);
   }, [selectedMail?.id]);
 
   useEffect(() => {
@@ -1089,12 +1309,103 @@ function MailWorkspace({
     };
   }, [readerMoreOpen]);
 
+  useEffect(() => {
+    if (!mailFilterMenuOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (mailFilterRef.current && !mailFilterRef.current.contains(event.target)) {
+        setMailFilterMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setMailFilterMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mailFilterMenuOpen]);
+
+  useEffect(() => {
+    setSelectedMailIds((prev) => {
+      const next = prev.filter((id) => visibleMails.some((mail) => mail.id === id));
+      return next.length === prev.length && next.every((id, index) => id === prev[index]) ? prev : next;
+    });
+  }, [visibleMails]);
+
+  useEffect(() => {
+    if (!mailContextMenu) return undefined;
+
+    const closeMailContextMenu = () => setMailContextMenu(null);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') closeMailContextMenu();
+    };
+
+    window.addEventListener('mousedown', closeMailContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', closeMailContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mailContextMenu]);
+
+  const openMailContextMenu = (event, mail) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMailContextMenu({
+      mailId: mail.id,
+      x: Math.min(event.clientX, window.innerWidth - 188),
+      y: Math.min(event.clientY, window.innerHeight - 176),
+    });
+  };
+
+  const runMailContextAction = (handler) => {
+    handler();
+    setMailContextMenu(null);
+  };
+
+  const enterMailSelectionMode = () => {
+    const fallbackMailId = selectedMail && visibleMails.some((mail) => mail.id === selectedMail.id) ? selectedMail.id : visibleMails[0]?.id;
+    setMailSelectionMode(true);
+    setSelectedMailIds((prev) => (prev.length > 0 ? prev : fallbackMailId ? [fallbackMailId] : []));
+  };
+
+  const exitMailSelectionMode = () => {
+    setMailSelectionMode(false);
+    setSelectedMailIds([]);
+  };
+
+  const toggleSelectedMail = (mailId) => {
+    setSelectedMailIds((prev) => (prev.includes(mailId) ? prev.filter((id) => id !== mailId) : [...prev, mailId]));
+  };
+
+  const applyMailListFilter = (filterId) => {
+    onSetMailListFilter(filterId);
+    setMailFilterMenuOpen(false);
+  };
+
+  const applyMailSortOrder = (sortId) => {
+    onSetMailSortOrder(sortId);
+    setMailFilterMenuOpen(false);
+  };
+
+  const selectNextVisibleMail = (mailId) => {
+    const currentIndex = visibleMails.findIndex((mail) => mail.id === mailId);
+    const nextMail = visibleMails[currentIndex + 1] || visibleMails[currentIndex - 1] || visibleMails.find((mail) => mail.id !== mailId);
+    if (nextMail) onSelectMail(nextMail.id);
+  };
+
   const renderReaderToolbar = () => {
     if (!selectedMail) return null;
 
     const toolbarButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950';
-    const toolbarPrimaryButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700';
-    const toolbarAccentButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-50';
+    const toolbarPrimaryButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg bg-[#0A59F7] px-3 text-sm font-bold text-white transition hover:bg-[#084DDB]';
+    const toolbarAccentButtonClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]';
     const windowButtonClass = 'inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950';
     const menuItemClass = 'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950';
     const readerActions = [
@@ -1137,7 +1448,7 @@ function MailWorkspace({
       {
         id: 'star',
         label: '标记旗标',
-        icon: Star,
+        icon: Flag,
         onClick: () => onToggleStar(selectedMail.id),
       },
       {
@@ -1207,7 +1518,7 @@ function MailWorkspace({
                     setReaderMoreOpen(false);
                     action.onClick();
                   }}
-                  className={action.variant === 'accent' ? `${menuItemClass} text-blue-700 hover:bg-blue-50 hover:text-blue-800` : menuItemClass}
+                  className={action.variant === 'accent' ? `${menuItemClass} text-[#0A59F7] hover:bg-[#0A59F7]/[0.08] hover:text-[#084DDB]` : menuItemClass}
                 >
                   {renderActionIcon(action, 16, 'shrink-0 text-slate-500')}
                   <span className="min-w-0 flex-1 truncate">{action.label}</span>
@@ -1235,10 +1546,24 @@ function MailWorkspace({
     );
   };
 
+  const contextMail = mailContextMenu ? visibleMails.find((mail) => mail.id === mailContextMenu.mailId) : null;
+  const selectedBatchMails = mailSelectionMode
+    ? selectedMailIds
+        .map((id) => visibleMails.find((mail) => mail.id === id))
+        .filter(Boolean)
+    : [];
+  const isMailReaderHidden = mailLayoutMode === MAIL_LAYOUT_MODE_AB;
+  const mailListMode = isMailReaderHidden ? 'table' : 'compact';
+
   return (
-      <div data-mail-workspace="true" className="flex min-w-0 flex-1 overflow-hidden bg-[#f6f7f9]">
-        <div className="flex w-[408px] min-w-0 flex-col border-r border-slate-200 bg-white">
-        <div className="border-b border-slate-200 bg-white px-5 pb-4 pt-5">
+      <div data-mail-workspace="true" data-mail-layout-mode={mailLayoutMode} className="flex min-w-0 flex-1 overflow-hidden bg-[#f6f7f9]">
+        <div
+          data-mail-list-pane="true"
+          data-mail-list-mode={mailListMode}
+          className={`flex min-w-0 flex-col border-r border-slate-200 bg-white ${isMailReaderHidden ? 'flex-1' : 'shrink-0'}`}
+          style={isMailReaderHidden ? undefined : { width: mailListWidth }}
+        >
+        <div className="bg-white px-6 pb-4 pt-6">
           <div data-mail-list-toolbar="true" className="space-y-4">
             <div className="flex h-10 items-center rounded-xl bg-slate-100 px-2">
               <button type="button" className="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold text-slate-800 transition hover:bg-white">
@@ -1258,310 +1583,577 @@ function MailWorkspace({
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg font-black text-slate-950">{folderLabel}</h2>
-                <div className="mt-1 text-xs font-semibold text-slate-400">
-                  {mails.length} 封邮件，{unreadCount} 封未读
+            {mailSelectionMode ? (
+              <div data-mail-selection-bar="true" className="flex h-12 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2 text-lg font-black text-slate-950">
+                  <SquareCheck size={22} className="shrink-0 fill-[#0A59F7] text-[#0A59F7]" />
+                  <span>已选中 <span className="text-[#0A59F7]">{selectedMailIds.length}</span> 封邮件</span>
                 </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button type="button" aria-label="刷新邮件" title="刷新邮件" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
-                  <RefreshCw size={16} />
-                </button>
-                <button type="button" aria-label="选择邮件" title="选择邮件" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
-                  <Square size={16} />
-                </button>
                 <button
                   type="button"
-                  onClick={onToggleUnreadOnly}
-                  aria-label="筛选邮件"
-                  title="筛选邮件"
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition ${
-                    unreadOnly ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                  aria-label="退出多选"
+                  title="退出多选"
+                  onClick={exitMailSelectionMode}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
                 >
-                  <AlignLeft size={16} />
-                </button>
-                <button type="button" aria-label="邮件排序" title="邮件排序" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900">
-                  <MoreHorizontal size={17} />
+                  <X size={20} />
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black text-slate-950">{folderLabel}</h2>
+                  <div className="mt-1 text-xs font-semibold text-slate-400">
+                    {mails.length} 封邮件，{unreadCount} 封未读
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isMailReaderHidden && (
+                    <button
+                      type="button"
+                      aria-label="显示阅读区"
+                      title="显示阅读区"
+                      onClick={onRestoreMailReader}
+                      className="inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-black text-[#0A59F7] transition hover:bg-[#0A59F7]/[0.08]"
+                    >
+                      <PanelRightOpen size={17} className="mr-1.5" />
+                      显示阅读区
+                    </button>
+                  )}
+                  <button type="button" aria-label="刷新邮件" title="刷新邮件" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950">
+                    <RefreshCw size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="多选邮件"
+                    title="多选邮件"
+                    onClick={enterMailSelectionMode}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+                  >
+                    <SquareCheck size={17} />
+                  </button>
+                  <div ref={mailFilterRef} className="relative">
+                    <button
+                      type="button"
+                      data-mail-filter-trigger="true"
+                      onClick={() => setMailFilterMenuOpen((prev) => !prev)}
+                      aria-label="筛选邮件"
+                      title="筛选邮件"
+                      aria-haspopup="menu"
+                      aria-expanded={mailFilterMenuOpen}
+                      className={`inline-flex h-9 items-center justify-center rounded-lg px-2.5 text-sm font-black transition ${
+                        mailListFilter !== 'all' ? 'bg-[#0A59F7]/[0.08] text-[#0A59F7]' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      }`}
+                    >
+                      <Funnel size={17} />
+                      {mailListFilter !== 'all' && <span className="ml-1.5 max-w-[56px] truncate">{activeMailFilter.label}</span>}
+                    </button>
+                    {mailFilterMenuOpen && (
+                      <div
+                        data-mail-filter-menu="true"
+                        role="menu"
+                        className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
+                      >
+                        {MAIL_LIST_FILTER_OPTIONS.map((option) => {
+                          const Icon = option.icon;
+                          const active = option.id === mailListFilter;
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={active}
+                              onClick={() => applyMailListFilter(option.id)}
+                              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-bold transition ${
+                                active ? 'bg-[#0A59F7]/[0.08] text-[#0A59F7]' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
+                              }`}
+                            >
+                              <Icon size={17} className="shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                              {active && <Check size={15} className="shrink-0" />}
+                            </button>
+                          );
+                        })}
+                        <div className="my-1 h-px bg-slate-100" />
+                        {MAIL_SORT_OPTIONS.map((option) => {
+                          const active = option.id === mailSortOrder;
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={active}
+                              onClick={() => applyMailSortOrder(option.id)}
+                              className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-bold transition ${
+                                active ? 'bg-[#0A59F7]/[0.08] text-[#0A59F7]' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
+                              }`}
+                            >
+                              <ListFilter size={17} className="shrink-0" />
+                              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                              {active && <Check size={15} className="shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {mailFolder === 'inbox' && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="flex items-center rounded-lg bg-slate-100 p-1">
-                {[
-                  ['focused', '重点'],
-                  ['other', '其他'],
-                ].map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => onSetMailFocusTab(id)}
-                    className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
-                      mailFocusTab === id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={onToggleUnreadOnly}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                  unreadOnly ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                仅看未读
-              </button>
-            </div>
-          )}
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2">
-            <Sparkles size={15} className="shrink-0 text-indigo-600" />
-            <div className="min-w-0">
-              <div className="text-xs font-black text-indigo-800">AI 智能分类</div>
-              <div className="mt-0.5 truncate text-[11px] font-semibold text-indigo-500">识别重要邮件、会议相关和待处理事项</div>
-            </div>
-          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className={`flex-1 overflow-y-auto bg-white ${isMailReaderHidden ? 'px-0 py-0' : 'px-3 py-2'}`}>
+          {isMailReaderHidden && (
+            <div
+              data-mail-wide-list-header="true"
+              className="sticky top-0 z-10 grid grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-y border-slate-200 bg-slate-50 px-5 py-2 text-xs font-black text-slate-500"
+            >
+              <span />
+              <span>发件人</span>
+              <span>主题与摘要</span>
+              <span>状态</span>
+              <span className="text-right">时间</span>
+            </div>
+          )}
           {visibleMails.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">当前筛选下没有邮件</div>
           ) : (
-            visibleMails.map((mail) => {
-              const account = accounts.find((item) => item.id === mail.accountId);
+            mailTimelineRows.map((row) => {
+              if (row.type === 'timeline') {
+                return (
+		                  <div
+		                    key={row.key}
+		                    data-mail-timeline-label="true"
+		                    className={
+                          isMailReaderHidden
+                            ? 'flex items-center gap-2 border-b border-slate-100 bg-white px-5 py-2 text-xs font-black text-slate-500'
+                            : 'flex items-center gap-2 px-3 pb-1 pt-4 text-sm font-black text-slate-600'
+                        }
+		                  >
+		                    <ChevronDown size={15} className="shrink-0 text-slate-500" />
+		                    <span>{row.label}</span>
+	                  </div>
+                );
+              }
+
+              const mail = row.mail;
               const selected = selectedMail?.id === mail.id;
-              const linkedEvent = mail.linkedEventId ? linkedEventLookup[mail.linkedEventId] || null : null;
-              const senderInitial = mail.fromName?.trim()?.[0] || mail.fromEmail?.trim()?.[0] || 'M';
-              const aiInsight = getMailAiInsight(mail, linkedEvent);
+              const selectedInBatch = selectedMailIds.includes(mail.id);
+              if (isMailReaderHidden) {
+                return (
+                  <div
+                    key={mail.id}
+                    data-mail-list-card={mail.id}
+                    data-mail-row-mode="table"
+                    onClick={() => {
+                      if (mailSelectionMode) {
+                        toggleSelectedMail(mail.id);
+                        return;
+                      }
+                      onSelectMail(mail.id);
+                    }}
+                    onContextMenu={(event) => openMailContextMenu(event, mail)}
+                    className={`group relative grid min-h-[54px] w-full cursor-pointer grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-b border-slate-100 px-5 py-2 text-left transition-colors ${
+                      selectedInBatch
+                        ? 'bg-[#0A59F7]/10'
+                        : selected
+                          ? 'bg-[#0A59F7]/10'
+                          : 'bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center">
+                      {mailSelectionMode ? (
+                        <input
+                          type="checkbox"
+                          aria-label={`选择邮件：${mail.subject}`}
+                          checked={selectedInBatch}
+                          onChange={() => toggleSelectedMail(mail.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-[#0A59F7] focus:ring-[#0A59F7]"
+                        />
+                      ) : (
+                        <span
+                          data-mail-read-state={mail.unread ? 'unread' : 'read'}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${mail.unread ? 'bg-[#0A59F7]' : 'bg-transparent'}`}
+                          aria-label={mail.unread ? '未读' : '已读'}
+                        />
+                      )}
+                    </div>
+                    <div data-mail-wide-column="sender" className="min-w-0">
+                      <div data-mail-sender-name="true" className="truncate text-sm font-black text-slate-950">{mail.fromName}</div>
+                      <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">{mail.fromEmail}</div>
+                    </div>
+                    <div data-mail-wide-column="subject" data-mail-row-content="true" className="min-w-0">
+                      <div data-mail-title-time="true" className="flex min-w-0 items-center gap-1.5">
+                        {mail.linkedEventId && <Calendar size={14} className="shrink-0 text-slate-500" aria-label="关联日程" />}
+                        <div data-mail-title-text="true" className={`min-w-0 truncate text-sm leading-snug ${mail.unread ? 'font-black text-[#0A59F7]' : 'font-black text-slate-950'}`}>
+                          {mail.subject}
+                        </div>
+                      </div>
+                      <div data-mail-preview="true" className={`mt-0.5 truncate text-xs font-medium leading-snug ${mail.unread ? 'text-slate-600' : 'text-slate-500'}`}>
+                        {mail.preview}
+                      </div>
+                    </div>
+                    <div data-mail-wide-column="status" data-mail-sender-markers="true" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-bold text-slate-600">
+                      {mail.unread && <span className="rounded-md bg-[#0A59F7]/[0.08] px-1.5 py-0.5 text-[#0A59F7]">未读</span>}
+                      {mail.starred && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-red-600">旗标</span>}
+                      {mail.attachments.length > 0 && <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">附件 {mail.attachments.length}</span>}
+                      {mail.linkedEventId && <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">关联日程</span>}
+                    </div>
+                    <div data-mail-wide-column="time" className="relative flex min-w-0 items-center justify-end">
+                      <div
+                        data-mail-hover-actions="true"
+                        className={`absolute right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteMail(mail.id);
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                          aria-label="删除邮件"
+                          title="删除"
+                        >
+                          <Trash size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleStar(mail.id);
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                          aria-label={mail.starred ? '取消旗标' : '标记旗标'}
+                          title={mail.starred ? '取消旗标' : '标记旗标'}
+                        >
+                          <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleRead(mail.id);
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                          aria-label={mail.unread ? '标为已读' : '标为未读'}
+                          title={mail.unread ? '标为已读' : '标为未读'}
+                        >
+                          <Mail size={14} />
+                        </button>
+                      </div>
+                      <div data-mail-timestamp="true" className="shrink-0 text-right text-xs font-semibold tabular-nums text-slate-500">{formatMailListTime(mail.timestamp)}</div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={mail.id}
-                  onClick={() => onSelectMail(mail.id)}
-                  className={`w-full cursor-pointer border-b border-slate-100 px-4 py-3.5 text-left transition-colors ${
-                    selected ? 'bg-blue-50/70 shadow-[inset_3px_0_0_#2563eb]' : 'hover:bg-slate-50'
+                  data-mail-list-card={mail.id}
+                  data-mail-row-mode="compact"
+                  onClick={() => {
+                    if (mailSelectionMode) {
+                      toggleSelectedMail(mail.id);
+                      return;
+                    }
+                    onSelectMail(mail.id);
+                  }}
+                  onContextMenu={(event) => openMailContextMenu(event, mail)}
+                  className={`group relative my-0.5 grid w-full cursor-pointer grid-cols-[10px_minmax(0,1fr)] gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
+                    selectedInBatch
+                      ? 'bg-[#0A59F7]/10 ring-1 ring-[#0A59F7]/30'
+                      : selected
+                        ? 'bg-[#0A59F7]/10 ring-1 ring-[#0A59F7]/30'
+                        : 'bg-white hover:bg-slate-100'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black ${
-                      mail.unread ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {senderInitial}
-                    </span>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onToggleStar(mail.id);
-                      }}
-                      className={`mt-1 ${mail.starred ? 'text-amber-500' : 'text-slate-300 hover:text-slate-500'}`}
-                      aria-label={mail.starred ? '取消星标' : '添加星标'}
-                    >
-                      <Star size={16} fill={mail.starred ? 'currentColor' : 'none'} />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className={`truncate text-sm ${mail.unread ? 'font-black text-slate-950' : 'font-bold text-slate-700'}`}>{mail.fromName}</div>
-                          <div className="mt-0.5 truncate text-[11px] font-semibold text-slate-400">{getAccountDisplayLabel(account)}</div>
+                  <div className="flex justify-center pt-[7px]">
+                    <span
+                      data-mail-read-state={mail.unread ? 'unread' : 'read'}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${mail.unread ? 'bg-[#0A59F7]' : 'bg-transparent'}`}
+                      aria-label={mail.unread ? '未读' : '已读'}
+                    />
+                  </div>
+	                  <div data-mail-row-content="true" className="min-w-0">
+	                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-3">
+	                      <div className="min-w-0">
+                          <div data-mail-sender-name="true" className="min-w-0 truncate text-sm font-black text-slate-950">{mail.fromName}</div>
+	                        <div data-mail-title-time="true" className="mt-1 flex min-w-0 items-center gap-1">
+	                          {mailSelectionMode && (
+	                            <input
+	                              type="checkbox"
+	                              aria-label={`选择邮件：${mail.subject}`}
+	                              checked={selectedInBatch}
+	                              onChange={() => toggleSelectedMail(mail.id)}
+	                              onClick={(event) => event.stopPropagation()}
+	                              className="h-4 w-4 shrink-0 rounded border-slate-300 text-[#0A59F7] focus:ring-[#0A59F7]"
+	                            />
+	                          )}
+	                          {mail.linkedEventId && <Calendar size={14} className="shrink-0 text-slate-500" aria-label="关联日程" />}
+	                          <div data-mail-title-text="true" className={`min-w-0 truncate text-sm leading-snug ${mail.unread ? 'font-black text-[#0A59F7]' : 'font-black text-slate-950'}`}>
+	                            {mail.subject}
+	                          </div>
+	                        </div>
                         </div>
-                        <div className="shrink-0 text-[11px] font-bold text-slate-400">{formatMailTime(mail.timestamp)}</div>
-                      </div>
-                      <div className={`mt-2 text-sm leading-snug ${mail.unread ? 'font-black text-slate-950' : 'font-semibold text-slate-700'}`} style={clampLinesStyle(1)}>
-                        {mail.subject}
-                      </div>
-                      <div className="mt-1 text-xs font-medium leading-snug text-slate-500" style={clampLinesStyle(2)}>
-                        {mail.preview}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {mail.unread && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700">未读</span>}
-                        {mail.attachments.length > 0 && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">
-                            附件 {mail.attachments.length}
-                          </span>
-                        )}
-                        {linkedEvent?.status === '已取消' && (
-                          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700">Cancel</span>
-                        )}
-                        {linkedEvent?.status === '草稿' && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-700">草稿</span>
-                        )}
-                        {linkedEvent?.status === '待响应' && (
-                          <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-black text-orange-700">待响应</span>
-                        )}
-                        {mail.linkedEventId && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700">关联日程</span>
-                        )}
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-black ${aiInsight.categoryTone}`}>
-                          AI · {aiInsight.categoryLabel}
-                        </span>
-                      </div>
-                    </div>
+	                      <div className="flex w-[88px] shrink-0 flex-col items-end">
+	                        <div className="relative h-6 w-[88px]">
+	                        <div
+	                          data-mail-hover-actions="true"
+	                          className={`absolute inset-y-0 right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
+	                        >
+	                          <button
+	                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteMail(mail.id);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                            aria-label="删除邮件"
+	                            title="删除"
+	                          >
+	                            <Trash size={14} />
+	                          </button>
+	                          <button
+	                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleStar(mail.id);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                            aria-label={mail.starred ? '取消旗标' : '标记旗标'}
+	                            title={mail.starred ? '取消旗标' : '标记旗标'}
+	                          >
+	                            <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
+	                          </button>
+	                          <button
+	                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onToggleRead(mail.id);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+                            aria-label={mail.unread ? '标为已读' : '标为未读'}
+	                            title={mail.unread ? '标为已读' : '标为未读'}
+	                          >
+	                            <Mail size={14} />
+	                          </button>
+	                        </div>
+	                        <div data-mail-sender-markers="true" className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 text-slate-500 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+	                          {mail.starred && (
+	                            <span role="img" aria-label="旗标邮件" title="旗标邮件" className="text-red-500">
+	                              <Flag size={14} fill="currentColor" />
+	                            </span>
+	                          )}
+	                          {mail.attachments.length > 0 && (
+	                            <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className="text-slate-500">
+	                              <Paperclip size={14} />
+	                            </span>
+	                          )}
+	                        </div>
+	                        </div>
+	                        <div data-mail-timestamp="true" className="mt-1 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-500">{formatMailListTime(mail.timestamp)}</div>
+	                      </div>
+	                    </div>
+	                    <div data-mail-preview="true" className={`mt-0.5 truncate text-xs font-medium leading-snug ${mail.unread ? 'text-slate-600' : 'text-slate-500'}`}>
+	                      {mail.preview}
+	                    </div>
                   </div>
                 </div>
               );
             })
           )}
+          {contextMail && (
+            <div
+              data-mail-context-menu="true"
+              role="menu"
+              className="fixed z-50 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
+              style={{ top: mailContextMenu.y, left: mailContextMenu.x }}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => runMailContextAction(() => onToggleRead(contextMail.id))}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Mail size={15} className="text-slate-400" />
+                {contextMail.unread ? '标为已读' : '标为未读'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => runMailContextAction(() => onToggleStar(contextMail.id))}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Flag size={15} fill={contextMail.starred ? 'currentColor' : 'none'} className={contextMail.starred ? 'text-red-500' : 'text-slate-400'} />
+                {contextMail.starred ? '取消旗标' : '标记旗标'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => runMailContextAction(() => onArchiveMail(contextMail.id))}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Archive size={15} className="text-slate-400" />
+                归档邮件
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => runMailContextAction(() => onDeleteMail(contextMail.id))}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
+              >
+                <Trash size={15} />
+                删除邮件
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 bg-[#f6f7f9]">
-        {!selectedMail ? (
-          <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">未选择邮件</div>
-        ) : (
-          <div className="h-full flex flex-col">
-            {renderReaderToolbar()}
-            <div className="border-b border-slate-200 bg-white px-7 py-5">
-              <div className="max-w-[1040px]">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{MAIL_FOLDERS.find((item) => item.id === selectedMail.folder)?.label}</span>
-                  {selectedMail.unread && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">未读</span>}
-                  {selectedLinkedEvent?.status === '已取消' && <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">Cancel</span>}
-                  {selectedLinkedEvent?.status === '草稿' && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">草稿</span>}
-                  {selectedMail.linkedEventId && (
+      {!isMailReaderHidden && (
+        <LayoutResizeHandle
+          id="mail-b"
+          label="调整邮件列表和阅读窗格宽度"
+          value={mailListWidth}
+          min={mailListBounds.min}
+          max={mailListBounds.max}
+          active={activeLayoutResize === 'mail-b'}
+          onStart={(event) => onStartLayoutResize('mail-b', event)}
+          onStep={(delta) => onStepLayoutResize('mail-b', delta)}
+        />
+      )}
+
+      {!isMailReaderHidden && (
+      <div data-mail-reader-region="true" className="min-w-0 flex-1 bg-[#f6f7f9]">
+        {mailSelectionMode ? (
+          <div data-mail-bulk-reader="true" className="flex h-full flex-col bg-[#f6f7f9]">
+            <div className="flex shrink-0 flex-nowrap items-center border-b border-slate-200 bg-white px-6 py-4">
+              <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap pr-2">
+                {[
+                  { label: '标为已读', icon: Mail, aria: '批量标为已读' },
+                  { label: '标为未读', icon: Mail, aria: '批量标为未读' },
+                  { label: '标记旗标', icon: Flag, aria: '批量标记旗标' },
+                  { label: '移动', icon: Archive, aria: '批量移动' },
+                  { label: '导出', icon: Save, aria: '批量导出' },
+                  { label: '删除', icon: Trash, aria: '批量删除', danger: true },
+                ].map((action) => {
+                  const Icon = action.icon;
+                  return (
                     <button
-                      onClick={() => onOpenLinkedEvent(selectedMail.linkedEventId)}
-                      className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                      key={action.aria}
+                      type="button"
+                      aria-label={action.aria}
+                      className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold transition ${
+                        action.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      }`}
                     >
-                      查看关联日程
+                      <Icon size={16} className="mr-1.5" fill={action.label.includes('旗标') ? 'currentColor' : 'none'} />
+                      {action.label}
                     </button>
-                  )}
-                </div>
-                <h2 className="text-[28px] font-black leading-tight text-slate-950">{selectedMail.subject}</h2>
-                <div className="mt-4 flex min-w-0 items-start gap-3 text-sm">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-base font-black text-white">{selectedInitial}</span>
-                  <div className="min-w-0">
-                    <div className="font-black text-slate-900">{selectedMail.fromName} <span className="font-semibold text-slate-500">&lt;{selectedMail.fromEmail}&gt;</span></div>
-                    <div className="mt-1 text-slate-500">收件人：{joinRecipients(selectedMail.to)}</div>
-                    {selectedMail.cc.length > 0 && <div className="mt-1 text-slate-500">抄送：{joinRecipients(selectedMail.cc)}</div>}
-                    <div className="mt-1 text-slate-400">{formatMailTime(selectedMail.timestamp)} · {getAccountDisplayLabel(selectedAccount)}</div>
-                  </div>
-                </div>
-                {selectedLinkedEvent && (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-500">
-                    日程：{selectedLinkedEvent.status || '已接受'} · {formatEventDateTime(selectedLinkedEvent)}
+                  );
+                })}
+              </div>
+              <button type="button" aria-label="更多批量操作" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100">
+                <MoreHorizontal size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-8 py-10">
+              <div className="mx-auto flex min-h-full max-w-[960px] items-center justify-center">
+                {selectedBatchMails.length === 0 ? (
+                  <div className="text-sm font-semibold text-slate-400">请选择要批量处理的邮件</div>
+                ) : (
+                  <div className="relative h-[560px] w-full max-w-[820px]">
+                    {selectedBatchMails.slice(0, 3).map((mail, index) => (
+                      <article
+                        key={mail.id}
+                        data-mail-stack-card="true"
+                        className="absolute left-1/2 top-1/2 origin-center rounded-xl border border-slate-200 bg-white px-8 py-6 shadow-[0_18px_48px_rgba(15,23,42,0.16)]"
+                        style={{
+                          width: 'clamp(420px, calc(100% - 32px), 760px)',
+                          transform: `translate(-50%, calc(-50% + ${index * 28}px)) rotate(${index === 0 ? -1.2 : index === 1 ? 1.1 : -0.6}deg)`,
+                          zIndex: 20 - index,
+                        }}
+                      >
+                        <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-xl font-black text-slate-950">{mail.subject}</h3>
+                            <div className="mt-2 text-sm font-semibold text-slate-600">{mail.fromName}</div>
+                            <div className="mt-1 truncate text-xs font-medium text-slate-400">
+                              {mail.fromEmail} · {formatMailTime(mail.timestamp)}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2 text-slate-400">
+                            {mail.starred && <Flag size={16} fill="currentColor" className="text-red-500" />}
+                            {mail.attachments.length > 0 && <Paperclip size={16} />}
+                            {mail.linkedEventId && <Calendar size={16} className="text-emerald-600" />}
+                          </div>
+                        </div>
+                        <p className="text-sm font-medium leading-6 text-slate-600">{mail.body || mail.preview}</p>
+                        {mail.attachments.length > 0 && (
+                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            {mail.attachments.slice(0, 2).map((attachment) => (
+                              <div key={attachment.name} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                                <Paperclip size={15} className="text-slate-400" />
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-bold text-slate-700">{attachment.name}</div>
+                                  <div className="text-xs text-slate-400">{attachment.size}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-7 py-6">
-              <section className="mb-5 max-w-[980px] overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <div className="flex items-center justify-between border-b border-indigo-50 bg-indigo-50/70 px-5 py-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={16} className="text-indigo-600" />
-                    <h3 className="text-sm font-black text-slate-950">AI 邮件助手</h3>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${selectedAiInsight.categoryTone}`}>
-                    {selectedAiInsight.categoryLabel}
-                  </span>
-                </div>
-                <div className="grid gap-0 md:grid-cols-[1.15fr_1fr_1fr]">
-                  <div className="border-b border-slate-100 px-5 py-4 md:border-b-0 md:border-r">
-                    <div className="text-xs font-black text-indigo-700">AI 摘要</div>
-                    <p className="mt-2 text-sm font-medium leading-6 text-slate-600">{selectedAiInsight.summary}</p>
-                  </div>
-                  <div className="border-b border-slate-100 px-5 py-4 md:border-b-0 md:border-r">
-                    <div className="text-xs font-black text-indigo-700">待处理事项</div>
-                    <ul className="mt-2 space-y-2">
-                      {(selectedAiInsight.todos.length > 0 ? selectedAiInsight.todos : ['暂无明确待处理事项']).map((todo) => (
-                        <li key={todo} className="flex gap-2 text-sm font-medium leading-5 text-slate-600">
-                          <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />
-                          <span>{todo}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="px-5 py-4">
-                    <div className="text-xs font-black text-indigo-700">快速回复建议</div>
-                    <div className="mt-2 space-y-2">
-                      {selectedAiInsight.replies.map((reply) => (
-                        <button
-                          key={reply}
-                          type="button"
-                          onClick={() => onCompose('reply', selectedMail.id)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50"
-                        >
-                          {reply}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {selectedLinkedEvent?.status === '已取消' && (
-                <div className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-rose-900">这场会议已经取消</div>
-                    <button
-                      onClick={() => onOpenLinkedEvent(selectedLinkedEvent.id)}
-                      className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100"
-                    >
-                      查看详情
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedMail.attachments.length > 0 && (
-                <div className="mb-5">
-                  <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">附件</div>
-                  <div className="flex flex-wrap gap-3">
-                    {selectedMail.attachments.map((attachment) => (
-                      <div key={attachment.name} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-                        <Paperclip size={14} className="mr-2 text-slate-400" />
-                        <div>
-                          <div className="text-sm font-bold text-slate-800">{attachment.name}</div>
-                          <div className="text-xs font-medium text-slate-400">{attachment.size}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <article className="max-w-[980px] rounded-2xl border border-slate-200 bg-white px-7 py-6 text-[15px] leading-8 text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <div className="whitespace-pre-wrap">{selectedMail.body}</div>
-              </article>
-            </div>
           </div>
+        ) : (
+          <MailReadingPane
+            mail={selectedMail}
+            state={selectedMail ? MAIL_READING_STATE_BY_MAIL_ID[selectedMail.id] : undefined}
+            folderLabel={selectedMail ? MAIL_FOLDERS.find((item) => item.id === selectedMail.folder)?.label : ''}
+            linkedEvent={
+              selectedLinkedEvent
+                ? {
+                    id: selectedLinkedEvent.id,
+                    status: selectedLinkedEvent.status,
+                    summary: `${selectedLinkedEvent.status || '已接受'} · ${formatEventDateTime(selectedLinkedEvent)}`,
+                  }
+                : null
+            }
+            aiInsight={selectedAiInsight}
+            formatMailTime={formatMailTime}
+            onReply={() => selectedMail && onCompose('reply', selectedMail.id)}
+            onReplyAll={() => selectedMail && onCompose('replyAll', selectedMail.id)}
+            onForward={() => selectedMail && onCompose('forward', selectedMail.id)}
+            onArchive={() => selectedMail && onArchiveMail(selectedMail.id)}
+            onDelete={() => selectedMail && onDeleteMail(selectedMail.id)}
+            onMove={() => selectedMail && (onMoveMail || onArchiveMail)(selectedMail.id)}
+            onToggleRead={() => selectedMail && onToggleRead(selectedMail.id)}
+            onToggleFollowUp={() => selectedMail && onToggleStar(selectedMail.id)}
+            onCreateTask={() => selectedMail && onCreateTaskFromMail(selectedMail.id)}
+            onCreateEvent={() => selectedMail && onScheduleFromMail(selectedMail.id)}
+            onRetry={() => selectedMail && onReaderRetry(selectedMail.id)}
+            onBackToList={() => selectedMail && onSelectMail(selectedMail.id)}
+            onViewNext={() => selectedMail && selectNextVisibleMail(selectedMail.id)}
+            onMarkReadAfterViewing={() => selectedMail && onMarkReadAfterViewing(selectedMail.id)}
+            onPreviewAttachment={(attachment) => selectedMail && onPreviewAttachment(selectedMail.id, attachment)}
+            onDownloadAttachment={(attachment) => selectedMail && onDownloadAttachment(selectedMail.id, attachment)}
+            onQuickReplySend={(body) => selectedMail && onQuickReplySend(selectedMail.id, body)}
+            onSecurityAction={(action) => selectedMail && onReaderSecurityAction(selectedMail.id, action)}
+            onOpenLinkedEvent={() => selectedMail?.linkedEventId && onOpenLinkedEvent(selectedMail.linkedEventId)}
+          />
         )}
       </div>
-
-      <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 bg-white 2xl:flex 2xl:flex-col">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <div className="text-sm font-black text-slate-900">关联日程</div>
-          <div className="mt-1 text-xs font-semibold text-slate-400">从邮件快速跳转到近期会议</div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="space-y-2.5">
-            {upcomingEvents.slice(0, 8).map((event) => {
-              const calendar = calendarMap[event.calId];
-              const account = accountMap[calendar?.accountId];
-              return (
-                <button
-                  key={event.id}
-                  onClick={() => onOpenEvent(event.id)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${calendar?.color || 'bg-slate-400'}`}></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold text-slate-900">{event.title}</div>
-                      <div className="mt-1 truncate text-xs font-semibold text-slate-500">{formatEventDateTime(event)}</div>
-                      <div className="mt-1 truncate text-xs font-medium text-slate-400">{getAccountDisplayLabel(account) || '未知账户'}</div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-            {upcomingEvents.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">近期没有日程</div>}
-          </div>
-        </div>
-      </aside>
+      )}
     </div>
   );
 }
@@ -1573,6 +2165,7 @@ function CalendarSidebar({
   focusDate,
   calendarLayout,
   collapsed,
+  width = APP_SIDEBAR_WIDTH,
   onNewEvent,
   onShiftMonth,
   onSelectDate,
@@ -1679,9 +2272,9 @@ function CalendarSidebar({
     <aside
       data-app-sidebar="calendar"
       className="relative z-10 hidden shrink-0 select-none border-r border-slate-200 bg-[#f1f3f5] md:flex md:flex-col"
-      style={{ width: APP_SIDEBAR_WIDTH, zIndex: 20 }}
+      style={{ width, zIndex: 20 }}
     >
-        <div className="px-5 pt-5 pb-4">
+        <div className="px-6 pb-4 pt-6">
           <div className="flex items-center justify-between gap-3">
             <div className="text-lg font-black text-gray-900">Coremail</div>
           <button
@@ -1693,7 +2286,7 @@ function CalendarSidebar({
           </button>
         </div>
         <div className="relative mt-4" ref={createMenuRef}>
-          <div className="flex w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-blue-600">
+          <div className="flex w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-[#0A59F7]">
             <button
               onClick={() => {
                 onNewEvent();
@@ -1741,7 +2334,7 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="px-5 pb-5">
+      <div className="px-6 pb-6">
         <div className="px-1 pt-1">
           <div className="mb-4 flex items-center justify-between gap-1">
             <div className="flex items-center gap-1">
@@ -1788,17 +2381,17 @@ function CalendarSidebar({
                     onClick={() => onSelectDate(cell.date)}
                     className={`relative z-[1] aspect-square w-7 flex items-center justify-center rounded-full font-medium transition-colors ${
                       isSelectedDate
-                        ? 'bg-blue-600 text-white font-bold hover:bg-blue-600'
+                        ? 'bg-[#0A59F7] text-white font-bold hover:bg-[#0A59F7]'
                         : cell.isCurrentMonth
                           ? 'text-gray-700 hover:bg-slate-200'
                           : 'text-gray-300 hover:bg-slate-100'
                     } ${
                       cell.isToday && !isSelectedDate
-                        ? 'ring-2 ring-blue-500 ring-offset-1 font-bold text-blue-600'
+                        ? 'ring-2 ring-[#0A59F7] ring-offset-1 font-bold text-[#0A59F7]'
                         : ''
                     } ${
                       cell.isToday && isSelectedDate
-                        ? 'ring-2 ring-blue-300 ring-offset-1'
+                        ? 'ring-2 ring-[#0A59F7]/40 ring-offset-1'
                         : ''
                     }`}
                   >
@@ -1806,7 +2399,7 @@ function CalendarSidebar({
                     {markerColors.length > 0 && (
                       <span
                         className={`pointer-events-none absolute left-1/2 bottom-[2px] h-[2px] w-[6px] -translate-x-1/2 rounded-full ${
-                          isSelectedDate ? 'bg-white' : 'bg-blue-500'
+                          isSelectedDate ? 'bg-white' : 'bg-[#0A59F7]'
                         }`}
                       ></span>
                     )}
@@ -1823,89 +2416,98 @@ function CalendarSidebar({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        <div>
-          <div className="space-y-5">
-            {[
-              { key: 'ownAccounts', title: '我的日历', ownership: 'self', items: ownAccounts },
-              { key: 'sharedAccounts', title: '共享日历', ownership: 'shared', items: sharedAccounts },
-            ].map((group) => (
-              <div key={group.title} className="group">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <button onClick={() => toggleSection(group.key)} className="flex items-center min-w-0 text-left">
-                    <ChevronDown size={14} className={`mr-1 text-gray-400 transition-transform ${collapsedSections[group.key] ? '-rotate-90' : ''}`} />
-                    <div className="relative text-[11px] font-bold text-gray-400 tracking-wide">
-                      {group.title}
-                      {group.ownership === 'shared' && pendingShareInvitationCount > 0 && (
-                        <span className="absolute -right-2 -top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
-                      )}
-                    </div>
-                  </button>
-                </div>
-		                {!collapsedSections[group.key] && <div className="space-y-[2px]">
-		                  {group.items.map((account) => {
-				const displayName = getAccountDisplayLabel(account);
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-3">
+        <div className="space-y-5">
+          {[
+            { key: 'ownAccounts', title: '我的日历', ownership: 'self', items: ownAccounts },
+            { key: 'sharedAccounts', title: '共享日历', ownership: 'shared', items: sharedAccounts },
+          ].map((group) => (
+            <div key={group.title} className="group px-1">
+              <button
+                type="button"
+                onClick={() => toggleSection(group.key)}
+                className="mb-1 flex h-9 w-full items-center justify-between rounded-lg px-2 text-left text-sm font-medium text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-900"
+              >
+                <span className="relative flex min-w-0 items-center pr-2">
+                  <span className="truncate text-[12px] font-bold tracking-wide text-slate-400">{group.title}</span>
+                  {group.ownership === 'shared' && pendingShareInvitationCount > 0 && (
+                    <span className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                  )}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`ml-2 shrink-0 text-slate-500 transition-transform ${
+                    collapsedSections[group.key] ? '-rotate-90' : ''
+                  }`}
+                />
+              </button>
+
+              {!collapsedSections[group.key] && (
+                <div className="mt-1 space-y-[2px]">
+                  {group.items.map((account) => {
+                    const displayName = getAccountDisplayLabel(account);
                     const fullLabel = getAccountFullLabel(account);
+
                     return (
-                    <div
-	                    key={account.id}
-	                    className="group/account relative -mx-1 flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 transition-colors duration-120 hover:bg-white/65"
-	                    onContextMenu={(e) => onAccountContextMenu(e, account)}
-	                  >
-	                    <label className="relative flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center" title={account.checked ? '取消选中此日历' : '选中此日历'}>
-	                      <input
-	                        type="checkbox"
-	                        checked={account.checked}
-	                        onChange={(e) => { e.stopPropagation(); onToggleAccount(account.id); }}
-	                        onClick={(e) => e.stopPropagation()}
-	                        aria-label={`显示${displayName}`}
-	                        className="sr-only"
-	                      />
-	                      <span
-	                        data-calendar-account-checkbox={account.id}
-	                        className={`flex h-5 w-5 items-center justify-center rounded-md border-[1.5px] transition-all duration-150 ${
-	                          account.checked
-	                            ? getAccountCheckboxTone(account.color)
-	                            : 'border-gray-300 bg-white text-transparent hover:border-blue-400'
-	                        }`}
-	                      >
-	                        {account.checked && <Check size={13} strokeWidth={2.8} />}
-	                      </span>
-	                    </label>
-	                    {/* Content area - click to open details */}
-	                    <div
-                        title={fullLabel}
-                        className="min-w-0 flex-1 truncate rounded px-1 py-0.5 -mx-1"
+                      <div
+                        key={account.id}
+                        className="group/account relative flex cursor-default items-center gap-2 rounded-xl px-2 py-1.5 transition-colors duration-120 hover:bg-white/65"
+                        onContextMenu={(e) => onAccountContextMenu(e, account)}
                       >
-			                        <span className="text-[14px] leading-snug font-semibold text-gray-800">
-			                          {displayName}
-			                        </span>
-			                      </div>
-			                      {/* Hover: More menu button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onAccountMenu?.(e, account); }}
-                        title="更多"
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 opacity-0 transition hover:bg-white hover:text-gray-700 group-hover/account:opacity-100"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-			                      {/* Pending notification dot */}
-                      {account.ownership === 'shared' && account.hasPendingInvite && (
-                        <span className="absolute right-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                      )}
-			                    </div>
-	                  );
-		              })}
+                        <label
+                          className="relative flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center"
+                          title={account.checked ? '取消选中此日历' : '选中此日历'}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={account.checked}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              onToggleAccount(account.id);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`显示${displayName}`}
+                            className="sr-only"
+                          />
+                          <span
+                            data-calendar-account-checkbox={account.id}
+                            className={`flex h-5 w-5 items-center justify-center rounded-md border-[1.5px] transition-all duration-150 ${
+                              account.checked ? getAccountCheckboxTone(account.color) : 'border-gray-300 bg-white text-transparent hover:border-[#0A59F7]/60'
+                            }`}
+                          >
+                            {account.checked && <Check size={13} strokeWidth={2.8} />}
+                          </span>
+                        </label>
+                        <div title={fullLabel} className="-mx-1 min-w-0 flex-1 truncate rounded px-1 py-0.5">
+                          <span className="text-[14px] font-semibold leading-snug text-gray-800">{displayName}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAccountMenu?.(e, account);
+                          }}
+                          title="更多"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 opacity-0 transition hover:bg-white hover:text-gray-700 group-hover/account:opacity-100"
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+                        {account.ownership === 'shared' && account.hasPendingInvite && (
+                          <span className="absolute right-1.5 top-1/2 h-1.5 w-1.5 shrink-0 -translate-y-1/2 animate-pulse rounded-full bg-red-500" />
+                        )}
+                      </div>
+                    );
+                  })}
+
                   {group.items.length === 0 && (
                     <div className="px-1 py-2.5 text-xs font-medium text-gray-400">
                       {`暂无${group.title}`}
                     </div>
                   )}
-                  {/* Persistent add button for shared calendars */}
+
                   {group.ownership === 'shared' && (
                     <button
                       onClick={onAddSharedCalendar}
-                      className="relative mt-0.5 flex w-full items-center justify-start gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-blue-600"
+                      className="relative mt-0.5 flex w-full items-center justify-start gap-1.5 rounded-lg px-2 py-[5px] text-[12px] font-medium text-gray-500 transition-colors duration-120 hover:bg-slate-200/70 hover:text-[#0A59F7]"
                     >
                       <Plus size={13} />
                       添加共享日历
@@ -1916,10 +2518,10 @@ function CalendarSidebar({
                       )}
                     </button>
                   )}
-                </div>}
-              </div>
-            ))}
-          </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -2076,7 +2678,7 @@ function WeekView({
                       key={day.date.toISOString()}
                       className={`border-r border-gray-200 ${
                         day.isToday
-                          ? 'bg-blue-50/70'
+                          ? 'bg-[#0A59F7]/[0.06]'
                           : showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date)
                             ? 'bg-amber-50/70'
                             : isWeekendDate(day.date)
@@ -2085,8 +2687,8 @@ function WeekView({
                       }`}
                     >
                       <div className="flex h-12 flex-col items-center justify-center">
-                        <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
-                        <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-900'}`}>
+                        <span className={`text-xs font-bold ${day.isToday ? 'text-[#0A59F7]' : 'text-gray-500'}`}>{day.short}</span>
+                        <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-[#0A59F7]' : 'text-gray-900'}`}>
                           {day.dayNumber}
                           {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date) && (
                             <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
@@ -2156,7 +2758,7 @@ function WeekView({
                                       onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                                       onMouseLeave={() => onHidePreview(event.id)}
                                       title={title}
-                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
+                                      className={`w-full truncate rounded-md border px-2 py-1 text-left text-[11px] font-semibold transition-colors hover:ring-2 hover:ring-[#0A59F7]/25 ${tones.container} ${
                                         flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                                       }`}
                                     >
@@ -2165,7 +2767,7 @@ function WeekView({
                                     </button>
                                   );
                                 })}
-                                {cellEvents.length > 3 && <div className="px-1 text-[10px] font-bold text-blue-600">+{cellEvents.length - 3} 更多</div>}
+                                {cellEvents.length > 3 && <div className="px-1 text-[10px] font-bold text-[#0A59F7]">+{cellEvents.length - 3} 更多</div>}
                               </div>
                             </div>
                           );
@@ -2188,7 +2790,7 @@ function WeekView({
 
               <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
                 {days.map((day, dayIndex) => (
-                  <div key={`${day.date.toISOString()}-split-timeline`} className={`relative border-r border-gray-200 ${day.isToday ? 'bg-blue-50/20' : 'bg-white'}`}>
+                  <div key={`${day.date.toISOString()}-split-timeline`} className={`relative border-r border-gray-200 ${day.isToday ? 'bg-[#0A59F7]/[0.02]' : 'bg-white'}`}>
                     <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${weekAccounts.length}, minmax(0, 1fr))` }}>
                       {weekAccounts.map((account, accountIndex) => {
                         const laneId = account.id;
@@ -2217,12 +2819,12 @@ function WeekView({
                                 data-slot-date-ms={stripTime(day.date).getTime()}
                                 data-slot-hour={hour}
                                 className={`group relative h-24 cursor-pointer border-b transition-colors ${
-                                  isWorkHour(hour) ? 'border-gray-100 bg-transparent hover:bg-blue-50' : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100'
+                                  isWorkHour(hour) ? 'border-gray-100 bg-transparent hover:bg-[#0A59F7]/[0.08]' : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100'
                                 }`}
                               >
                                 {!selection && (
-                                  <div className="absolute inset-1 hidden items-center justify-center rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/60 group-hover:flex">
-                                    <Plus className="text-blue-500" size={16} />
+                                  <div className="absolute inset-1 hidden items-center justify-center rounded-lg border-2 border-dashed border-[#0A59F7]/35 bg-[#0A59F7]/[0.05] group-hover:flex">
+                                    <Plus className="text-[#0A59F7]" size={16} />
                                   </div>
                                 )}
                               </div>
@@ -2230,7 +2832,7 @@ function WeekView({
 
                             {selection && sameDay(selection.date, day.date) && (selection.laneId || null) === laneId && (
                               <div
-                                className="pointer-events-none absolute rounded-lg border-2 border-blue-400 bg-blue-100/80 shadow-sm"
+                                className="pointer-events-none absolute rounded-lg border-2 border-[#0A59F7]/60 bg-[#0A59F7]/[0.12] shadow-sm"
                                 style={{
                                   top: `${getWeekTimeTop(selection.startH)}px`,
                                   height: `${getTimeHeight(selection.durationH)}px`,
@@ -2239,7 +2841,7 @@ function WeekView({
                                   zIndex: 4,
                                 }}
                               >
-                                <div className="px-2 py-1.5 text-[11px] font-black text-blue-700">
+                                <div className="px-2 py-1.5 text-[11px] font-black text-[#0A59F7]">
                                   新建 {formatTimeRange(selection.startH, selection.durationH)}
                                 </div>
                               </div>
@@ -2291,8 +2893,8 @@ function WeekView({
                                   onMouseLeave={() => onHidePreview(event.id)}
                                   title={`${title} · ${formatTimeRange(safeStartH, safeDuration)}`}
                                   className={`group absolute overflow-hidden rounded-lg border px-2 py-1.5 shadow-none ${tones.container} ${statusSurface.cardClass} ${
-                                    editable ? 'cursor-grab select-none hover:ring-2 hover:ring-blue-200/80 active:cursor-grabbing' : 'cursor-pointer'
-                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none z-20 ring-2 ring-blue-300 shadow-lg' : 'hover:z-10'} ${
+                                    editable ? 'cursor-grab select-none hover:ring-2 hover:ring-[#0A59F7]/30 active:cursor-grabbing' : 'cursor-pointer'
+                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none z-20 ring-2 ring-[#0A59F7]/40 shadow-lg' : 'hover:z-10'} ${
                                     flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                                   }`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width }}
@@ -2314,7 +2916,7 @@ function WeekView({
                                       }`}
                                       aria-label="调整开始时间"
                                     >
-                                      <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                      <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                                     </button>
                                   )}
                                   {isBusyOnlyEvent(event, calendar) ? (
@@ -2350,7 +2952,7 @@ function WeekView({
                                       }`}
                                       aria-label="调整时长"
                                     >
-                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                                     </button>
                                   )}
                                 </div>
@@ -2421,7 +3023,7 @@ function WeekView({
                           key={`${pane.account.id}-${day.date.toISOString()}-date-header`}
                           className={`flex-1 border-r border-gray-200 px-2 ${
                             day.isToday
-                              ? 'bg-blue-50/80'
+                              ? 'bg-[#0A59F7]/[0.07]'
                               : showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date)
                                 ? 'bg-amber-50/70'
                                 : isWeekendDate(day.date)
@@ -2431,8 +3033,8 @@ function WeekView({
                           style={{ height: `${weekTimelineHeaderHeight}px` }}
                         >
                           <div className="flex h-full flex-col items-center justify-center">
-                            <span className={`text-xs font-bold ${day.isToday ? 'text-blue-600' : 'text-gray-500'}`}>{day.short}</span>
-                            <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-blue-700' : 'text-gray-800'}`}>
+                            <span className={`text-xs font-bold ${day.isToday ? 'text-[#0A59F7]' : 'text-gray-500'}`}>{day.short}</span>
+                            <span className={`inline-flex items-center gap-1 text-lg font-black ${day.isToday ? 'text-[#0A59F7]' : 'text-gray-800'}`}>
                               {day.dayNumber}
                               {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(day.date) && (
                                 <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
@@ -2499,7 +3101,7 @@ function WeekView({
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
                               title={visibleTitle}
-                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
+                              className={`pointer-events-auto absolute rounded-md border text-left px-2 py-1 text-[11px] font-semibold truncate transition-colors hover:ring-2 hover:ring-[#0A59F7]/25 ${tones.container} ${
                                 flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                               }`}
                               style={{ left, width, top }}
@@ -2547,7 +3149,7 @@ function WeekView({
                       return (
                         <div
                           key={`${pane.account.id}-${day.date.toISOString()}`}
-                          className={`flex-1 border-r border-gray-200 relative ${day.isToday ? 'bg-blue-50/30' : ''}`}
+                          className={`flex-1 border-r border-gray-200 relative ${day.isToday ? 'bg-[#0A59F7]/[0.03]' : ''}`}
                         >
                           {HOURS.map((hour) => (
                             <div
@@ -2563,12 +3165,12 @@ function WeekView({
                               data-slot-date-ms={stripTime(day.date).getTime()}
                               data-slot-hour={hour}
                             className={`h-24 border-b transition-colors cursor-pointer relative group ${
-                              isWorkHour(hour) ? 'border-gray-100 bg-white hover:bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                              isWorkHour(hour) ? 'border-gray-100 bg-white hover:bg-[#0A59F7]/[0.08]' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                             }`}
                           >
                             {!selection && (
-                              <div className="hidden group-hover:flex absolute inset-1 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50/60 items-center justify-center">
-                                <Plus className="text-blue-500" size={18} />
+                              <div className="hidden group-hover:flex absolute inset-1 border-2 border-dashed border-[#0A59F7]/35 rounded-lg bg-[#0A59F7]/[0.05] items-center justify-center">
+                                <Plus className="text-[#0A59F7]" size={18} />
                               </div>
                             )}
                           </div>
@@ -2576,7 +3178,7 @@ function WeekView({
 
                           {selection && sameDay(selection.date, day.date) && (selection.laneId || null) === laneId && (
                             <div
-                              className="absolute rounded-xl border-2 border-blue-400 bg-blue-100/80 shadow-sm pointer-events-none"
+                              className="absolute rounded-xl border-2 border-[#0A59F7]/60 bg-[#0A59F7]/[0.12] shadow-sm pointer-events-none"
                               style={{
                                 top: `${getWeekTimeTop(selection.startH)}px`,
                                 height: `${getTimeHeight(selection.durationH)}px`,
@@ -2585,7 +3187,7 @@ function WeekView({
                                 zIndex: 4,
                               }}
                             >
-                              <div className="px-2 py-2 text-blue-700">
+                              <div className="px-2 py-2 text-[#0A59F7]">
                                 {isSplit ? (
                                   <div className="flex flex-col gap-0.5 leading-tight">
                                     <span className="truncate text-[11px] font-black">新建</span>
@@ -2651,8 +3253,8 @@ function WeekView({
                                   onMouseLeave={() => onHidePreview(event.id)}
                                   title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}`}
                                   className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg shadow-none' : 'rounded-xl shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
-                                    editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
-                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'} ${
+                                    editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-[#0A59F7]/30 hover:z-10' : 'cursor-pointer'
+                                  } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-[#0A59F7]/40 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md hover:z-10'} ${
                                     flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                                   }`}
                                   style={{ top: `${top}px`, height: `${height}px`, left, width, padding: useCompactCard ? '6px' : '8px' }}
@@ -2680,7 +3282,7 @@ function WeekView({
                                       }`}
                                       aria-label="调整开始时间"
                                     >
-                                      <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                      <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                                     </button>
                                   )}
                                   {hiddenDetails ? (
@@ -2721,7 +3323,7 @@ function WeekView({
                                       }`}
                                       aria-label="调整时长"
                                     >
-                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                                     </button>
                                   )}
                                 </div>
@@ -2925,7 +3527,7 @@ function DayView({
                               onMouseMove={(entry) => onPreviewEvent(entry, event.id)}
                               onMouseLeave={() => onHidePreview(event.id)}
                               title={`${visibleTitle}${account ? ` · ${getAccountDisplayLabel(account)}` : ''}`}
-                              className={`relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition-colors hover:ring-2 hover:ring-blue-200/70 ${tones.container} ${
+                              className={`relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition-colors hover:ring-2 hover:ring-[#0A59F7]/25 ${tones.container} ${
                                 flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                               }`}
                             >
@@ -2985,12 +3587,12 @@ function DayView({
                             data-slot-date-ms={stripTime(focusDate).getTime()}
                             data-slot-hour={hour}
                             className={`h-24 border-b transition-colors cursor-pointer relative group ${
-                              isWorkHour(hour) ? 'border-gray-100 bg-white hover:bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                              isWorkHour(hour) ? 'border-gray-100 bg-white hover:bg-[#0A59F7]/[0.08]' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                             }`}
                           >
                             {!selection && (
-                              <div className="hidden group-hover:flex absolute inset-1 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 bg-opacity-60 items-center justify-center">
-                                <Plus className="text-blue-500" size={18} />
+                              <div className="hidden group-hover:flex absolute inset-1 border-2 border-dashed border-[#0A59F7]/35 rounded-lg bg-[#0A59F7]/[0.06] items-center justify-center">
+                                <Plus className="text-[#0A59F7]" size={18} />
                               </div>
                             )}
                           </div>
@@ -2999,7 +3601,7 @@ function DayView({
                     ))}
                     {selection && sameDay(selection.date, focusDate) && (selection.laneId || null) === lane.id && (
                       <div
-                        className="absolute rounded-xl border-2 border-blue-400 bg-blue-100/80 shadow-sm pointer-events-none"
+                        className="absolute rounded-xl border-2 border-[#0A59F7]/60 bg-[#0A59F7]/[0.12] shadow-sm pointer-events-none"
                         style={{
                           top: `${getTimeTop(selection.startH)}px`,
                           height: `${getTimeHeight(selection.durationH)}px`,
@@ -3008,7 +3610,7 @@ function DayView({
                           zIndex: 4,
                         }}
                       >
-                        <div className="px-3 py-2 text-[11px] font-black text-blue-700">
+                        <div className="px-3 py-2 text-[11px] font-black text-[#0A59F7]">
                           新建 {formatTimeRange(selection.startH, selection.durationH)}
                         </div>
                       </div>
@@ -3062,8 +3664,8 @@ function DayView({
                             onMouseLeave={() => onHidePreview(event.id)}
                             title={`${visibleTitle} · ${formatTimeRange(safeStartH, safeDuration)}${event.location && !hiddenDetails ? ` · ${event.location}` : ''}`}
                             className={`group absolute overflow-hidden border ${useCompactCard ? 'rounded-lg p-2.5 shadow-none' : 'rounded-xl p-3 shadow-sm'} ${tones.container} ${statusSurface.cardClass} ${
-                              editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-blue-200/80 hover:z-10' : 'cursor-pointer'
-                            } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-blue-300 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'} ${
+                              editable ? 'cursor-grab active:cursor-grabbing select-none hover:ring-2 hover:ring-[#0A59F7]/30 hover:z-10' : 'cursor-pointer'
+                            } ${isInteracting && interaction?.changed ? 'pointer-events-none ring-2 ring-[#0A59F7]/40 shadow-lg z-20' : useCompactCard ? 'hover:z-10' : 'hover:shadow-md'} ${
                               flashingEventId === event.id ? 'coremail-event-locate-pulse' : ''
                             }`}
                             style={{ top: `${top}px`, height: `${height}px`, left, width }}
@@ -3091,7 +3693,7 @@ function DayView({
                                 }`}
                                 aria-label="调整开始时间"
                               >
-                                <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                <span className="mt-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                               </button>
                             )}
                             {hiddenDetails ? (
@@ -3133,7 +3735,7 @@ function DayView({
                                       }`}
                                       aria-label="调整时长"
                                     >
-                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm"></span>
+                                      <span className="mb-1.5 h-3 w-3 rounded-full border-2 border-white bg-[#0A59F7] shadow-sm"></span>
                                     </button>
                                   )}
                                 </div>
@@ -3211,8 +3813,8 @@ function MonthView({
           : isHuaweiWorkday
             ? 'bg-amber-50/70 hover:bg-amber-50'
             : isWeekend
-              ? 'bg-slate-50/80 hover:bg-blue-50/40'
-              : 'bg-white hover:bg-blue-50/40';
+              ? 'bg-slate-50/80 hover:bg-[#0A59F7]/[0.04]'
+              : 'bg-white hover:bg-[#0A59F7]/[0.04]';
         const showQuickCreate = cell.isCurrentMonth && isSelectedDate;
         const maxVisibleEvents = options.groupBySource ? 4 : 3;
 
@@ -3232,9 +3834,9 @@ function MonthView({
                   }}
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black transition ${
                     cell.isToday
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-[#0A59F7] text-white'
                       : isSelectedDate
-                        ? 'border border-blue-500 bg-blue-50 text-blue-700'
+                        ? 'border border-[#0A59F7] bg-[#0A59F7]/[0.08] text-[#0A59F7]'
                         : cell.isCurrentMonth
                           ? 'text-slate-800 hover:bg-slate-100'
                           : 'text-slate-300'
@@ -3256,8 +3858,8 @@ function MonthView({
                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-slate-400 transition ${
                   cell.isCurrentMonth
                     ? showQuickCreate
-                      ? 'border-blue-200 bg-blue-50 text-blue-600 opacity-100'
-                      : 'border-slate-200 bg-white opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-600 group-focus-within:opacity-100 group-focus-within:pointer-events-auto'
+                      ? 'border-[#0A59F7]/25 bg-[#0A59F7]/[0.08] text-[#0A59F7] opacity-100'
+                      : 'border-slate-200 bg-white opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-hover:border-[#0A59F7]/25 group-hover:bg-[#0A59F7]/[0.08] group-hover:text-[#0A59F7] group-focus-within:opacity-100 group-focus-within:pointer-events-auto'
                     : 'pointer-events-none opacity-0'
                 }`}
                 title="新建日程"
@@ -3322,7 +3924,7 @@ function MonthView({
                     event.stopPropagation();
                     onSelectDate(cell.date);
                   }}
-                  className="text-[11px] font-bold text-blue-600 pl-1"
+                  className="text-[11px] font-bold text-[#0A59F7] pl-1"
                 >
                   +{dayEvents.length - maxVisibleEvents} 更多
                 </button>
@@ -3389,7 +3991,7 @@ function EventPreviewCard({
         <div className={`relative border-b px-4 py-3 ${titleTone.container}`}>
           {!isBusyOnly && <div className={`absolute bottom-0 left-0 top-0 w-1 ${titleTone.stripe}`}></div>}
           {mode === 'drag' && label && (
-            <div className="mb-2 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+            <div className="mb-2 inline-flex rounded-full bg-[#0A59F7]/[0.08] px-2 py-0.5 text-[11px] font-bold text-[#0A59F7]">
               {label}
             </div>
           )}
@@ -3420,7 +4022,7 @@ function EventPreviewCard({
           )}
 
           <div className="flex min-w-0 items-center font-bold text-gray-800">
-            <Clock size={13} className="mr-2 shrink-0 text-blue-600" />
+            <Clock size={13} className="mr-2 shrink-0 text-[#0A59F7]" />
             {formatEventDateTime(event)}
           </div>
 
@@ -3432,7 +4034,7 @@ function EventPreviewCard({
           )}
 
           {mode === 'drag' && (
-            <div className="rounded-xl bg-blue-50 px-3 py-2 text-[11px] font-bold text-blue-700">
+            <div className="rounded-xl bg-[#0A59F7]/[0.08] px-3 py-2 text-[11px] font-bold text-[#0A59F7]">
               松手即可应用新的时间安排
             </div>
           )}
@@ -3457,7 +4059,7 @@ function EventPreviewCard({
                   entry.stopPropagation();
                   onJoinEvent?.(event);
                 }}
-                className="inline-flex h-8 flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700"
+                className="inline-flex h-8 flex-1 items-center justify-center rounded-lg bg-[#0A59F7] px-3 text-xs font-bold text-white transition hover:bg-[#084DDB]"
               >
                 加入会议
               </button>
@@ -3524,7 +4126,7 @@ function PermissionDropdown({ value, onChange, className = '' }) {
           setOpen((prev) => !prev);
           window.requestAnimationFrame(syncMenuRect);
         }}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left outline-none transition hover:bg-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left outline-none transition hover:bg-slate-50 focus:border-[#0A59F7] focus:ring-2 focus:ring-[#0A59F7]/20"
       >
         <span className="min-w-0">
           <span className="block truncate whitespace-nowrap text-sm font-black text-slate-900">{selected.label}</span>
@@ -3556,7 +4158,7 @@ function PermissionDropdown({ value, onChange, className = '' }) {
                     setOpen(false);
                   }}
                   className={`flex w-full flex-col px-3 py-2.5 text-left transition ${
-                    selected.id === option.id ? 'bg-blue-50' : 'hover:bg-slate-50'
+                    selected.id === option.id ? 'bg-[#0A59F7]/[0.08]' : 'hover:bg-slate-50'
                   }`}
                 >
                   <span className="text-sm font-black text-slate-900">{option.label}</span>
@@ -3639,7 +4241,7 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
               }
             }}
             placeholder="姓名或邮箱"
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#0A59F7] focus:ring-2 focus:ring-[#0A59F7]/20"
           />
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
@@ -3672,7 +4274,7 @@ function ShareMemberComposer({ existingShares = [], onAdd }) {
           type="button"
           onClick={() => addMember()}
           disabled={!resolvedMember}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-[#0A59F7] px-3 text-sm font-bold text-white transition hover:bg-[#084DDB] disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           添加
         </button>
@@ -3798,7 +4400,7 @@ function MailboxPermissionModal({
       <div className="w-[760px] max-w-[92vw] max-h-[70vh] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b border-slate-200 bg-[#fcfcfb] px-6 py-5">
           <div className="flex min-w-0 items-center gap-3">
-            <span className={`h-4 w-4 shrink-0 rounded-full ${account.color || 'bg-blue-500'}`}></span>
+            <span className={`h-4 w-4 shrink-0 rounded-full ${account.color || 'bg-[#0A59F7]'}`}></span>
             <div className="min-w-0">
               <div className="truncate text-lg font-black text-gray-900">{panelTitle}</div>
               <div className="mt-1 truncate text-sm text-gray-500">{accountLabel}</div>
@@ -3820,7 +4422,7 @@ function MailboxPermissionModal({
                     <input
                       value={draftName}
                       onChange={(event) => setDraftName(event.target.value)}
-                      className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      className="h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#0A59F7] focus:ring-2 focus:ring-[#0A59F7]/20"
                     />
                   </label>
                   <button
@@ -3848,7 +4450,7 @@ function MailboxPermissionModal({
                       type="button"
                       onClick={() => onUpdateAccountColor(account.id, color)}
                       className={`h-9 w-9 rounded-full ${color} transition ${
-                        account.color === color ? 'ring-2 ring-blue-500 ring-offset-2' : 'hover:scale-105'
+                        account.color === color ? 'ring-2 ring-[#0A59F7] ring-offset-2' : 'hover:scale-105'
                       }`}
                       title="修改颜色"
                     />
@@ -4169,14 +4771,14 @@ function AddSharedCalendarModal({
                         if (event.key === 'Escape') setShowAccountSuggestions(false);
                       }}
                       placeholder="姓名或邮箱"
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#0A59F7] focus:ring-2 focus:ring-[#0A59F7]/20"
                     />
                   </div>
                   <PermissionDropdown value={draft.permissionId} onChange={(permissionId) => onChange({ permissionId })} />
                   <button
                     onClick={onSubmit}
                     disabled={!draft.email.trim()}
-                    className="inline-flex h-11 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0A59F7] px-4 text-sm font-bold text-white transition hover:bg-[#084DDB] disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     添加
                   </button>
@@ -4528,13 +5130,13 @@ function ReminderModal({
                     key={event.id}
                     data-reminder-event-id={event.id}
                     className={`group border-l-[3px] transition ${
-                      selected ? 'border-l-blue-500 bg-blue-50/45' : 'border-l-transparent hover:bg-slate-50/80'
+                      selected ? 'border-l-[#0A59F7] bg-[#0A59F7]/[0.04]' : 'border-l-transparent hover:bg-slate-50/80'
                     } ${
                       index > 0 ? 'border-t border-slate-100' : ''
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-4 px-5 py-4">
-                      <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${canJoin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${canJoin ? 'bg-[#0A59F7]/[0.08] text-[#0A59F7]' : 'bg-slate-100 text-slate-500'}`}>
                         {canJoin ? <Video size={23} fill="currentColor" strokeWidth={2.2} /> : <Calendar size={22} />}
                       </span>
                       <div
@@ -4550,7 +5152,7 @@ function ReminderModal({
                       >
                         <div className="flex min-w-0 flex-wrap items-center gap-3">
                           <div className="min-w-0 truncate text-sm font-black text-gray-900">{event.title || '无标题'}</div>
-                          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${timeMeta.state === 'ongoing' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${timeMeta.state === 'ongoing' ? 'bg-emerald-50 text-emerald-700' : 'bg-[#0A59F7]/[0.08] text-[#0A59F7]'}`}>
                             {statusText}
                           </span>
                         </div>
@@ -4579,7 +5181,7 @@ function ReminderModal({
                           <button
                             type="button"
                             onClick={() => onJoinEvent(event)}
-                            className="inline-flex h-11 items-center rounded-lg bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-700"
+                            className="inline-flex h-11 items-center rounded-lg bg-[#0A59F7] px-5 text-sm font-bold text-white transition hover:bg-[#084DDB]"
                           >
                             加入会议
                           </button>
@@ -4632,7 +5234,7 @@ function ReminderModal({
             <button
               type="button"
               onClick={onOpenSettings}
-              className="shrink-0 font-bold text-blue-600 transition hover:text-blue-700"
+              className="shrink-0 font-bold text-[#0A59F7] transition hover:text-[#084DDB]"
             >
               提醒设置
             </button>
@@ -4657,7 +5259,7 @@ function ReminderModal({
                   type="checkbox"
                   checked={skipDismissAllNextTime}
                   onChange={(event) => setSkipDismissAllNextTime(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0A59F7] focus:ring-[#0A59F7]"
                 />
                 下次不再提示
               </label>
@@ -4672,7 +5274,7 @@ function ReminderModal({
                 <button
                   type="button"
                   onClick={confirmDismissAllEvents}
-                  className="inline-flex h-9 items-center rounded-lg bg-blue-600 px-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                  className="inline-flex h-9 items-center rounded-lg bg-[#0A59F7] px-3 text-sm font-bold text-white transition hover:bg-[#084DDB]"
                 >
                   全部清除
                 </button>
@@ -4751,6 +5353,14 @@ function MainApp() {
   const [focusDate, setFocusDate] = useState(stripTime(TODAY_DATE));
   const [calendarSidebarCollapsed, setCalendarSidebarCollapsed] = useState(false);
   const [mailSidebarCollapsed, setMailSidebarCollapsed] = useState(false);
+  const [mailSidebarNarrowExpanded, setMailSidebarNarrowExpanded] = useState(false);
+  const [initialMailLayout] = useState(() => loadMailLayoutPreferences());
+  const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth());
+  const [calendarSidebarWidth, setCalendarSidebarWidth] = useState(() => getDefaultCalendarSidebarWidth());
+  const [mailSidebarWidth, setMailSidebarWidth] = useState(() => initialMailLayout.sidebarWidth);
+  const [mailListWidth, setMailListWidth] = useState(() => initialMailLayout.listWidth);
+  const [mailLayoutMode, setMailLayoutMode] = useState(() => initialMailLayout.layoutMode);
+  const [activeLayoutResize, setActiveLayoutResize] = useState(null);
   const [focusedAccountId, setFocusedAccountId] = useState(null);
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null);
   const [feedback, setFeedback] = useState({ type: null, payload: null });
@@ -4817,8 +5427,8 @@ function MainApp() {
   );
   const [mailFolder, setMailFolder] = useState('inbox');
   const [selectedMailAccountId, setSelectedMailAccountId] = useState(MOCK_MAILS[0]?.accountId || MOCK_ACCOUNTS[0]?.id || 'acc1');
-  const [mailFocusTab, setMailFocusTab] = useState('focused');
-  const [mailUnreadOnly, setMailUnreadOnly] = useState(false);
+  const [mailListFilter, setMailListFilter] = useState('all');
+  const [mailSortOrder, setMailSortOrder] = useState('newest');
   const [selectedMailId, setSelectedMailId] = useState(MOCK_MAILS[0]?.id || null);
   const [mailComposer, setMailComposer] = useState({
     open: false,
@@ -4849,6 +5459,7 @@ function MainApp() {
     }),
   );
   const eventInteractionRef = useRef(null);
+  const layoutResizeRef = useRef(null);
   const suppressOpenUntilRef = useRef(0);
   const timeSelectionRef = useRef(null);
   const isSelectingTimeRef = useRef(false);
@@ -4863,6 +5474,12 @@ function MainApp() {
   const calendarMap = useMemo(() => Object.fromEntries(calendars.map((calendar) => [calendar.id, calendar])), [calendars]);
   const activeAccountIds = useMemo(() => accounts.filter((account) => account.checked).map((account) => account.id), [accounts]);
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
+  const mailResponsiveSidebarCollapsed = viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && !mailSidebarNarrowExpanded;
+  const effectiveMailSidebarCollapsed = mailSidebarCollapsed || mailResponsiveSidebarCollapsed;
+  const mailLayoutSidebarWidth = effectiveMailSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : mailSidebarWidth;
+  const calendarSidebarBounds = getCalendarSidebarBounds(viewportWidth);
+  const mailSidebarBounds = { min: APP_SIDEBAR_MIN_WIDTH, max: APP_SIDEBAR_MAX_WIDTH };
+  const mailListBounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
   const currentUserIdentities = useMemo(() => buildCurrentUserIdentitySet(accounts), [accounts]);
   const normalizedCalendarSearch = calendarSearchQuery.trim().toLowerCase();
   const calendarSearchAccountOptions = useMemo(() => activeAccounts.map((account) => ({ ...account, label: account.email || account.name })), [activeAccounts]);
@@ -4881,6 +5498,281 @@ function MainApp() {
       // Ignore storage failures; the current session state still applies.
     }
   }, [skipReminderDismissAllConfirm]);
+
+  const saveMailLayoutPreference = ({ layoutMode = mailLayoutMode, sidebarWidth = mailSidebarWidth, listWidth = mailListWidth, readerWidth = null } = {}) => {
+    persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: mailSidebarCollapsed });
+  };
+
+  const setLayoutWidth = (type, nextWidth, viewportWidth = getViewportWidth()) => {
+    if (type === 'calendar-a') {
+      const bounds = getCalendarSidebarBounds(viewportWidth);
+      setCalendarSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      return;
+    }
+
+    if (type === 'mail-a') {
+      const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+      const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
+      setMailSidebarWidth(nextSidebarWidth);
+      setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
+      return;
+    }
+
+    if (type === 'mail-b') {
+      const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
+      setMailListWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+    }
+  };
+
+  const getLayoutWidth = (type) => {
+    if (type === 'calendar-a') return calendarSidebarWidth;
+    if (type === 'mail-a') return mailSidebarWidth;
+    return mailListWidth;
+  };
+
+  const startLayoutResize = (type, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    layoutResizeRef.current = {
+      type,
+      startX: event.clientX,
+      lastClientX: event.clientX,
+      startWidth: getLayoutWidth(type),
+      viewportWidth: getViewportWidth(),
+      sidebarWidth: mailLayoutSidebarWidth,
+      listWidth: mailListWidth,
+      layoutMode: mailLayoutMode,
+    };
+    setActiveLayoutResize(type);
+    document.documentElement.style.cursor = 'col-resize';
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const stepLayoutResize = (type, delta) => {
+    const viewportWidth = getViewportWidth();
+    const nextWidth = getLayoutWidth(type) + delta;
+    setLayoutWidth(type, nextWidth, viewportWidth);
+
+    if (type === 'mail-a') {
+      const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+      const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
+      const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
+      saveMailLayoutPreference({ sidebarWidth: nextSidebarWidth, listWidth: nextListWidth });
+    }
+    if (type === 'mail-b') {
+      const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
+      saveMailLayoutPreference({ listWidth: clampNumber(nextWidth, bounds.min, bounds.max) });
+    }
+  };
+
+  useLayoutEffect(() => {
+    const clampLayoutWidths = () => {
+      const nextViewportWidth = getViewportWidth();
+      const nextCalendarBounds = getCalendarSidebarBounds(nextViewportWidth);
+      const nextNarrowExpanded = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && mailSidebarNarrowExpanded;
+      const nextResponsiveMailCollapsed = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && !nextNarrowExpanded;
+
+      setViewportWidth(nextViewportWidth);
+      if (nextViewportWidth >= MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && mailSidebarNarrowExpanded) {
+        setMailSidebarNarrowExpanded(false);
+      }
+      setCalendarSidebarWidth((width) => clampNumber(width, nextCalendarBounds.min, nextCalendarBounds.max));
+      setMailSidebarWidth((width) => {
+        const nextSidebarWidth = clampNumber(width, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+        const nextLayoutMode = nextViewportWidth < MAIL_LAYOUT_AB_WIDTH || nextNarrowExpanded ? MAIL_LAYOUT_MODE_AB : mailLayoutMode;
+        const nextLayoutSidebarWidth = nextResponsiveMailCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : nextSidebarWidth;
+        const nextMailListBounds = getMailListBounds(nextViewportWidth, nextLayoutSidebarWidth, nextLayoutMode);
+        setMailLayoutMode(nextLayoutMode);
+        setMailListWidth((listWidth) => clampNumber(listWidth, nextMailListBounds.min, nextMailListBounds.max));
+        return nextSidebarWidth;
+      });
+    };
+
+    clampLayoutWidths();
+    window.addEventListener('resize', clampLayoutWidths);
+    return () => window.removeEventListener('resize', clampLayoutWidths);
+  }, [mailLayoutMode, mailSidebarNarrowExpanded]);
+
+  useEffect(() => {
+    const clearLayoutResize = () => {
+      layoutResizeRef.current = null;
+      setActiveLayoutResize(null);
+      document.documentElement.style.cursor = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    const handleMouseMove = (event) => {
+      const active = layoutResizeRef.current;
+      if (!active) return;
+
+      event.preventDefault();
+      active.lastClientX = event.clientX;
+      const nextWidth = active.startWidth + event.clientX - active.startX;
+
+      if (active.type === 'calendar-a') {
+        const bounds = getCalendarSidebarBounds(active.viewportWidth);
+        setCalendarSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      }
+
+      if (active.type === 'mail-a') {
+        const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+        const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
+        setMailSidebarWidth(nextSidebarWidth);
+        setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
+      }
+
+      if (active.type === 'mail-b') {
+        const bounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, active.layoutMode);
+        setMailListWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      }
+    };
+
+    const handleMouseUp = () => {
+      const active = layoutResizeRef.current;
+      if (!active) return;
+
+      const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
+      if (active.type === 'mail-a') {
+        const nextSidebarWidth = clampNumber(finalWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+        const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
+        const nextListWidth = clampNumber(active.listWidth, nextListBounds.min, nextListBounds.max);
+        persistMailLayoutPreference({
+          layoutMode: active.layoutMode,
+          sidebarWidth: nextSidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: getMailReaderWidth(active.viewportWidth, nextSidebarWidth, nextListWidth),
+          isACollapsed: mailSidebarCollapsed,
+        }, active.viewportWidth);
+      }
+
+      if (active.type === 'mail-b') {
+        const readerWidth = getMailReaderWidth(active.viewportWidth, active.sidebarWidth, finalWidth);
+        if (active.layoutMode === MAIL_LAYOUT_MODE_ABC && readerWidth < MAIL_READER_HIDE_THRESHOLD) {
+          const abBounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, MAIL_LAYOUT_MODE_AB);
+          const nextListWidth = abBounds.max;
+          setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
+          setMailListWidth(nextListWidth);
+          persistMailLayoutPreference({
+            layoutMode: MAIL_LAYOUT_MODE_AB,
+            sidebarWidth: active.sidebarWidth,
+            listWidth: nextListWidth,
+            readerWidth: 0,
+            isACollapsed: mailSidebarCollapsed,
+          }, active.viewportWidth);
+        } else {
+          const abcBounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, MAIL_LAYOUT_MODE_ABC);
+          const nextListWidth = clampNumber(finalWidth, abcBounds.min, abcBounds.max);
+          setMailLayoutMode(MAIL_LAYOUT_MODE_ABC);
+          setMailListWidth(nextListWidth);
+          persistMailLayoutPreference({
+            layoutMode: MAIL_LAYOUT_MODE_ABC,
+            sidebarWidth: active.sidebarWidth,
+            listWidth: nextListWidth,
+            readerWidth: getMailReaderWidth(active.viewportWidth, active.sidebarWidth, nextListWidth),
+            isACollapsed: mailSidebarCollapsed,
+          }, active.viewportWidth);
+        }
+      }
+
+      clearLayoutResize();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (layoutResizeRef.current) clearLayoutResize();
+    };
+  }, [mailSidebarCollapsed]);
+
+  const restoreMailReader = () => {
+    const viewportWidth = getViewportWidth();
+    const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, MAIL_LAYOUT_MODE_ABC);
+    const preferredListWidth = clampNumber(viewportWidth - mailLayoutSidebarWidth - MAIL_READER_DEFAULT_WIDTH, bounds.min, bounds.max);
+    const readerWidth = getMailReaderWidth(viewportWidth, mailLayoutSidebarWidth, preferredListWidth);
+
+    setMailLayoutMode(MAIL_LAYOUT_MODE_ABC);
+    setMailListWidth(preferredListWidth);
+    saveMailLayoutPreference({
+      layoutMode: MAIL_LAYOUT_MODE_ABC,
+      sidebarWidth: mailSidebarWidth,
+      listWidth: preferredListWidth,
+      readerWidth,
+    });
+  };
+
+  const handleToggleMailSidebarCollapsed = () => {
+    const nextViewportWidth = getViewportWidth();
+    const isNarrowDesktop = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH;
+
+    if (isNarrowDesktop && effectiveMailSidebarCollapsed && !mailSidebarCollapsed) {
+      const nextSidebarWidth = clampNumber(mailSidebarWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+      const nextListBounds = getMailListBounds(nextViewportWidth, nextSidebarWidth, MAIL_LAYOUT_MODE_AB);
+      const nextListWidth = nextListBounds.max;
+
+      setMailSidebarNarrowExpanded(true);
+      setMailSidebarCollapsed(false);
+      setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
+      setMailListWidth(nextListWidth);
+      persistMailLayoutPreference(
+        {
+          layoutMode: MAIL_LAYOUT_MODE_AB,
+          sidebarWidth: nextSidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: 0,
+          isACollapsed: false,
+        },
+        nextViewportWidth,
+      );
+      return;
+    }
+
+    if (isNarrowDesktop && !effectiveMailSidebarCollapsed) {
+      const nextLayoutMode = nextViewportWidth < MAIL_LAYOUT_AB_WIDTH ? MAIL_LAYOUT_MODE_AB : MAIL_LAYOUT_MODE_ABC;
+      const nextListBounds = getMailListBounds(nextViewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, nextLayoutMode);
+      const nextListWidth =
+        nextLayoutMode === MAIL_LAYOUT_MODE_AB ? nextListBounds.max : clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
+
+      setMailSidebarNarrowExpanded(false);
+      setMailSidebarCollapsed(false);
+      setMailLayoutMode(nextLayoutMode);
+      setMailListWidth(nextListWidth);
+      persistMailLayoutPreference(
+        {
+          layoutMode: nextLayoutMode,
+          sidebarWidth: mailSidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: nextLayoutMode === MAIL_LAYOUT_MODE_AB ? 0 : getMailReaderWidth(nextViewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, nextListWidth),
+          isACollapsed: true,
+        },
+        nextViewportWidth,
+      );
+      return;
+    }
+
+    const nextCollapsed = !mailSidebarCollapsed;
+    const nextLayoutSidebarWidth = nextCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : mailSidebarWidth;
+    const nextListBounds = getMailListBounds(nextViewportWidth, nextLayoutSidebarWidth, mailLayoutMode);
+    const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
+
+    setMailSidebarNarrowExpanded(false);
+    setMailSidebarCollapsed(nextCollapsed);
+    setMailListWidth(nextListWidth);
+    persistMailLayoutPreference(
+      {
+        layoutMode: mailLayoutMode,
+        sidebarWidth: mailSidebarWidth,
+        listWidth: nextListWidth,
+        readerWidth: getMailReaderWidth(nextViewportWidth, nextLayoutSidebarWidth, nextListWidth),
+        isACollapsed: nextCollapsed,
+      },
+      nextViewportWidth,
+    );
+  };
 
   useEffect(() => {
     if (!calendarSearchPopoverOpen) return undefined;
@@ -4940,14 +5832,19 @@ function MainApp() {
       [...mails]
         .filter((mail) => {
           const matchesFolder = mailMatchesFolder(mail, mailFolder);
-          const matchesFocus = mailFolder !== 'inbox' || mail.category === mailFocusTab;
-          const matchesUnread = !mailUnreadOnly || mail.unread;
+          const signals = getMailSmartSignals(mail);
+          const matchesListFilter =
+            mailListFilter === 'all' ||
+            (mailListFilter === 'unread' && mail.unread) ||
+            (mailListFilter === 'flagged' && mail.starred) ||
+            (mailListFilter === 'attachment' && mail.attachments.length > 0) ||
+            (mailListFilter === 'important' && signals.important);
           const matchesAccount = mail.accountId === selectedMailAccountId;
 
-          return matchesFolder && matchesFocus && matchesUnread && matchesAccount;
+          return matchesFolder && matchesListFilter && matchesAccount;
         })
-        .sort((left, right) => right.timestamp - left.timestamp),
-    [mailFocusTab, mailFolder, mailUnreadOnly, mails, selectedMailAccountId],
+        .sort((left, right) => (mailSortOrder === 'oldest' ? left.timestamp - right.timestamp : right.timestamp - left.timestamp)),
+    [mailFolder, mailListFilter, mailSortOrder, mails, selectedMailAccountId],
   );
 
   const rangeEvents = useMemo(
@@ -5929,7 +6826,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: `已同步 ${nextReport.calendarCount} 个日历，刷新 ${nextReport.updatedCount} 场会议`,
       icon: <RefreshCw size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -5983,7 +6880,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: `${option.label}重新提醒`,
       icon: <Bell size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -6049,7 +6946,7 @@ function MainApp() {
 
   /* ===== 日历颜色 ===== */
   const CALENDAR_COLORS = [
-    'bg-blue-500', 'bg-cyan-500', 'bg-sky-500',
+    'bg-[#0A59F7]', 'bg-cyan-500', 'bg-sky-500',
     'bg-emerald-500', 'bg-green-500', 'bg-teal-500',
     'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500',
     'bg-orange-500', 'bg-amber-500', 'bg-yellow-500',
@@ -6456,20 +7353,6 @@ function MainApp() {
     }));
   };
 
-  const addMailRecipient = (field, email) => {
-    setMailComposer((prev) => {
-      const current = parseRecipients(prev.draft[field]);
-      if (current.includes(email)) return prev;
-      return {
-        ...prev,
-        draft: {
-          ...prev.draft,
-          [field]: joinRecipients([...current, email]),
-        },
-      };
-    });
-  };
-
   const addMailAttachment = () => {
     setMailComposer((prev) => ({
       ...prev,
@@ -6500,6 +7383,7 @@ function MainApp() {
     const draft = mailComposer.draft;
     const to = parseRecipients(draft.to);
     const cc = parseRecipients(draft.cc);
+    const bcc = parseRecipients(draft.bcc || '');
     if (mode === 'send' && to.length === 0) {
       triggerFeedback('L3', {
         msg: '请先填写收件人',
@@ -6523,9 +7407,11 @@ function MainApp() {
       fromEmail: account?.email || 'me@calendarpro.io',
       to,
       cc,
+      bcc,
       preview: draft.body.trim().split('\n').find(Boolean) || '(无正文)',
       body: draft.body.trim(),
       attachments: draft.attachments,
+      importance: draft.importance || 'normal',
       timestamp: Date.now(),
       linkedEventId: mails.find((mail) => mail.id === mailComposer.sourceMailId)?.linkedEventId || null,
     };
@@ -6553,7 +7439,6 @@ function MainApp() {
     const targetMail = mails.find((mail) => mail.id === mailId);
     if (targetMail) setSelectedMailAccountId(targetMail.accountId);
     setSelectedMailId(mailId);
-    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, unread: false } : mail)));
   };
 
   const selectMailboxFolder = (folderId, accountId = selectedMailAccountId) => {
@@ -6562,23 +7447,56 @@ function MainApp() {
     const nextMail = [...mails]
       .filter((mail) => {
         const matchesFolder = mailMatchesFolder(mail, folderId);
-        const matchesFocus = folderId !== 'inbox' || mail.category === mailFocusTab;
-        const matchesUnread = !mailUnreadOnly || mail.unread;
-        return mail.accountId === accountId && matchesFolder && matchesFocus && matchesUnread;
+        const signals = getMailSmartSignals(mail);
+        const matchesListFilter =
+          mailListFilter === 'all' ||
+          (mailListFilter === 'unread' && mail.unread) ||
+          (mailListFilter === 'flagged' && mail.starred) ||
+          (mailListFilter === 'attachment' && mail.attachments.length > 0) ||
+          (mailListFilter === 'important' && signals.important);
+        return mail.accountId === accountId && matchesFolder && matchesListFilter;
       })
-      .sort((left, right) => right.timestamp - left.timestamp)[0];
+      .sort((left, right) => (mailSortOrder === 'oldest' ? left.timestamp - right.timestamp : right.timestamp - left.timestamp))[0];
     setSelectedMailId(nextMail?.id || null);
   };
 
+  const getNextFilteredMailId = (mailId) => {
+    const currentIndex = filteredMails.findIndex((mail) => mail.id === mailId);
+    const nextMail = filteredMails[currentIndex + 1] || filteredMails[currentIndex - 1] || filteredMails.find((mail) => mail.id !== mailId);
+    return nextMail?.id || null;
+  };
+
   const toggleMailStar = (mailId) => {
-    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, starred: !mail.starred } : mail)));
+    const currentMail = mails.find((mail) => mail.id === mailId);
+    const willStar = !currentMail?.starred;
+    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, starred: willStar, hasFollowUp: willStar } : mail)));
+    triggerFeedback('L3', {
+      msg: willStar ? '已添加跟进' : '已取消跟进',
+      icon: <Flag size={16} fill={willStar ? 'currentColor' : 'none'} />,
+      color: 'bg-slate-900',
+    });
   };
 
   const toggleMailRead = (mailId) => {
-    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, unread: !mail.unread } : mail)));
+    const currentMail = mails.find((mail) => mail.id === mailId);
+    const willUnread = !currentMail?.unread;
+    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, unread: willUnread } : mail)));
+    triggerFeedback('L3', {
+      msg: willUnread ? '已标为未读' : '已标为已读',
+      icon: <Mail size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const markMailReadAfterViewing = (mailId) => {
+    setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, unread: false } : mail)));
   };
 
   const archiveMail = (mailId) => {
+    const previousMail = mails.find((mail) => mail.id === mailId);
+    if (!previousMail) return;
+    const nextMailId = getNextFilteredMailId(mailId);
+
     setMails((prev) =>
       prev.map((mail) =>
         mail.id === mailId
@@ -6590,15 +7508,26 @@ function MainApp() {
           : mail,
       ),
     );
-    setMailFolder('archive');
+    setSelectedMailId(nextMailId);
     triggerFeedback('L3', {
       msg: '邮件已存档',
       icon: <Archive size={16} />,
       color: 'bg-slate-900',
+      actionText: '撤销',
+      actionLabel: '撤销归档邮件',
+      onAction: () => {
+        setMails((prev) => prev.map((mail) => (mail.id === mailId ? previousMail : mail)));
+        setSelectedMailId(mailId);
+        setFeedback({ type: null, payload: null });
+      },
     });
   };
 
   const deleteMail = (mailId) => {
+    const previousMail = mails.find((mail) => mail.id === mailId);
+    if (!previousMail) return;
+    const nextMailId = getNextFilteredMailId(mailId);
+
     setMails((prev) =>
       prev.map((mail) =>
         mail.id === mailId
@@ -6610,11 +7539,83 @@ function MainApp() {
           : mail,
       ),
     );
-    setMailFolder('deleted');
+    setSelectedMailId(nextMailId);
     triggerFeedback('L3', {
       msg: '邮件已删除',
       icon: <Trash size={16} />,
       color: 'bg-slate-900',
+      actionText: '撤销',
+      actionLabel: '撤销删除邮件',
+      onAction: () => {
+        setMails((prev) => prev.map((mail) => (mail.id === mailId ? previousMail : mail)));
+        setSelectedMailId(mailId);
+        setFeedback({ type: null, payload: null });
+      },
+    });
+  };
+
+  const moveMail = (mailId) => {
+    archiveMail(mailId);
+    triggerFeedback('L3', {
+      msg: '邮件已移动到归档',
+      icon: <Archive size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const createTaskFromMail = (mailId) => {
+    const mail = mails.find((item) => item.id === mailId);
+    triggerFeedback('L3', {
+      msg: mail ? `已从「${mail.subject}」创建跟进任务` : '已创建跟进任务',
+      icon: <SquareCheck size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const retryMailReader = () => {
+    triggerFeedback('L3', {
+      msg: '已重新加载邮件内容',
+      icon: <RefreshCw size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const previewMailAttachment = (_mailId, attachment) => {
+    triggerFeedback('L3', {
+      msg: attachment.canPreview ? `正在预览 ${attachment.name}` : '该附件暂不支持预览',
+      icon: <FileText size={16} />,
+      color: attachment.canPreview ? 'bg-slate-900' : 'bg-amber-600',
+    });
+  };
+
+  const downloadMailAttachment = (_mailId, attachment) => {
+    const blocked = attachment.status === 'scanning' || attachment.status === 'blocked' || attachment.status === 'unavailable' || !attachment.canDownload;
+    triggerFeedback('L3', {
+      msg: blocked ? '附件当前不可下载' : `附件下载中：${attachment.name}`,
+      icon: <Paperclip size={16} />,
+      color: blocked ? 'bg-red-600' : 'bg-slate-900',
+    });
+  };
+
+  const sendQuickReply = (_mailId, body) => {
+    triggerFeedback('L3', {
+      msg: body ? '快捷回复已发送' : '回复内容为空',
+      icon: <Reply size={16} />,
+      color: body ? 'bg-emerald-600' : 'bg-amber-600',
+    });
+  };
+
+  const runReaderSecurityAction = (_mailId, action) => {
+    const messageMap = {
+      details: '已打开风险详情',
+      report: '已举报邮件',
+      showImages: '已显示外部图片',
+      trustSender: '已信任该发件人',
+    };
+    triggerFeedback('L3', {
+      msg: messageMap[action] || '已处理安全操作',
+      icon: <AlertCircle size={16} />,
+      color: action === 'report' ? 'bg-red-600' : 'bg-slate-900',
     });
   };
 
@@ -6655,7 +7656,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: '已从邮件生成日程草稿',
       icon: <Calendar size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -6696,7 +7697,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: successMessage,
       icon: <ArrowRight size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -6746,7 +7747,7 @@ function MainApp() {
       triggerFeedback('L3', {
         msg: currentShare?.status === 'accepted' ? '日历共享权限已更新' : '已更新待接受权限，对方接受后生效',
         icon: <Check size={16} />,
-        color: 'bg-blue-600',
+        color: 'bg-[#0A59F7]',
       });
     }
   };
@@ -6818,7 +7819,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: `已发送给 ${nextMember.name || nextMember.email}，待对方接受后生效`,
       icon: <Send size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -6839,7 +7840,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: '默认共享权限已更新',
       icon: <Check size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -7431,7 +8432,7 @@ function MainApp() {
     triggerFeedback('L3', {
       msg: '已回到今日',
       icon: <Calendar size={16} />,
-      color: 'bg-blue-600',
+      color: 'bg-[#0A59F7]',
     });
   };
 
@@ -7771,7 +8772,7 @@ function MainApp() {
         triggerFeedback('L3', {
           msg: `已更新日程：${formatDraftTime(active.next.date, active.next.startH, active.next.durationH)}`,
           icon: <Clock size={16} />,
-          color: 'bg-blue-600',
+          color: 'bg-[#0A59F7]',
         });
       }
 
@@ -7993,6 +8994,7 @@ function MainApp() {
           focusDate={focusDate}
           calendarLayout={calendarLayout}
           collapsed={calendarSidebarCollapsed}
+          width={calendarSidebarWidth}
           onNewEvent={() => navTo('create')}
           onShiftMonth={(delta) => setFocusDate((prev) => stripTime(addMonths(prev, delta)))}
           onSelectDate={(date) => selectDate(date, calendarLayout === 'month' ? 'day' : null)}
@@ -8013,18 +9015,45 @@ function MainApp() {
       ) : activeProduct === 'mail' ? (
         <MailSidebar
           accounts={accounts}
-          mails={mails}
-          mailFolder={mailFolder}
-          selectedMailAccountId={selectedMailAccountId}
-          collapsed={mailSidebarCollapsed}
-          onToggleCollapsed={() => setMailSidebarCollapsed((prev) => !prev)}
-          onSelectFolder={selectMailboxFolder}
+	          mails={mails}
+	          mailFolder={mailFolder}
+	          selectedMailAccountId={selectedMailAccountId}
+	          collapsed={effectiveMailSidebarCollapsed}
+	          width={mailSidebarWidth}
+		          onToggleCollapsed={handleToggleMailSidebarCollapsed}
+	          onSelectFolder={selectMailboxFolder}
           onCompose={openMailComposer}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
         />
       ) : (
         <UtilitySidebar activeProduct={activeProduct} onSelectProduct={handleProductSelect} />
+      )}
+
+      {activeProduct === 'calendar' && !calendarSidebarCollapsed && (
+        <LayoutResizeHandle
+          id="calendar-a"
+          label="调整日历 A 栏宽度"
+          value={calendarSidebarWidth}
+          min={calendarSidebarBounds.min}
+          max={calendarSidebarBounds.max}
+          active={activeLayoutResize === 'calendar-a'}
+          onStart={(event) => startLayoutResize('calendar-a', event)}
+          onStep={(delta) => stepLayoutResize('calendar-a', delta)}
+        />
+      )}
+
+	      {activeProduct === 'mail' && !effectiveMailSidebarCollapsed && (
+	        <LayoutResizeHandle
+          id="mail-a"
+          label="调整邮箱 A 栏宽度"
+          value={mailSidebarWidth}
+          min={mailSidebarBounds.min}
+          max={mailSidebarBounds.max}
+          active={activeLayoutResize === 'mail-a'}
+          onStart={(event) => startLayoutResize('mail-a', event)}
+          onStep={(delta) => stepLayoutResize('mail-a', delta)}
+        />
       )}
 
       <div className="relative z-10 flex flex-1 min-w-0 min-h-0 flex-col overflow-hidden bg-white">
@@ -8036,7 +9065,7 @@ function MainApp() {
                 {currentScreen === 'search' && (
                   <button
                     onClick={() => navTo('calendar')}
-                    className="inline-flex h-10 shrink-0 items-center text-sm font-bold text-slate-700 transition hover:text-blue-600"
+                    className="inline-flex h-10 shrink-0 items-center text-sm font-bold text-slate-700 transition hover:text-[#0A59F7]"
                   >
                     <ChevronLeft size={15} className="mr-1" />
                     返回日历
@@ -8142,20 +9171,13 @@ function MainApp() {
                     )}
                   </div>
                 )}
-                {currentScreen !== 'search' && (
-                  <>
-                    <button
-                      onClick={handleCalendarSync}
-                      className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
-                    >
-                      <RefreshCw size={14} className="mr-1.5" />
-                      同步日历
-                    </button>
-                    <button
-                      onClick={handleOpenReminders}
-                      className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
-                    >
-                      <Bell size={14} className="mr-1.5" />
+	                {currentScreen !== 'search' && (
+	                  <>
+	                    <button
+	                      onClick={handleOpenReminders}
+	                      className="inline-flex h-10 shrink-0 items-center rounded-xl px-3 text-sm font-bold text-gray-700 transition hover:bg-black/5"
+	                    >
+	                      <Bell size={14} className="mr-1.5" />
                       提醒
                     </button>
                   </>
@@ -8210,7 +9232,7 @@ function MainApp() {
               <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden bg-white">
                 {(currentScreen === 'calendar' || currentScreen === 'create') && (
                   <div className="relative flex flex-1 min-w-0 min-h-0 flex-col bg-white">
-                    <header className="relative flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:px-8" style={{ zIndex: 10 }}>
+                    <header className="relative flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white px-6 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between" style={{ zIndex: 10 }}>
                       <div className="flex items-center gap-3 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
                         <button
                           onClick={jumpToToday}
@@ -8232,8 +9254,17 @@ function MainApp() {
                       </div>
 
                         <div className="flex items-center gap-2 flex-wrap min-w-0 sm:justify-end">
-                        <div className="inline-flex items-center rounded-lg bg-gray-100 p-[3px]">
-                            {VIEW_OPTIONS.map((option) => (
+	                        <button
+	                          type="button"
+	                          onClick={handleCalendarSync}
+	                          aria-label="同步日历"
+	                          title="同步日历"
+	                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
+	                        >
+	                          <RefreshCw size={18} />
+	                        </button>
+	                        <div className="inline-flex items-center rounded-lg bg-gray-100 p-[3px]">
+	                            {VIEW_OPTIONS.map((option) => (
                               <button
                                 key={option.id}
                                 onClick={() => {
@@ -8476,7 +9507,7 @@ function MainApp() {
                                       markReminderJoined(selectedEvent.id);
                                       openExternalLink(selectedEvent.meetingLink, '已打开会议链接');
                                     }}
-                                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-700"
+                                    className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg bg-[#0A59F7] px-4 text-sm font-bold text-white transition hover:bg-[#084DDB]"
                                   >
                                     <ArrowRight size={14} className="mr-2" />
                                     加入会议
@@ -8486,7 +9517,7 @@ function MainApp() {
 
                               <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                                 <div className="flex min-w-0 gap-3 border-b border-gray-100 py-3 text-sm">
-                                  <Clock size={16} className="mt-0.5 shrink-0 text-blue-600" />
+                                  <Clock size={16} className="mt-0.5 shrink-0 text-[#0A59F7]" />
                                   <div className="grid min-w-0 flex-1 grid-cols-[64px_minmax(0,1fr)] gap-3">
                                     <div className="font-bold text-gray-400">时间</div>
                                     <div className="min-w-0 space-y-1">
@@ -8531,7 +9562,7 @@ function MainApp() {
                                           </button>
                                           <button
                                             onClick={() => handleRespondToEvent(selectedEvent.id, 'accept')}
-                                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700"
+                                            className="rounded-lg bg-[#0A59F7] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#084DDB]"
                                           >
                                             接受
                                           </button>
@@ -8989,7 +10020,7 @@ function MainApp() {
                                       repeat: event.target.checked ? 'every_week' : 'does_not_repeat',
                                     })
                                   }
-                                  className="h-4 w-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
+                                  className="h-4 w-4 rounded border-slate-300 text-[#0A59F7] focus:ring-[#0A59F7]"
                                 />
                                 标记为定期
                               </label>
@@ -9073,7 +10104,7 @@ function MainApp() {
                             <textarea
                               value={draftForm.description}
                               onChange={(event) => patchDraft({ description: event.target.value })}
-                              className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                              className="min-h-[96px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A59F7]/20"
                               placeholder="补充会议背景、目标、议程和会前准备..."
                             ></textarea>
                           </div>
@@ -9097,7 +10128,7 @@ function MainApp() {
                             </button>
                             <button
                               onClick={() => saveDraft('send')}
-                              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                              className="inline-flex items-center gap-2 rounded-lg bg-[#0A59F7] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#084DDB]"
                             >
                               <Send size={15} />
                               发送通知
@@ -9116,25 +10147,36 @@ function MainApp() {
               accounts={accounts}
               mails={filteredMails}
               mailFolder={mailFolder}
-              mailFocusTab={mailFocusTab}
-              unreadOnly={mailUnreadOnly}
+              mailListFilter={mailListFilter}
+              mailSortOrder={mailSortOrder}
               selectedMail={selectedMail && filteredMails.some((mail) => mail.id === selectedMail.id) ? selectedMail : filteredMails[0] || null}
               onSelectMail={handleSelectMail}
               onToggleStar={toggleMailStar}
               onToggleRead={toggleMailRead}
               onArchiveMail={archiveMail}
               onDeleteMail={deleteMail}
+              onMoveMail={moveMail}
               onCompose={openMailComposer}
               onEditDraft={(mailId) => openMailComposer('editDraft', mailId)}
               onScheduleFromMail={createEventFromMail}
+              onMarkReadAfterViewing={markMailReadAfterViewing}
+              onCreateTaskFromMail={createTaskFromMail}
+              onPreviewAttachment={previewMailAttachment}
+              onDownloadAttachment={downloadMailAttachment}
+              onQuickReplySend={sendQuickReply}
+              onReaderRetry={retryMailReader}
+              onReaderSecurityAction={runReaderSecurityAction}
               onOpenLinkedEvent={(eventId) => navTo('details', eventId)}
-              onToggleUnreadOnly={() => setMailUnreadOnly((prev) => !prev)}
-              onSetMailFocusTab={setMailFocusTab}
-              upcomingEvents={reminderEvents.active.filter((item) => item.kind !== 'notification')}
+              onSetMailListFilter={setMailListFilter}
+              onSetMailSortOrder={setMailSortOrder}
               linkedEventLookup={allEventLookup}
-              accountMap={accountMap}
-              calendarMap={calendarMap}
-              onOpenEvent={(eventId) => navTo('details', eventId)}
+              mailListWidth={mailListWidth}
+              mailListBounds={mailListBounds}
+              mailLayoutMode={mailLayoutMode}
+              activeLayoutResize={activeLayoutResize}
+              onStartLayoutResize={startLayoutResize}
+              onStepLayoutResize={stepLayoutResize}
+              onRestoreMailReader={restoreMailReader}
             />
           ) : activeProduct === 'settings' ? (
             <CalendarReminderSettingsPage
@@ -9154,10 +10196,8 @@ function MainApp() {
             open={mailComposer.open}
             draft={mailComposer.draft}
             accounts={accounts}
-            contacts={MAIL_CONTACTS}
             onClose={closeMailComposer}
             onChange={patchMailComposer}
-            onAddRecipient={addMailRecipient}
             onAddAttachment={addMailAttachment}
             onRemoveAttachment={removeMailAttachment}
             onSaveDraft={() => saveMailComposer('draft')}
@@ -9218,7 +10258,7 @@ function MainApp() {
               value={calendarRenameDialog.name}
               onChange={(e) => setCalendarRenameDialog((prev) => ({ ...prev, name: e.target.value }))}
               onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') closeRenameDialog(); }}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#0A59F7]/60 focus:ring-1 focus:ring-[#0A59F7]/30"
               placeholder="输入日历名称"
             />
             <div className="mt-4 flex justify-end gap-2">
@@ -9553,7 +10593,7 @@ function MainApp() {
               )}
               <button
                 onClick={feedback.payload?.onConfirm}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                className="rounded-xl bg-[#0A59F7] px-4 py-2 text-sm font-bold text-white hover:bg-[#084DDB]"
               >
                 {feedback.payload?.confirmText || '确认'}
               </button>
@@ -9570,6 +10610,16 @@ function MainApp() {
         >
           {feedback.payload?.icon}
           <span className="ml-2">{feedback.payload?.msg}</span>
+          {feedback.payload?.actionText && feedback.payload?.onAction && (
+            <button
+              type="button"
+              onClick={feedback.payload.onAction}
+              className="ml-3 rounded-full bg-white/15 px-2.5 py-1 text-xs font-black text-white transition hover:bg-white/25"
+              aria-label={feedback.payload?.actionLabel || feedback.payload.actionText}
+            >
+              {feedback.payload.actionText}
+            </button>
+          )}
         </div>
       )}
     </div>

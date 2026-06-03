@@ -1,5 +1,3 @@
-import { AlertCircle, Archive, Calendar, FileText, Inbox, Mail, Send, Settings, Trash, Users } from 'lucide-react';
-
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const BASE_WEEK_START = new Date(2026, 0, 5);
 export const TODAY_DATE = new Date(2026, 0, 9, 10, 30);
@@ -21,20 +19,20 @@ export const VIEW_OPTIONS = [
   { id: 'day', label: '日' },
 ];
 export const PRODUCT_TABS = [
-  { id: 'mail', label: '邮件', icon: Mail },
-  { id: 'calendar', label: '日历', icon: Calendar },
-  { id: 'contacts', label: '通讯录', icon: Users },
-  { id: 'settings', label: '设置', icon: Settings },
+  { id: 'mail', label: '邮件', icon: 'lucide:mail' },
+  { id: 'calendar', label: '日历', icon: 'lucide:calendar' },
+  { id: 'contacts', label: '通讯录', icon: 'lucide:users' },
+  { id: 'settings', label: '设置', icon: 'lucide:settings' },
 ];
 export const MAIL_FOLDERS = [
-  { id: 'inbox', label: '收件箱', icon: Inbox },
-  { id: 'drafts', label: '草稿', icon: FileText },
-  { id: 'sent', label: '已发送', icon: Send },
-  { id: 'deleted', label: '已删除邮件', icon: Trash },
-  { id: 'junk', label: '垃圾邮件', icon: AlertCircle },
-  { id: 'outbox', label: '发件箱', icon: Send },
-  { id: 'archive', label: '存档', icon: Archive },
-  { id: 'conversation', label: '对话历史记录', icon: FileText },
+  { id: 'inbox', label: '收件箱', icon: 'lucide:inbox' },
+  { id: 'drafts', label: '草稿', icon: 'lucide:file-text' },
+  { id: 'sent', label: '已发送', icon: 'lucide:send' },
+  { id: 'deleted', label: '已删除邮件', icon: 'lucide:trash' },
+  { id: 'junk', label: '垃圾邮件', icon: 'lucide:circle-alert' },
+  { id: 'outbox', label: '发件箱', icon: 'lucide:send' },
+  { id: 'archive', label: '存档', icon: 'lucide:archive' },
+  { id: 'conversation', label: '对话历史记录', icon: 'lucide:file-text' },
 ];
 export const MAIL_CONTACTS = [
   { id: 'mc1', name: '产品经理', email: 'pm@calendarpro.io', scope: 'internal' },
@@ -452,7 +450,7 @@ export const formatAgendaEventLabel = (event) => {
   return `${date.getMonth() + 1}/${date.getDate()} ${WEEKDAY_NAMES[dayIndex]} · ${event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}`;
 };
 export const getAgendaStatusTone = (status) => {
-  if (status === '待响应') return 'bg-blue-50 text-blue-700 border-blue-200';
+  if (status === '待响应') return 'bg-[#0A59F7]/[0.08] text-[#0A59F7] border-[#0A59F7]/25';
   if (status === '草稿') return 'bg-slate-100 text-slate-700 border-slate-200';
   if (status === '已取消') return 'bg-slate-100 text-slate-500 border-slate-200';
   if (status === '已拒绝') return 'bg-rose-50 text-rose-700 border-rose-200';
@@ -510,10 +508,10 @@ export const getAccountCheckboxTone = (color) => {
   if (color?.includes('gray')) return 'border-gray-500 bg-gray-500 text-white hover:border-gray-400';
   if (color?.includes('zinc')) return 'border-zinc-500 bg-zinc-500 text-white hover:border-zinc-400';
   if (color?.includes('slate')) return 'border-slate-500 bg-slate-500 text-white hover:border-slate-400';
-  return 'border-blue-600 bg-blue-600 text-white hover:border-blue-400';
+  return 'border-[#0A59F7] bg-[#0A59F7] text-white hover:border-[#0A59F7]/60';
 };
 export const ACCOUNT_COLOR_OPTIONS = [
-  'bg-blue-500',
+  'bg-[#0A59F7]',
   'bg-orange-500',
   'bg-emerald-500',
   'bg-violet-500',
@@ -639,7 +637,7 @@ export const SEARCH_ACCOUNT_SCOPE_OPTIONS = [
 export const SEARCH_COLOR_CATEGORY_OPTIONS = [
   { id: 'all', label: '颜色分类：全部', shortLabel: '全部', colorClass: 'bg-slate-400' },
   { id: 'none', label: '无分类', shortLabel: '无分类', colorClass: 'bg-slate-300' },
-  { id: 'project', label: '项目', shortLabel: '项目', colorClass: 'bg-blue-500' },
+  { id: 'project', label: '项目', shortLabel: '项目', colorClass: 'bg-[#0A59F7]' },
   { id: 'customer', label: '客户', shortLabel: '客户', colorClass: 'bg-emerald-500' },
   { id: 'important', label: '重要', shortLabel: '重要', colorClass: 'bg-rose-500' },
   { id: 'todo', label: '待处理', shortLabel: '待处理', colorClass: 'bg-amber-500' },
@@ -1228,7 +1226,7 @@ export const getEventSecondaryLine = (event, calendar) => {
 };
 
 const EVENT_TONE_BY_COLOR_CLASS = {
-  'bg-blue-500': { container: 'bg-blue-50 border-blue-200 text-slate-950', stripe: 'bg-blue-500' },
+  'bg-[#0A59F7]': { container: 'bg-[#0A59F7]/[0.08] border-[#0A59F7]/25 text-slate-950', stripe: 'bg-[#0A59F7]' },
   'bg-cyan-500': { container: 'bg-cyan-50 border-cyan-200 text-slate-950', stripe: 'bg-cyan-500' },
   'bg-sky-500': { container: 'bg-sky-50 border-sky-200 text-slate-950', stripe: 'bg-sky-500' },
   'bg-emerald-500': { container: 'bg-emerald-50 border-emerald-200 text-slate-950', stripe: 'bg-emerald-500' },
@@ -1282,7 +1280,7 @@ export const getToneClasses = (event, colorClass) => {
     };
   }
 
-  return EVENT_TONE_BY_COLOR_CLASS[colorClass] || EVENT_TONE_BY_COLOR_CLASS['bg-blue-500'];
+  return EVENT_TONE_BY_COLOR_CLASS[colorClass] || EVENT_TONE_BY_COLOR_CLASS['bg-[#0A59F7]'];
 };
 
 export const getDefaultEditableCalendarId = (calendars, activeAccountIds, preferredAccountId = null) => {
@@ -1353,7 +1351,7 @@ export const MOCK_ACCOUNTS = [
     email: 'me@calendarpro.io',
     role: '我的账户',
     ownership: 'self',
-    color: 'bg-blue-500',
+    color: 'bg-[#0A59F7]',
     checked: true,
     mailboxMembers: [
       { id: 'mb1', name: '我', email: 'me@calendarpro.io', fullAccess: true, sendAs: true, sendOnBehalf: false },
@@ -1472,7 +1470,7 @@ export const MOCK_CALENDARS = [
     name: '小华',
     type: 'my',
     owner: '小华',
-    color: 'bg-blue-500',
+    color: 'bg-[#0A59F7]',
     checked: true,
     permission: '可编辑',
     isPrimary: true,
@@ -2602,7 +2600,7 @@ export const MOCK_MAILS = [
     subject: 'Q2 路线评审材料已更新', fromName: '产品经理', fromEmail: 'pm@calendarpro.io',
     to: ["me@calendarpro.io"], cc: ["ea@calendarpro.io"],
     preview: '评审材料已经补齐预算和风险页，建议明天下午一起过一遍。', body: 'Hi，\n\n评审材料已经补齐预算和风险页，建议明天下午一起过一遍。如果你确认，我会同步给张总和研发负责人。\n\n附件里是最新版本。\n\nThanks,\n产品经理',
-    attachments: [{"name": "Q2_路线评审_v4.pptx", "size": "8.2 MB"}],
+    attachments: [{ id: 'att-m1-roadmap', name: 'Q2_路线评审_v4.pptx', type: 'PPTX', size: '8.2 MB', status: 'safe', canPreview: true, canDownload: true }],
     timestamp: new Date(2026, 0, 9, 9, 20, 0).getTime(),
     linkedEventId: 'e6',
   },
@@ -2658,8 +2656,15 @@ export const MOCK_MAILS = [
     unread: false, starred: false,
     subject: '部门周会纪要', fromName: '孙莉', fromEmail: 'rd@partner.com',
     to: ["me@calendarpro.io"], cc: [],
-    preview: '本周核心数据已汇总完成。', body: '本周五 15:00 将召开项目例会，主要议题：\n1. 进度同步\n2. 风险识别\n3. 资源协调\n\n请准时参加。',
-    attachments: [{"name": "代码审查报告.html", "size": "320 KB"}],
+    preview: '本周核心数据已汇总完成。', body: '本周五 15:00 将召开项目例会，主要议题：\n1. 进度同步\n2. 风险识别\n3. 资源协调\n\n请准时参加。\n\n会议资料临时放在 https://partner.example.com/review，请确认来源后再访问。',
+    attachments: [{ id: 'att-m7-risk-html', name: '代码审查报告.html', type: 'HTML', size: '320 KB', status: 'blocked', canPreview: false, canDownload: false, riskReason: 'HTML 附件包含可疑脚本，已限制下载。' }],
+    security: {
+      level: 'warning',
+      isExternalSender: true,
+      hasExternalLinks: true,
+      hasRiskyAttachments: true,
+      message: '邮件包含外部链接或敏感附件，请确认来源后处理。',
+    },
     timestamp: new Date(2026, 0, 6, 12, 0, 0).getTime(),
   },
   {
@@ -2749,6 +2754,7 @@ export const MOCK_MAILS = [
     subject: '外包管理规范', fromName: '马超', fromEmail: 'dev@corp.com',
     to: ["me@calendarpro.io"], cc: [],
     preview: '根据会议讨论结果，现整理相关材料。', body: '本周数据已汇总完成，核心指标如下：\n\n新增用户：+12.5%\n活跃度：提升 3.2pp\n转化率：稳定在 8.7%\n\n详细报告见附件。',
+    quotedHistory: '历史邮件：\n周老师：上周口径已按人力系统数据调整。\n我：请补充绩效区间和申诉截止时间。\n\n--\n免责声明：本邮件仅供内部绩效沟通使用。',
     attachments: [{"name": "代码审查报告.html", "size": "320 KB"}],
     timestamp: new Date(2026, 0, 7, 9, 5, 0).getTime(),
   },
@@ -2911,6 +2917,7 @@ export const MOCK_MAILS = [
     subject: '绩效考核结果公示', fromName: '周老师', fromEmail: 'support@corp.com',
     to: ["me@calendarpro.io"], cc: ["boss@calendarpro.io"],
     preview: '根据会议讨论结果，现整理相关材料。', body: '本周数据已汇总完成，核心指标如下：\n\n新增用户：+12.5%\n活跃度：提升 3.2pp\n转化率：稳定在 8.7%\n\n详细报告见附件。',
+    quotedHistory: '历史邮件：\n周老师：上周口径已按人力系统数据调整。\n我：请补充绩效区间和申诉截止时间。\n\n--\n免责声明：本邮件仅供内部绩效沟通使用。',
     attachments: [{"name": "项目进度表_2026Q1.xlsx", "size": "2.3 MB"}],
     timestamp: new Date(2026, 0, 8, 16, 55, 0).getTime(),
   },
@@ -2956,6 +2963,7 @@ export const MOCK_MAILS = [
     subject: '办公用品申领', fromName: '人力资源', fromEmail: 'admin@team.org',
     to: ["me@calendarpro.io"], cc: [],
     preview: '根据会议讨论结果，现整理相关材料。', body: '根据上次会议讨论结果，现将相关材料整理如下。请各负责人按时间节点推进工作。',
+    isSystemMail: true,
     attachments: [],
     timestamp: new Date(2026, 0, 9, 13, 55, 0).getTime(),
   },
@@ -2974,6 +2982,7 @@ export const MOCK_MAILS = [
     subject: '转化率分析', fromName: '林总监', fromEmail: 'finance@corp.com',
     to: ["me@calendarpro.io"], cc: [],
     preview: '详细方案请查看附件文档。', body: '经过团队持续努力，本次迭代已按计划完成开发和测试。请各模块负责人确认上线时间。',
+    permissionDenied: true,
     attachments: [{"name": "测试用例_全量.xlsx", "size": "1.8 MB"}],
     timestamp: new Date(2026, 0, 9, 9, 25, 0).getTime(),
   },
@@ -4462,9 +4471,11 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       accountId: mail.accountId || fallbackAccountId,
       to: joinRecipients(mail.to),
       cc: joinRecipients(mail.cc),
+      bcc: joinRecipients(mail.bcc || []),
       subject: mail.subject || '',
       body: mail.body || '',
       attachments: mail.attachments || [],
+      importance: mail.importance || 'normal',
     };
   }
 
@@ -4474,9 +4485,11 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       accountId: fallbackAccountId,
       to: '',
       cc: '',
+      bcc: '',
       subject: '',
       body: '',
       attachments: [],
+      importance: 'normal',
     };
   }
 
@@ -4488,9 +4501,11 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       accountId: mail.accountId || fallbackAccountId,
       to: mail.fromEmail,
       cc: '',
+      bcc: '',
       subject: ensureSubjectPrefix(mail.subject, 'RE'),
       body: quoteBody,
       attachments: [],
+      importance: 'normal',
     };
   }
 
@@ -4500,9 +4515,11 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
       accountId: mail.accountId || fallbackAccountId,
       to: joinRecipients(Array.from(new Set([mail.fromEmail, ...(mail.to || [])]))),
       cc: joinRecipients(mail.cc || []),
+      bcc: '',
       subject: ensureSubjectPrefix(mail.subject, 'RE'),
       body: quoteBody,
       attachments: [],
+      importance: 'normal',
     };
   }
 
@@ -4511,8 +4528,10 @@ export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 
     accountId: mail.accountId || fallbackAccountId,
     to: '',
     cc: '',
+    bcc: '',
     subject: ensureSubjectPrefix(mail.subject, 'FW'),
     body: `请查收以下转发内容。${quoteBody}`,
     attachments: mail.attachments || [],
+    importance: 'normal',
   };
 };

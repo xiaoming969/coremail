@@ -14,7 +14,7 @@
 
 ## 1. 文档目的
 
-Coremail 当前覆盖邮件、日历、多账号、共享权限、日程搜索和邮件搜索。随着功能增加，如果没有统一数据模型，很容易出现：
+Coremail 当前覆盖邮件、日历、通讯录、多账号、共享权限、日程搜索、邮件搜索和人员搜索。随着功能增加，如果没有统一数据模型，很容易出现：
 
 - 同一字段多种名称。
 - 权限标签和权限 ID 混用。
@@ -101,9 +101,12 @@ Account 1 -> N Calendar
 Account 1 -> N Mail
 Calendar 1 -> N Event
 Calendar 1 -> N CalendarShare
+Department 1 -> N Contact
+ContactGroup N -> N Contact
 ShareInvitation -> Calendar 或待创建共享日历
 Mail 0/1 -> Event
 MailDraft -> Mail
+SearchResult -> Mail、Event 或 Contact
 ```
 
 业务解释：
@@ -113,6 +116,8 @@ MailDraft -> Mail
 - 日程属于某个日历。
 - 邮件属于某个账号和文件夹。
 - 邮件可以关联日程，也可以生成日程。
+- 联系人属于企业通讯录、个人通讯录、外部联系人或群组。
+- 部门和群组帮助识别人员来源和选择影响范围。
 - 共享邀请被接收后，会在接收方左侧生成共享日历。
 
 ## 4. Account
@@ -494,6 +499,7 @@ startAt + endAt + timezone
 | `size` | string | 否 | 文件大小展示值 |
 | `url` | string | 否 | 文件访问链接 |
 | `permission` | string | 否 | 附件权限状态 |
+| `securityStatus` | string | 否 | 安全扫描状态，例如 scanning、safe、risky、blocked、unavailable |
 
 规则：
 
@@ -515,15 +521,21 @@ startAt + endAt + timezone
 | `category` | string | 否 | 重点或其他 |
 | `unread` | boolean | 是 | 是否未读 |
 | `starred` | boolean | 是 | 是否星标 |
+| `flagStatus` | string | 否 | 旗标或跟进状态 |
+| `importance` | string | 否 | 重要性，例如 normal、high |
+| `conversationId` | string | 否 | 会话 ID |
 | `subject` | string | 是 | 主题 |
 | `fromName` | string | 是 | 发件人名称 |
 | `fromEmail` | string | 是 | 发件人邮箱 |
+| `fromScope` | string | 否 | 发件人范围，例如 internal、external、system |
 | `to` | string[] | 是 | 收件人 |
 | `cc` | string[] | 否 | 抄送人 |
 | `preview` | string | 否 | 列表摘要 |
 | `body` | string | 否 | 正文 |
 | `attachments` | Attachment[] | 否 | 附件 |
 | `timestamp` | number | 是 | 邮件时间 |
+| `securityStatus` | string | 否 | 邮件安全状态 |
+| `isSystem` | boolean | 否 | 是否系统邮件 |
 | `linkedEventId` | string | 否 | 关联日程 ID |
 
 ### 15.2 `folder`
@@ -586,11 +598,71 @@ a@example.com; b@example.com
 
 展示层仍可接受用户粘贴的分隔字符串。
 
-## 17. SearchResult
+## 17. Contact Directory
+
+通讯录实体用于联系人列表、联系人详情、组织架构、人员搜索和人员选择。
+
+### 17.1 Contact
+
+联系人表示内部员工或外部联系人。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 联系人唯一 ID |
+| `name` | string | 是 | 姓名 |
+| `email` | string | 是 | 邮箱 |
+| `departmentId` | string | 否 | 所属部门 ID |
+| `departmentName` | string | 否 | 所属部门展示名 |
+| `organizationPath` | string[] | 否 | 组织路径 |
+| `title` | string | 否 | 职位或角色 |
+| `phone` | string | 否 | 手机号 |
+| `officePhone` | string | 否 | 办公电话 |
+| `scope` | string | 是 | 联系人范围，例如 internal、external |
+| `status` | string | 否 | 可见或可选状态 |
+| `groupIds` | string[] | 否 | 所属群组 |
+
+规则：
+
+- 重名人员必须通过 `departmentName`、`title`、`email` 或 `organizationPath` 辅助识别。
+- 外部联系人使用 `scope: external`，展示层必须明确标识。
+- 权限不足联系人不要展示空姓名或空邮箱，应使用 `status` 说明不可见原因。
+
+### 17.2 Department
+
+部门用于组织架构树和部门选择。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 部门唯一 ID |
+| `name` | string | 是 | 部门名称 |
+| `parentId` | string | 否 | 上级部门 ID |
+| `path` | string[] | 否 | 完整组织路径 |
+| `memberCount` | number | 否 | 成员数量 |
+| `managerContactId` | string | 否 | 部门负责人联系人 ID |
+
+### 17.3 ContactGroup
+
+群组用于分发列表、协作组和人员选择。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 群组唯一 ID |
+| `name` | string | 是 | 群组名称 |
+| `type` | string | 是 | 群组类型，例如 distribution、project、department |
+| `memberCount` | number | 否 | 成员数量 |
+| `memberContactIds` | string[] | 否 | 成员联系人 ID |
+| `scope` | string | 否 | 群组范围，例如 internal、external |
+
+规则：
+
+- 群组和部门不是个人联系人，人员选择中必须显示对象类型。
+- 选择群组或部门时，展示层必须说明影响范围。
+
+## 18. SearchResult
 
 搜索结果通常是派生对象，不应作为持久化实体。
 
-### 17.1 CalendarSearchResult
+### 18.1 CalendarSearchResult
 
 字段：
 
@@ -602,7 +674,7 @@ a@example.com; b@example.com
 | `sourceLabel` | string | 跨账号来源展示 |
 | `match` | SearchMatch | 匹配信息 |
 
-### 17.2 MailSearchResult
+### 18.2 MailSearchResult
 
 建议字段：
 
@@ -614,7 +686,19 @@ a@example.com; b@example.com
 | `sourceLabel` | string | 跨账号来源展示 |
 | `match` | SearchMatch | 匹配信息 |
 
-### 17.3 SearchMatch
+### 18.3 ContactSearchResult
+
+建议字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `contact` | Contact | 命中的联系人 |
+| `department` | Department | 所属部门 |
+| `groups` | ContactGroup[] | 所属群组 |
+| `sourceLabel` | string | 来源展示 |
+| `match` | SearchMatch | 匹配信息 |
+
+### 18.4 SearchMatch
 
 建议字段：
 
@@ -629,7 +713,7 @@ a@example.com; b@example.com
 - 普通搜索结果页不展示“命中来源”文案。
 - `matchedFields` 只用于决定是否展示正文片段或附件信息。
 
-## 18. UI State
+## 19. UI State
 
 以下属于界面状态，不应作为核心业务实体：
 
@@ -649,7 +733,7 @@ a@example.com; b@example.com
 - 不应污染业务实体字段。
 - 不应依赖 UI state 判断权限。
 
-## 19. Mock 数据规则
+## 20. Mock 数据规则
 
 当前 demo 使用 mock 数据。
 
@@ -657,6 +741,7 @@ a@example.com; b@example.com
 
 - mock 数据可以用相对时间字段制造稳定演示。
 - mock 数据可以保留丰富场景，例如多账号、共享日历、循环会议、历史会议。
+- mock 数据应覆盖联系人、部门、群组、重名人员和外部联系人。
 - mock 数据字段应尽量接近真实模型。
 - 新增 mock 字段时，应同步更新本文档。
 
@@ -666,7 +751,7 @@ a@example.com; b@example.com
 - 用展示文案代替稳定 ID。
 - 把 UI 状态写进 mock 实体。
 
-## 20. 数据模型检查清单
+## 21. 数据模型检查清单
 
 新增或修改字段前，检查：
 
