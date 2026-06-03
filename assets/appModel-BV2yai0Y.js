@@ -60,7 +60,7 @@ Thanks,
 我：请补充绩效区间和申诉截止时间。
 
 --
-免责声明：本邮件仅供内部绩效沟通使用。`,attachments:[{name:`项目进度表_2026Q1.xlsx`,size:`2.3 MB`}],timestamp:new Date(2026,0,8,16,55,0).getTime()},{id:`m36`,accountId:`acc3`,folder:`sent`,category:`other`,unread:!1,starred:!1,subject:`福利政策更新`,fromName:`我`,fromEmail:`me@calendarpro.io`,to:[`rd@calendarpro.io`],cc:[],preview:`系统维护通知，请提前做好准备。`,body:`客户反馈了几个使用上的问题，已整理清单并分配处理人。优先级别已标注，请尽快跟进。`,attachments:[{name:`数据看板截图.png`,size:`2.1 MB`}],timestamp:new Date(2026,0,2,17,50,0).getTime()},{id:`m37`,accountId:`acc1`,folder:`inbox`,category:`focused`,unread:!0,starred:!1,subject:`办公用品申领`,fromName:`刘工`,fromEmail:`qa@partner.com`,to:[`me@calendarpro.io`],cc:[`pm@calendarpro.io`],preview:`异常数据排查完成，修复方案已提交。`,body:`本周五 15:00 将召开项目例会，主要议题：
+免责声明：本邮件仅供内部绩效沟通使用。`,attachments:[{name:`项目进度表_2026Q1.xlsx`,size:`2.3 MB`},{id:`att-m35-warning-macro`,name:`绩效申诉材料宏.xlsm`,type:`XLSM`,size:`620 KB`,status:`warning`,canPreview:!0,canDownload:!0,riskReason:`包含宏脚本，下载前请确认来源。`}],timestamp:new Date(2026,0,8,16,55,0).getTime()},{id:`m36`,accountId:`acc3`,folder:`sent`,category:`other`,unread:!1,starred:!1,subject:`福利政策更新`,fromName:`我`,fromEmail:`me@calendarpro.io`,to:[`rd@calendarpro.io`],cc:[],preview:`系统维护通知，请提前做好准备。`,body:`客户反馈了几个使用上的问题，已整理清单并分配处理人。优先级别已标注，请尽快跟进。`,attachments:[{name:`数据看板截图.png`,size:`2.1 MB`}],timestamp:new Date(2026,0,2,17,50,0).getTime()},{id:`m37`,accountId:`acc1`,folder:`inbox`,category:`focused`,unread:!0,starred:!1,subject:`办公用品申领`,fromName:`刘工`,fromEmail:`qa@partner.com`,to:[`me@calendarpro.io`],cc:[`pm@calendarpro.io`],preview:`异常数据排查完成，修复方案已提交。`,body:`本周五 15:00 将召开项目例会，主要议题：
 1. 进度同步
 2. 风险识别
 3. 资源协调
