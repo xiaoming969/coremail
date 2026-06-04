@@ -157,6 +157,7 @@ const Edit = createLucideIcon('pencil');
 const Eye = createLucideIcon('eye');
 const FileText = createLucideIcon('file-text');
 const Flag = createLucideIcon('flag');
+const FlagFilled = createIconifyIcon('ph:flag-fill');
 const Forward = createLucideIcon('forward');
 const Funnel = createLucideIcon('funnel');
 const HelpCircle = createLucideIcon('circle-help');
@@ -202,11 +203,12 @@ const MAIL_LIST_DEFAULT_WIDTH = 544;
 const MAIL_LIST_MIN_WIDTH = 360;
 const MAIL_READER_DEFAULT_WIDTH = 864;
 const MAIL_READER_MIN_WIDTH = 720;
-const MAIL_READER_HIDE_THRESHOLD = 640;
+const MAIL_LAYOUT_AB_EXPAND_RATIO = 0.7;
 const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
 const MAIL_LAYOUT_MODE_AB = 'AB';
 const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
+const MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD = 160;
 const MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH = 1320;
 const MAIL_LAYOUT_AB_WIDTH = 1144;
 const SHOW_CALENDAR_SEARCH_ENTRY = false;
@@ -1428,8 +1430,8 @@ function MailWorkspace({
           </span>
         )}
         {mail.starred && (
-          <span role="img" aria-label="旗标邮件" title="旗标邮件" className={`${statusIconClass} text-red-500`}>
-            <Flag size={14} fill="currentColor" />
+          <span role="img" aria-label="旗标邮件" title="旗标邮件" data-mail-flag-icon-mode="filled" className={`${statusIconClass} text-red-500`}>
+            <FlagFilled size={14} />
           </span>
         )}
         {mail.attachments.length > 0 && (
@@ -1473,8 +1475,9 @@ function MailWorkspace({
           className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-100 ${mail.starred ? 'text-red-500' : 'text-slate-900'}`}
           aria-label={mail.starred ? '取消旗标' : '标记旗标'}
           title={mail.starred ? '取消旗标' : '标记旗标'}
+          data-mail-flag-icon-mode={mail.starred ? 'filled' : 'outline'}
         >
-          <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
+          {mail.starred ? <FlagFilled size={14} /> : <Flag size={14} />}
         </button>
         <button
           type="button"
@@ -1580,8 +1583,8 @@ function MailWorkspace({
       },
       {
         id: 'star',
-        label: '标记旗标',
-        icon: Flag,
+        label: selectedMail.starred ? '取消旗标' : '标记旗标',
+        icon: selectedMail.starred ? FlagFilled : Flag,
         onClick: () => onToggleStar(selectedMail.id),
       },
       {
@@ -1611,7 +1614,7 @@ function MailWorkspace({
     };
     const renderActionIcon = (action, size = 16, className = 'mr-1.5') => {
       const Icon = action.icon;
-      return <Icon size={size} className={className} fill={action.id === 'star' && selectedMail.starred ? 'currentColor' : 'none'} />;
+      return <Icon size={size} className={`${className} ${action.id === 'star' && selectedMail.starred ? 'text-red-500' : ''}`.trim()} />;
     };
 
     return (
@@ -1972,7 +1975,7 @@ function MailWorkspace({
                     <div data-mail-wide-column="time" className="relative flex min-w-0 items-center justify-end">
                       <div
                         data-mail-hover-actions="true"
-                        className={`absolute right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
+                        className={`pointer-events-none absolute right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
                       >
 	                        {renderMailQuickActions(mail)}
                       </div>
@@ -2034,11 +2037,11 @@ function MailWorkspace({
 	                        <div className="relative h-6 w-[88px]">
 	                        <div
 	                          data-mail-hover-actions="true"
-	                          className={`absolute inset-y-0 right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
+	                          className={`pointer-events-none absolute inset-y-0 right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
 	                        >
 		                          {renderMailQuickActions(mail)}
 	                        </div>
-	                        <div data-mail-sender-markers="true" className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 text-slate-500 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+	                        <div data-mail-sender-markers="true" className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 text-slate-500 transition-opacity group-hover:opacity-0">
 	                          {renderMailStatusIcons(mail)}
 	                        </div>
 	                        </div>
@@ -2071,13 +2074,13 @@ function MailWorkspace({
 	                {contextMail.unread ? <MailOpen size={15} className="text-slate-400" /> : <Mail size={15} className="text-slate-400" />}
 	                {contextMail.unread ? '标为已读' : '标为未读'}
 	              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => runMailContextAction(() => onToggleStar(contextMail.id))}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-	                <Flag size={15} fill={contextMail.starred ? 'currentColor' : 'none'} className={contextMail.starred ? 'text-red-500' : 'text-slate-400'} />
+	              <button
+	                type="button"
+	                role="menuitem"
+	                onClick={() => runMailContextAction(() => onToggleStar(contextMail.id))}
+	                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+	              >
+	                {contextMail.starred ? <FlagFilled size={15} className="text-red-500" /> : <Flag size={15} className="text-slate-400" />}
 	                {contextMail.starred ? '取消旗标' : '标记旗标'}
 	              </button>
 	              <button
@@ -2180,7 +2183,7 @@ function MailWorkspace({
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-2 text-slate-400">
-                            {mail.starred && <Flag size={16} fill="currentColor" className="text-red-500" />}
+                            {mail.starred && <FlagFilled size={16} className="text-red-500" />}
                             {mail.attachments.length > 0 && <Paperclip size={16} />}
                             {mail.linkedEventId && <Calendar size={16} className="text-emerald-600" />}
                           </div>
@@ -5571,8 +5574,16 @@ function MainApp() {
     }
 
     if (type === 'mail-a') {
+      if (effectiveMailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+        return;
+      }
+
       const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
       const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
+      if (effectiveMailSidebarCollapsed) {
+        setMailSidebarCollapsed(false);
+        setMailSidebarNarrowExpanded(viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
+      }
       setMailSidebarWidth(nextSidebarWidth);
       setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
       return;
@@ -5586,7 +5597,7 @@ function MainApp() {
 
   const getLayoutWidth = (type) => {
     if (type === 'calendar-a') return calendarSidebarWidth;
-    if (type === 'mail-a') return mailSidebarWidth;
+    if (type === 'mail-a') return mailLayoutSidebarWidth;
     return mailListWidth;
   };
 
@@ -5600,8 +5611,10 @@ function MainApp() {
       startWidth: getLayoutWidth(type),
       viewportWidth: getViewportWidth(),
       sidebarWidth: mailLayoutSidebarWidth,
+      preferredSidebarWidth: mailSidebarWidth,
       listWidth: mailListWidth,
       layoutMode: mailLayoutMode,
+      mailSidebarCollapsed: effectiveMailSidebarCollapsed,
     };
     setActiveLayoutResize(type);
     document.documentElement.style.cursor = 'col-resize';
@@ -5611,14 +5624,38 @@ function MainApp() {
 
   const stepLayoutResize = (type, delta) => {
     const viewportWidth = getViewportWidth();
-    const nextWidth = getLayoutWidth(type) + delta;
+    const nextWidth =
+      type === 'mail-a' && effectiveMailSidebarCollapsed && delta > 0 ? APP_SIDEBAR_MIN_WIDTH : getLayoutWidth(type) + delta;
     setLayoutWidth(type, nextWidth, viewportWidth);
 
     if (type === 'mail-a') {
+      if (effectiveMailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+        persistMailLayoutPreference(
+          {
+            layoutMode: mailLayoutMode,
+            sidebarWidth: mailSidebarWidth,
+            listWidth: mailListWidth,
+            readerWidth: getMailReaderWidth(viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, mailListWidth),
+            isACollapsed: true,
+          },
+          viewportWidth,
+        );
+        return;
+      }
+
       const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
       const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
       const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
-      saveMailLayoutPreference({ sidebarWidth: nextSidebarWidth, listWidth: nextListWidth });
+      persistMailLayoutPreference(
+        {
+          layoutMode: mailLayoutMode,
+          sidebarWidth: nextSidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: getMailReaderWidth(viewportWidth, nextSidebarWidth, nextListWidth),
+          isACollapsed: false,
+        },
+        viewportWidth,
+      );
     }
     if (type === 'mail-b') {
       const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
@@ -5677,8 +5714,16 @@ function MainApp() {
       }
 
       if (active.type === 'mail-a') {
+        if (active.mailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+          return;
+        }
+
         const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
         const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
+        if (active.mailSidebarCollapsed) {
+          setMailSidebarCollapsed(false);
+          setMailSidebarNarrowExpanded(active.viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
+        }
         setMailSidebarWidth(nextSidebarWidth);
         setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
       }
@@ -5695,21 +5740,40 @@ function MainApp() {
 
       const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
       if (active.type === 'mail-a') {
+        if (active.mailSidebarCollapsed && finalWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+          persistMailLayoutPreference({
+            layoutMode: active.layoutMode,
+            sidebarWidth: active.preferredSidebarWidth,
+            listWidth: active.listWidth,
+            readerWidth: getMailReaderWidth(active.viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, active.listWidth),
+            isACollapsed: true,
+          }, active.viewportWidth);
+          clearLayoutResize();
+          return;
+        }
+
         const nextSidebarWidth = clampNumber(finalWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
         const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
         const nextListWidth = clampNumber(active.listWidth, nextListBounds.min, nextListBounds.max);
+        setMailSidebarCollapsed(false);
+        setMailSidebarNarrowExpanded(active.viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
+        setMailSidebarWidth(nextSidebarWidth);
+        setMailListWidth(nextListWidth);
         persistMailLayoutPreference({
           layoutMode: active.layoutMode,
           sidebarWidth: nextSidebarWidth,
           listWidth: nextListWidth,
           readerWidth: getMailReaderWidth(active.viewportWidth, nextSidebarWidth, nextListWidth),
-          isACollapsed: mailSidebarCollapsed,
+          isACollapsed: false,
         }, active.viewportWidth);
       }
 
       if (active.type === 'mail-b') {
-        const readerWidth = getMailReaderWidth(active.viewportWidth, active.sidebarWidth, finalWidth);
-        if (active.layoutMode === MAIL_LAYOUT_MODE_ABC && readerWidth < MAIL_READER_HIDE_THRESHOLD) {
+        const availableMailContentWidth = Math.max(MAIL_LIST_MIN_WIDTH, active.viewportWidth - active.sidebarWidth);
+        const shouldUsePureList =
+          active.layoutMode === MAIL_LAYOUT_MODE_ABC && finalWidth >= availableMailContentWidth * MAIL_LAYOUT_AB_EXPAND_RATIO;
+
+        if (shouldUsePureList) {
           const abBounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, MAIL_LAYOUT_MODE_AB);
           const nextListWidth = abBounds.max;
           setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
@@ -7532,7 +7596,7 @@ function MainApp() {
     setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, starred: willStar, hasFollowUp: willStar } : mail)));
     triggerFeedback('L3', {
       msg: willStar ? '已标记旗标' : '已取消旗标',
-      icon: <Flag size={16} fill={willStar ? 'currentColor' : 'none'} />,
+      icon: willStar ? <FlagFilled size={16} className="text-red-500" /> : <Flag size={16} />,
       color: 'bg-slate-900',
     });
   };
@@ -9125,12 +9189,12 @@ function MainApp() {
         />
       )}
 
-	      {activeProduct === 'mail' && !effectiveMailSidebarCollapsed && (
+	      {activeProduct === 'mail' && (!effectiveMailSidebarCollapsed || mailSidebarCollapsed) && (
 	        <LayoutResizeHandle
           id="mail-a"
           label="调整邮箱 A 栏宽度"
-          value={mailSidebarWidth}
-          min={mailSidebarBounds.min}
+          value={mailLayoutSidebarWidth}
+          min={effectiveMailSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : mailSidebarBounds.min}
           max={mailSidebarBounds.max}
           active={activeLayoutResize === 'mail-a'}
           onStart={(event) => startLayoutResize('mail-a', event)}

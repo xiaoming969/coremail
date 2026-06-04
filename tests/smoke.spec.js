@@ -128,7 +128,16 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   const mailBSplitterBox = await mailBSplitter.boundingBox();
   await page.mouse.move(mailBSplitterBox.x + mailBSplitterBox.width / 2, mailBSplitterBox.y + mailBSplitterBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(mailBSplitterBox.x + 260, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.move(mailBSplitterBox.x + 340, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.up();
+
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect(mailReaderPane).toBeVisible();
+
+  const mailBSplitterBoxAfterSoftDrag = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + mailBSplitterBoxAfterSoftDrag.width / 2, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + 470, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
   await page.mouse.up();
 
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
@@ -150,6 +159,7 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
   await firstWideRow.hover();
   const firstWideActions = firstWideRow.locator('[data-mail-hover-actions="true"]');
+  await expect(firstWideRow.getByRole('button', { name: '取消旗标' })).toHaveAttribute('data-mail-flag-icon-mode', 'filled');
   await expect
     .poll(() =>
       firstWideActions.evaluate((node) =>
@@ -159,6 +169,11 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
       ),
     )
     .toBe('标为已读|取消旗标|删除邮件');
+  await firstWideRow.getByRole('button', { name: '取消旗标' }).focus();
+  await page.mouse.move(1500, 120);
+  await expect
+    .poll(() => firstWideActions.evaluate((node) => window.getComputedStyle(node).opacity))
+    .toBe('0');
   await firstWideRow.click();
   await expect(firstWideRow.locator('[data-mail-read-state="read"]')).toBeVisible();
   await firstWideRow.hover();
@@ -215,6 +230,30 @@ test('mail layout keeps reader width by collapsing A column on narrow desktop', 
   await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBeGreaterThanOrEqual(720);
   await expect(page.locator('[data-layout-resizer="mail-a"]')).toHaveCount(0);
   await expect(page.locator('[data-layout-resizer="mail-b"]')).toBeVisible();
+});
+
+test('mail manually collapsed A column can be dragged back open', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+
+  await mailSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+
+  const mailASplitter = page.locator('[data-layout-resizer="mail-a"]');
+  await expect(mailASplitter).toBeVisible();
+
+  const mailASplitterBox = await mailASplitter.boundingBox();
+  await page.mouse.move(mailASplitterBox.x + mailASplitterBox.width / 2, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailASplitterBox.x + 220, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.up();
+
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+  await expect(mailSidebar.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
 });
 
 test('mail A column expands from auto-collapsed narrow desktop into pure list mode', async ({ page }) => {
@@ -454,6 +493,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
     .toBe(true);
   await expect(firstMailCard.getByRole('button', { name: '删除邮件' })).toBeVisible();
   await expect(firstMailCard.getByRole('button', { name: '取消旗标' })).toBeVisible();
+  await expect(firstMailCard.getByRole('button', { name: '取消旗标' })).toHaveAttribute('data-mail-flag-icon-mode', 'filled');
   await expect(firstMailCard.getByRole('button', { name: '标为已读' })).toBeVisible();
   await expect
     .poll(() =>
@@ -464,6 +504,11 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
       ),
     )
     .toBe('标为已读|取消旗标|删除邮件');
+  await firstMailCard.getByRole('button', { name: '取消旗标' }).focus();
+  await page.mouse.move(1500, 120);
+  await expect
+    .poll(() => firstMailCard.locator('[data-mail-hover-actions="true"]').evaluate((node) => window.getComputedStyle(node).opacity))
+    .toBe('0');
   await firstMailCard.click({ button: 'right' });
   const mailContextMenu = mailView.locator('[data-mail-context-menu="true"]');
   await expect(mailContextMenu).toBeVisible();
