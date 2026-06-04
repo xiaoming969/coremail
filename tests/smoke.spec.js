@@ -150,6 +150,7 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   const firstWideRow = mailView.locator('[data-mail-list-card="m1"]');
   await expect(firstWideRow).toHaveAttribute('data-mail-row-mode', 'table');
   await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).toContainText('产品经理');
+  await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).not.toContainText('@');
   await expect(firstWideRow.locator('[data-mail-wide-column="subject"]')).toContainText('Q2 路线评审材料已更新');
   const firstWideStatus = firstWideRow.locator('[data-mail-wide-column="status"]');
   await expect(firstWideStatus).not.toContainText('附件 1');
@@ -157,8 +158,23 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(firstWideStatus.getByLabel('未读邮件')).toBeVisible();
   await expect(firstWideStatus.getByLabel('旗标邮件')).toBeVisible();
   await expect(firstWideStatus.getByLabel('含 1 个附件')).toBeVisible();
-  await expect(firstWideStatus.getByLabel('关联日程')).toBeVisible();
+  await expect(firstWideStatus.getByLabel('关联日程')).toHaveCount(0);
   await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
+  const selectedActions = mailView.locator('[data-mail-selected-actions="true"]');
+  await expect(selectedActions).toBeVisible();
+  await expect(selectedActions.getByRole('button', { name: '标为已读' })).toBeVisible();
+  await expect(selectedActions.getByRole('button', { name: '取消旗标' })).toBeVisible();
+  await expect(selectedActions.getByRole('button', { name: '归档邮件' })).toBeVisible();
+  await expect(selectedActions.getByRole('button', { name: '删除邮件' })).toBeVisible();
+  const senderColumnWidthBefore = Math.round((await firstWideRow.locator('[data-mail-wide-column="sender"]').boundingBox()).width);
+  const senderColumnResizer = mailView.locator('[data-mail-column-resizer="sender"]');
+  await expect(senderColumnResizer).toBeVisible();
+  const senderColumnResizerBox = await senderColumnResizer.boundingBox();
+  await page.mouse.move(senderColumnResizerBox.x + senderColumnResizerBox.width / 2, senderColumnResizerBox.y + senderColumnResizerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(senderColumnResizerBox.x + 48, senderColumnResizerBox.y + senderColumnResizerBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await firstWideRow.locator('[data-mail-wide-column="sender"]').boundingBox()).width)).toBeGreaterThan(senderColumnWidthBefore + 24);
   await firstWideRow.hover();
   const firstWideActions = firstWideRow.locator('[data-mail-hover-actions="true"]');
   await expect(firstWideRow.getByRole('button', { name: '取消旗标' })).toHaveAttribute('data-mail-flag-icon-mode', 'filled');
@@ -770,7 +786,8 @@ test('mail reading pane surfaces enterprise body states and interactions', async
 
   await mailView.locator('[data-mail-list-card="m42"]').scrollIntoViewIfNeeded();
   await mailView.locator('[data-mail-list-card="m42"]').click();
-  await expect(reader.locator('[data-mail-state-view="permissionDenied"]')).toContainText('你暂无权限查看此邮件内容');
+  await expect(reader.locator('[data-mail-state-view="permissionDenied"]')).toHaveCount(0);
+  await expect(reader.locator('[data-mail-body="true"]')).toContainText('经过团队持续努力');
 
   await mailView.locator('[data-mail-list-card="m50"]').scrollIntoViewIfNeeded();
   await mailView.locator('[data-mail-list-card="m50"]').click();

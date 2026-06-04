@@ -2994,7 +2994,6 @@ export const MOCK_MAILS = [
     subject: '转化率分析', fromName: '林总监', fromEmail: 'finance@corp.com',
     to: ["me@calendarpro.io"], cc: [],
     preview: '详细方案请查看附件文档。', body: '经过团队持续努力，本次迭代已按计划完成开发和测试。请各模块负责人确认上线时间。',
-    permissionDenied: true,
     attachments: [{"name": "测试用例_全量.xlsx", "size": "1.8 MB"}],
     timestamp: new Date(2026, 0, 9, 9, 25, 0).getTime(),
   },

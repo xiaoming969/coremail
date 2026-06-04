@@ -126,7 +126,6 @@ export const getSecurityInfo = (mail: MailReadingPaneMail, attachments = normali
 export const getEffectiveReadingState = (mail: MailReadingPaneMail | null, requestedState?: MailReadingState): MailReadingState => {
   if (!mail) return 'empty';
   if (requestedState) return requestedState;
-  if (mail.permissionDenied) return 'permissionDenied';
   if (mail.deleted || mail.folder === 'deleted') return 'deleted';
   if (mail.externalImagesBlocked) return 'externalImagesBlocked';
   if (mail.readingState) return mail.readingState;

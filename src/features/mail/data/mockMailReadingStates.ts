@@ -8,7 +8,6 @@ export type MailReadingScenario = {
 };
 
 export const MAIL_READING_STATE_BY_MAIL_ID: Record<string, MailReadingState> = {
-  m42: 'permissionDenied',
   m50: 'loading',
   m53: 'externalImagesBlocked',
   m54: 'attachmentError',
@@ -27,7 +26,6 @@ export const MAIL_READING_SCENARIOS: MailReadingScenario[] = [
   { id: 'long-thread', mailId: 'm35', label: '长邮件链邮件', state: 'normal' },
   { id: 'system', mailId: 'm40', label: '系统通知邮件', state: 'normal' },
   { id: 'loading', mailId: 'm50', label: '正文加载中状态', state: 'loading' },
-  { id: 'permission-denied', mailId: 'm42', label: '权限不足状态', state: 'permissionDenied' },
   { id: 'deleted', mailId: 'm56', label: '邮件已删除状态', state: 'deleted' },
   { id: 'load-error', mailId: 'm57', label: '正文加载失败状态', state: 'error' },
   { id: 'blocked', mailId: 'm55', label: '安全拦截状态', state: 'blocked' },

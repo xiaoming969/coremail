@@ -213,6 +213,18 @@ const MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD = 160;
 const MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD = 192;
 const MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH = 1320;
 const MAIL_LAYOUT_AB_WIDTH = 1144;
+const MAIL_TABLE_COLUMN_DEFAULTS = {
+  sender: 136,
+  subject: 520,
+  status: 120,
+  time: 92,
+};
+const MAIL_TABLE_COLUMN_BOUNDS = {
+  sender: { min: 96, max: 240 },
+  subject: { min: 360, max: 840 },
+  status: { min: 84, max: 180 },
+  time: { min: 72, max: 144 },
+};
 const SHOW_CALENDAR_SEARCH_ENTRY = false;
 
 const getViewportWidth = () => (typeof window === 'undefined' ? 1280 : window.innerWidth);
@@ -1266,8 +1278,10 @@ function MailWorkspace({
   const [mailSelectionMode, setMailSelectionMode] = useState(false);
   const [selectedMailIds, setSelectedMailIds] = useState([]);
   const [mailListDetailId, setMailListDetailId] = useState(null);
+  const [mailTableColumns, setMailTableColumns] = useState(MAIL_TABLE_COLUMN_DEFAULTS);
   const readerMoreRef = useRef(null);
   const mailFilterRef = useRef(null);
+  const mailTableColumnResizeRef = useRef(null);
   const folderLabel = getMailFolderLabel(mailFolder);
   const unreadCount = mails.filter((mail) => mail.unread).length;
   const normalizedMailSearchQuery = mailSearchQuery.trim().toLowerCase();
@@ -1282,6 +1296,7 @@ function MailWorkspace({
   const isMailSearchActive = Boolean(normalizedMailSearchQuery);
   const mailListSummary = isMailSearchActive ? `搜索到 ${visibleMails.length} 封邮件` : `${mails.length} 封邮件，${unreadCount} 封未读`;
   const activeMailFilter = MAIL_LIST_FILTER_OPTIONS.find((option) => option.id === mailListFilter) || MAIL_LIST_FILTER_OPTIONS[0];
+  const mailTableGridTemplate = `10px ${mailTableColumns.sender}px minmax(${mailTableColumns.subject}px,1fr) ${mailTableColumns.status}px ${mailTableColumns.time}px`;
   const mailTimelineRows = useMemo(() => {
     const rows = [];
     let previousTimelineKey = '';
@@ -1372,6 +1387,72 @@ function MailWorkspace({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [mailContextMenu]);
+
+  useEffect(() => {
+    const handleMouseMove = (event) => {
+      const active = mailTableColumnResizeRef.current;
+      if (!active) return;
+      event.preventDefault();
+      const bounds = MAIL_TABLE_COLUMN_BOUNDS[active.column];
+      const nextWidth = clampNumber(active.startWidth + event.clientX - active.startX, bounds.min, bounds.max);
+      setMailTableColumns((prev) => ({ ...prev, [active.column]: nextWidth }));
+    };
+
+    const handleMouseUp = () => {
+      if (!mailTableColumnResizeRef.current) return;
+      mailTableColumnResizeRef.current = null;
+      document.documentElement.style.cursor = '';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (mailTableColumnResizeRef.current) handleMouseUp();
+    };
+  }, []);
+
+  const startMailTableColumnResize = (column, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    mailTableColumnResizeRef.current = {
+      column,
+      startX: event.clientX,
+      startWidth: mailTableColumns[column],
+    };
+    document.documentElement.style.cursor = 'col-resize';
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const renderMailTableColumnResizer = (column, label) => (
+    <span
+      role="separator"
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuemin={MAIL_TABLE_COLUMN_BOUNDS[column].min}
+      aria-valuemax={MAIL_TABLE_COLUMN_BOUNDS[column].max}
+      aria-valuenow={Math.round(mailTableColumns[column])}
+      tabIndex={0}
+      data-mail-column-resizer={column}
+      onMouseDown={(event) => startMailTableColumnResize(column, event)}
+      onKeyDown={(event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const delta = event.key === 'ArrowRight' ? 16 : -16;
+        setMailTableColumns((prev) => {
+          const bounds = MAIL_TABLE_COLUMN_BOUNDS[column];
+          return { ...prev, [column]: clampNumber(prev[column] + delta, bounds.min, bounds.max) };
+        });
+      }}
+      className="absolute inset-y-0 right-[-10px] z-20 hidden w-5 cursor-col-resize select-none outline-none md:block"
+    >
+      <span className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-transparent transition group-hover:bg-slate-300 group-focus:bg-[#0A59F7]" />
+    </span>
+  );
 
   const openMailContextMenu = (event, mail) => {
     event.preventDefault();
@@ -1506,6 +1587,39 @@ function MailWorkspace({
           <Trash size={14} />
         </button>
       </>
+    );
+  };
+
+  const renderMailSelectedActions = (mail) => {
+    if (!mail) return null;
+    const readActionLabel = mail.unread ? '标为已读' : '标为未读';
+    const ReadActionIcon = mail.unread ? MailOpen : Mail;
+    const selectedActionClass = 'inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-950';
+    return (
+      <div data-mail-selected-actions="true" className="flex shrink-0 items-center gap-1 rounded-lg bg-white/80 p-0.5">
+        <button type="button" onClick={() => onToggleRead(mail.id)} className={selectedActionClass} aria-label={readActionLabel} title={readActionLabel}>
+          <ReadActionIcon size={16} className="mr-1.5" />
+          {readActionLabel}
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleStar(mail.id)}
+          className={`${selectedActionClass} ${mail.starred ? 'text-red-600 hover:text-red-700' : ''}`}
+          aria-label={mail.starred ? '取消旗标' : '标记旗标'}
+          title={mail.starred ? '取消旗标' : '标记旗标'}
+        >
+          {mail.starred ? <FlagFilled size={16} className="mr-1.5" /> : <Flag size={16} className="mr-1.5" />}
+          {mail.starred ? '取消旗标' : '标记旗标'}
+        </button>
+        <button type="button" onClick={() => onArchiveMail(mail.id)} className={selectedActionClass} aria-label="归档邮件" title="归档邮件">
+          <Archive size={16} className="mr-1.5" />
+          归档
+        </button>
+        <button type="button" onClick={() => onDeleteMail(mail.id)} className={`${selectedActionClass} text-red-600 hover:text-red-700`} aria-label="删除邮件" title="删除邮件">
+          <Trash size={16} className="mr-1.5" />
+          删除
+        </button>
+      </div>
     );
   };
 
@@ -1759,6 +1873,7 @@ function MailWorkspace({
 	                  </div>
 	                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
+                  {isMailReaderHidden && !mailSelectionMode && effectiveSelectedMail && renderMailSelectedActions(effectiveSelectedMail)}
                   {isMailReaderHidden && (
                     <button
                       type="button"
@@ -1878,13 +1993,14 @@ function MailWorkspace({
 	          {isMailReaderHidden && (
             <div
               data-mail-wide-list-header="true"
-              className="sticky top-0 z-10 grid grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-y border-slate-200 bg-slate-50 px-5 py-2 text-xs font-black text-slate-500"
+              className="sticky top-0 z-10 grid items-center gap-4 border-y border-slate-200 bg-slate-50 px-5 py-2 text-xs font-black text-slate-500"
+              style={{ gridTemplateColumns: mailTableGridTemplate }}
             >
               <span />
-              <span>发件人</span>
-              <span>主题与摘要</span>
-              <span>状态</span>
-              <span className="text-right">时间</span>
+              <span className="group relative min-w-0">发件人{renderMailTableColumnResizer('sender', '调整发件人列宽')}</span>
+              <span className="group relative min-w-0">主题与摘要{renderMailTableColumnResizer('subject', '调整主题与摘要列宽')}</span>
+              <span className="group relative min-w-0">状态{renderMailTableColumnResizer('status', '调整状态列宽')}</span>
+              <span className="group relative min-w-0 text-right">时间{renderMailTableColumnResizer('time', '调整时间列宽')}</span>
             </div>
           )}
 	          {visibleMails.length === 0 ? (
@@ -1942,13 +2058,14 @@ function MailWorkspace({
 	                    }}
 	                    onDoubleClick={() => openMailListDetail(mail)}
 	                    onContextMenu={(event) => openMailContextMenu(event, mail)}
-                    className={`group relative grid min-h-[54px] w-full cursor-pointer grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-b border-slate-100 px-5 py-2 text-left transition-colors ${
+                    className={`group relative grid min-h-[54px] w-full cursor-pointer items-center gap-4 border-b border-slate-100 px-5 py-2 text-left transition-colors ${
                       selectedInBatch
                         ? 'bg-[#0A59F7]/10'
                         : selected
                           ? 'bg-[#0A59F7]/10'
                           : 'bg-white hover:bg-slate-50'
                     }`}
+                    style={{ gridTemplateColumns: mailTableGridTemplate }}
                   >
                     <div className="flex items-center justify-center">
                       {mailSelectionMode ? (
@@ -1970,7 +2087,6 @@ function MailWorkspace({
                     </div>
                     <div data-mail-wide-column="sender" className="min-w-0">
                       <div data-mail-sender-name="true" className="truncate text-sm font-black text-slate-950">{mail.fromName}</div>
-                      <div className="mt-0.5 truncate text-xs font-semibold text-slate-500">{mail.fromEmail}</div>
                     </div>
                     <div data-mail-wide-column="subject" data-mail-row-content="true" className="min-w-0">
                       <div data-mail-title-time="true" className="flex min-w-0 items-center gap-1.5">
@@ -1984,7 +2100,7 @@ function MailWorkspace({
                       </div>
                     </div>
 	                    <div data-mail-wide-column="status" data-mail-sender-markers="true" className="flex min-w-0 items-center gap-1.5 text-slate-500">
-	                      {renderMailStatusIcons(mail, { showUnread: true, showLinkedEvent: true })}
+	                      {renderMailStatusIcons(mail, { showUnread: true, showLinkedEvent: false })}
 	                    </div>
                     <div data-mail-wide-column="time" className="relative flex min-w-0 items-center justify-end">
                       <div

@@ -781,25 +781,14 @@ function LoadingState() {
 function MailStateView({
   state,
   onRetry,
-  onBackToList,
   onViewNext,
   onSecurityAction,
-}: Pick<MailReaderActionHandlers, 'onRetry' | 'onBackToList' | 'onViewNext' | 'onSecurityAction'> & { state: MailReadingState | 'unselected' }) {
+}: Pick<MailReaderActionHandlers, 'onRetry' | 'onViewNext' | 'onSecurityAction'> & { state: MailReadingState | 'unselected' }) {
   if (state === 'loading') return <LoadingState />;
 
   if (state === 'unselected') {
     return (
       <StateShell state="unselected" icon="lucide:mail-open" title="请选择一封邮件查看内容" desc="从左侧列表选择邮件，或使用上下方向键切换邮件。" />
-    );
-  }
-
-  if (state === 'permissionDenied') {
-    return (
-      <StateShell state="permissionDenied" icon="lucide:lock" title="你暂无权限查看此邮件内容" desc="如果需要访问，请联系邮箱管理员或邮件所有者。">
-        <button type="button" onClick={onBackToList} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-50">
-          返回列表
-        </button>
-      </StateShell>
     );
   }
 
@@ -853,7 +842,6 @@ export default function MailReadingPane({
   onCreateTask,
   onCreateEvent,
   onRetry,
-  onBackToList,
   onViewNext,
   onMarkReadAfterViewing,
   onPreviewAttachment,
@@ -870,7 +858,7 @@ export default function MailReadingPane({
   const effectiveState = mail ? getEffectiveReadingState(mail, state) : 'unselected';
   const attachments = useMemo(() => (mail ? normalizeAttachments(mail) : []), [mail]);
   const security = useMemo(() => (mail ? getSecurityInfo({ ...mail, readingState: effectiveState === 'unselected' ? undefined : effectiveState }, attachments) : { level: 'none' as const }), [attachments, effectiveState, mail]);
-  const blocksFullContent = effectiveState === 'loading' || effectiveState === 'error' || effectiveState === 'permissionDenied' || effectiveState === 'deleted' || effectiveState === 'blocked';
+  const blocksFullContent = effectiveState === 'loading' || effectiveState === 'error' || effectiveState === 'deleted' || effectiveState === 'blocked';
 
   useEffect(() => {
     setRecipientExpanded(false);
@@ -919,7 +907,7 @@ export default function MailReadingPane({
   if (!mail) {
     return (
       <div data-mail-reading-pane="true" className="h-full">
-        <MailStateView state="unselected" onRetry={onRetry} onBackToList={onBackToList} onViewNext={onViewNext} onSecurityAction={onSecurityAction} />
+        <MailStateView state="unselected" onRetry={onRetry} onViewNext={onViewNext} onSecurityAction={onSecurityAction} />
       </div>
     );
   }
@@ -927,7 +915,7 @@ export default function MailReadingPane({
   return (
     <div data-mail-reading-pane="true" className="h-full min-w-0 bg-[#f6f7f9]">
       {blocksFullContent ? (
-        <MailStateView state={effectiveState} onRetry={onRetry} onBackToList={onBackToList} onViewNext={onViewNext} onSecurityAction={onSecurityAction} />
+        <MailStateView state={effectiveState} onRetry={onRetry} onViewNext={onViewNext} onSecurityAction={onSecurityAction} />
       ) : (
         <div className="flex h-full flex-col">
           <MailActionBar

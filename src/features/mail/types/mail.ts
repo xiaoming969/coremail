@@ -38,7 +38,6 @@ export type MailReadingState =
   | 'empty'
   | 'error'
   | 'attachmentError'
-  | 'permissionDenied'
   | 'deleted'
   | 'blocked'
   | 'externalImagesBlocked';
@@ -71,7 +70,6 @@ export type MailReadingPaneMail = {
   security?: MailSecurityInfo;
   readingState?: MailReadingState;
   deleted?: boolean;
-  permissionDenied?: boolean;
   externalImagesBlocked?: boolean;
 };
 

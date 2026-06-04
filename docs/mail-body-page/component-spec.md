@@ -9,7 +9,6 @@
 - `mail`
 - `loading`
 - `error`
-- `permissionDenied`
 - `deleted`
 - `onReply`
 - `onReplyAll`
@@ -24,7 +23,7 @@
 - `onCreateTask`
 - `onCreateEvent`
 
-状态包括 `normal`、`loading`、`empty`、`error`、`permissionDenied`、`deleted`、`blocked`。
+状态包括 `normal`、`loading`、`empty`、`error`、`deleted`、`blocked`。
 
 ## 2. MailActionBar
 
@@ -76,4 +75,4 @@
 
 ## 10. MailStateView
 
-统一展示空、加载、失败、权限不足、已删除、安全拦截等状态。
+统一展示空、加载、失败、已删除、安全拦截等状态。
