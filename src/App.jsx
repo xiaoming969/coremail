@@ -163,6 +163,7 @@ const HelpCircle = createLucideIcon('circle-help');
 const ListFilter = createLucideIcon('list-filter');
 const Lock = createLucideIcon('lock');
 const Mail = createLucideIcon('mail');
+const MailOpen = createLucideIcon('mail-open');
 const MapPin = createLucideIcon('map-pin');
 const Maximize2 = createLucideIcon('maximize-2');
 const Minus = createLucideIcon('minus');
@@ -1248,6 +1249,7 @@ function MailWorkspace({
   const [mailFilterMenuOpen, setMailFilterMenuOpen] = useState(false);
   const [mailSelectionMode, setMailSelectionMode] = useState(false);
   const [selectedMailIds, setSelectedMailIds] = useState([]);
+  const [mailListDetailId, setMailListDetailId] = useState(null);
   const readerMoreRef = useRef(null);
   const mailFilterRef = useRef(null);
   const folderLabel = getMailFolderLabel(mailFolder);
@@ -1261,8 +1263,6 @@ function MailWorkspace({
       )
     : mails;
   const effectiveSelectedMail = selectedMail && visibleMails.some((mail) => mail.id === selectedMail.id) ? selectedMail : visibleMails[0] || null;
-  const selectedLinkedEvent = effectiveSelectedMail?.linkedEventId ? linkedEventLookup[effectiveSelectedMail.linkedEventId] || null : null;
-  const selectedAiInsight = getMailAiInsight(effectiveSelectedMail, selectedLinkedEvent);
   const isMailSearchActive = Boolean(normalizedMailSearchQuery);
   const mailListSummary = isMailSearchActive ? `搜索到 ${visibleMails.length} 封邮件` : `${mails.length} 封邮件，${unreadCount} 封未读`;
   const activeMailFilter = MAIL_LIST_FILTER_OPTIONS.find((option) => option.id === mailListFilter) || MAIL_LIST_FILTER_OPTIONS[0];
@@ -1401,6 +1401,136 @@ function MailWorkspace({
     const currentIndex = visibleMails.findIndex((mail) => mail.id === mailId);
     const nextMail = visibleMails[currentIndex + 1] || visibleMails[currentIndex - 1] || visibleMails.find((mail) => mail.id !== mailId);
     if (nextMail) onSelectMail(nextMail.id);
+  };
+
+  const selectMailFromList = (mail) => {
+    onSelectMail(mail.id);
+    if (mail.unread) onMarkReadAfterViewing(mail.id);
+  };
+
+  const openMailListDetail = (mail) => {
+    selectMailFromList(mail);
+    setMailListDetailId(mail.id);
+    setMailContextMenu(null);
+  };
+
+  const closeMailListDetail = () => {
+    setMailListDetailId(null);
+  };
+
+  const renderMailStatusIcons = (mail, { showUnread = false, showLinkedEvent = false } = {}) => {
+    const statusIconClass = 'inline-flex h-6 min-w-6 items-center justify-center rounded-md text-slate-500';
+    return (
+      <>
+        {showUnread && mail.unread && (
+          <span role="img" aria-label="未读邮件" title="未读邮件" className={`${statusIconClass} text-[#0A59F7]`}>
+            <Mail size={14} />
+          </span>
+        )}
+        {mail.starred && (
+          <span role="img" aria-label="旗标邮件" title="旗标邮件" className={`${statusIconClass} text-red-500`}>
+            <Flag size={14} fill="currentColor" />
+          </span>
+        )}
+        {mail.attachments.length > 0 && (
+          <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className={`${statusIconClass} gap-0.5`}>
+            <Paperclip size={14} />
+            <span className="text-[11px] font-black leading-none">{mail.attachments.length}</span>
+          </span>
+        )}
+        {showLinkedEvent && mail.linkedEventId && (
+          <span role="img" aria-label="关联日程" title="关联日程" className={statusIconClass}>
+            <Calendar size={14} />
+          </span>
+        )}
+      </>
+    );
+  };
+
+  const renderMailQuickActions = (mail) => {
+    const readActionLabel = mail.unread ? '标为已读' : '标为未读';
+    const ReadActionIcon = mail.unread ? MailOpen : Mail;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleRead(mail.id);
+          }}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+          aria-label={readActionLabel}
+          title={readActionLabel}
+        >
+          <ReadActionIcon size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleStar(mail.id);
+          }}
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-100 ${mail.starred ? 'text-red-500' : 'text-slate-900'}`}
+          aria-label={mail.starred ? '取消旗标' : '标记旗标'}
+          title={mail.starred ? '取消旗标' : '标记旗标'}
+        >
+          <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
+        </button>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDeleteMail(mail.id);
+          }}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
+          aria-label="删除邮件"
+          title="删除"
+        >
+          <Trash size={14} />
+        </button>
+      </>
+    );
+  };
+
+  const renderMailReaderPane = (mail, { onBackToList } = {}) => {
+    const linkedEvent = mail?.linkedEventId ? linkedEventLookup[mail.linkedEventId] || null : null;
+    return (
+      <MailReadingPane
+        mail={mail}
+        state={mail ? MAIL_READING_STATE_BY_MAIL_ID[mail.id] : undefined}
+        folderLabel={mail ? MAIL_FOLDERS.find((item) => item.id === mail.folder)?.label : ''}
+        linkedEvent={
+          linkedEvent
+            ? {
+                id: linkedEvent.id,
+                status: linkedEvent.status,
+                summary: `${linkedEvent.status || '已接受'} · ${formatEventDateTime(linkedEvent)}`,
+              }
+            : null
+        }
+        aiInsight={getMailAiInsight(mail, linkedEvent)}
+        formatMailTime={formatMailTime}
+        onReply={() => mail && onCompose('reply', mail.id)}
+        onReplyAll={() => mail && onCompose('replyAll', mail.id)}
+        onForward={() => mail && onCompose('forward', mail.id)}
+        onArchive={() => mail && onArchiveMail(mail.id)}
+        onDelete={() => mail && onDeleteMail(mail.id)}
+        onMove={() => mail && (onMoveMail || onArchiveMail)(mail.id)}
+        onToggleRead={() => mail && onToggleRead(mail.id)}
+        onToggleFollowUp={() => mail && onToggleStar(mail.id)}
+        onCreateTask={() => mail && onCreateTaskFromMail(mail.id)}
+        onCreateEvent={() => mail && onScheduleFromMail(mail.id)}
+        onRetry={() => mail && onReaderRetry(mail.id)}
+        onBackToList={onBackToList || (() => mail && onSelectMail(mail.id))}
+        onViewNext={() => mail && selectNextVisibleMail(mail.id)}
+        onMarkReadAfterViewing={() => mail && onMarkReadAfterViewing(mail.id)}
+        onPreviewAttachment={(attachment) => mail && onPreviewAttachment(mail.id, attachment)}
+        onDownloadAttachment={(attachment) => mail && onDownloadAttachment(mail.id, attachment)}
+        onQuickReplySend={(body) => mail && onQuickReplySend(mail.id, body)}
+        onSecurityAction={(action) => mail && onReaderSecurityAction(mail.id, action)}
+        onOpenLinkedEvent={() => mail?.linkedEventId && onOpenLinkedEvent(mail.linkedEventId)}
+      />
+    );
   };
 
   const renderReaderToolbar = () => {
@@ -1557,6 +1687,7 @@ function MailWorkspace({
     : [];
   const isMailReaderHidden = mailLayoutMode === MAIL_LAYOUT_MODE_AB;
   const mailListMode = isMailReaderHidden ? 'table' : 'compact';
+  const mailListDetailMail = isMailReaderHidden && mailListDetailId ? visibleMails.find((mail) => mail.id === mailListDetailId) || null : null;
 
   return (
       <div data-mail-workspace="true" data-mail-layout-mode={mailLayoutMode} className="flex min-w-0 flex-1 overflow-hidden bg-[#f6f7f9]">
@@ -1707,8 +1838,27 @@ function MailWorkspace({
 
         </div>
 
-        <div className={`flex-1 overflow-y-auto bg-white ${isMailReaderHidden ? 'px-0 py-0' : 'px-3 py-2'}`}>
-          {isMailReaderHidden && (
+	        <div className={`flex-1 bg-white ${mailListDetailMail ? 'overflow-hidden' : 'overflow-y-auto'} ${isMailReaderHidden ? 'px-0 py-0' : 'px-3 py-2'}`}>
+	          {mailListDetailMail ? (
+	            <div data-mail-list-detail-page="true" className="flex h-full min-h-0 flex-col bg-[#f6f7f9]">
+	              <div className="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5">
+	                <button
+	                  type="button"
+	                  onClick={closeMailListDetail}
+	                  className="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm font-black text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+	                >
+	                  <ChevronLeft size={16} className="mr-1.5" />
+	                  返回邮件列表
+	                </button>
+	                <div className="min-w-0 truncate text-sm font-semibold text-slate-500">{mailListDetailMail.subject}</div>
+	              </div>
+	              <div className="min-h-0 flex-1 overflow-hidden">
+	                {renderMailReaderPane(mailListDetailMail, { onBackToList: closeMailListDetail })}
+	              </div>
+	            </div>
+	          ) : (
+	            <>
+	          {isMailReaderHidden && (
             <div
               data-mail-wide-list-header="true"
               className="sticky top-0 z-10 grid grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-y border-slate-200 bg-slate-50 px-5 py-2 text-xs font-black text-slate-500"
@@ -1766,14 +1916,15 @@ function MailWorkspace({
                     key={mail.id}
                     data-mail-list-card={mail.id}
                     data-mail-row-mode="table"
-                    onClick={() => {
-                      if (mailSelectionMode) {
-                        toggleSelectedMail(mail.id);
-                        return;
-                      }
-                      onSelectMail(mail.id);
-                    }}
-                    onContextMenu={(event) => openMailContextMenu(event, mail)}
+	                    onClick={() => {
+	                      if (mailSelectionMode) {
+	                        toggleSelectedMail(mail.id);
+	                        return;
+	                      }
+	                      selectMailFromList(mail);
+	                    }}
+	                    onDoubleClick={() => openMailListDetail(mail)}
+	                    onContextMenu={(event) => openMailContextMenu(event, mail)}
                     className={`group relative grid min-h-[54px] w-full cursor-pointer grid-cols-[10px_168px_minmax(240px,1.4fr)_minmax(176px,0.8fr)_96px] items-center gap-4 border-b border-slate-100 px-5 py-2 text-left transition-colors ${
                       selectedInBatch
                         ? 'bg-[#0A59F7]/10'
@@ -1815,53 +1966,15 @@ function MailWorkspace({
                         {mail.preview}
                       </div>
                     </div>
-                    <div data-mail-wide-column="status" data-mail-sender-markers="true" className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-bold text-slate-600">
-                      {mail.unread && <span className="rounded-md bg-[#0A59F7]/[0.08] px-1.5 py-0.5 text-[#0A59F7]">未读</span>}
-                      {mail.starred && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-red-600">旗标</span>}
-                      {mail.attachments.length > 0 && <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">附件 {mail.attachments.length}</span>}
-                      {mail.linkedEventId && <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-600">关联日程</span>}
-                    </div>
+	                    <div data-mail-wide-column="status" data-mail-sender-markers="true" className="flex min-w-0 items-center gap-1.5 text-slate-500">
+	                      {renderMailStatusIcons(mail, { showUnread: true, showLinkedEvent: true })}
+	                    </div>
                     <div data-mail-wide-column="time" className="relative flex min-w-0 items-center justify-end">
                       <div
                         data-mail-hover-actions="true"
                         className={`absolute right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
                       >
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onDeleteMail(mail.id);
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                          aria-label="删除邮件"
-                          title="删除"
-                        >
-                          <Trash size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleStar(mail.id);
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                          aria-label={mail.starred ? '取消旗标' : '标记旗标'}
-                          title={mail.starred ? '取消旗标' : '标记旗标'}
-                        >
-                          <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onToggleRead(mail.id);
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                          aria-label={mail.unread ? '标为已读' : '标为未读'}
-                          title={mail.unread ? '标为已读' : '标为未读'}
-                        >
-                          <Mail size={14} />
-                        </button>
+	                        {renderMailQuickActions(mail)}
                       </div>
                       <div data-mail-timestamp="true" className="shrink-0 text-right text-xs font-semibold tabular-nums text-slate-500">{formatMailListTime(mail.timestamp)}</div>
                     </div>
@@ -1873,13 +1986,13 @@ function MailWorkspace({
                   key={mail.id}
                   data-mail-list-card={mail.id}
                   data-mail-row-mode="compact"
-                  onClick={() => {
-                    if (mailSelectionMode) {
-                      toggleSelectedMail(mail.id);
-                      return;
-                    }
-                    onSelectMail(mail.id);
-                  }}
+	                  onClick={() => {
+	                    if (mailSelectionMode) {
+	                      toggleSelectedMail(mail.id);
+	                      return;
+	                    }
+	                    selectMailFromList(mail);
+	                  }}
                   onContextMenu={(event) => openMailContextMenu(event, mail)}
                   className={`group relative my-0.5 grid w-full cursor-pointer grid-cols-[10px_minmax(0,1fr)] gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
                     selectedInBatch
@@ -1923,54 +2036,10 @@ function MailWorkspace({
 	                          data-mail-hover-actions="true"
 	                          className={`absolute inset-y-0 right-0 z-10 items-center justify-end gap-1 rounded-lg bg-white px-1 opacity-0 shadow-sm ring-1 ring-slate-200/80 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${mailSelectionMode ? 'hidden' : 'flex'}`}
 	                        >
-	                          <button
-	                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteMail(mail.id);
-                            }}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                            aria-label="删除邮件"
-	                            title="删除"
-	                          >
-	                            <Trash size={14} />
-	                          </button>
-	                          <button
-	                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onToggleStar(mail.id);
-                            }}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                            aria-label={mail.starred ? '取消旗标' : '标记旗标'}
-	                            title={mail.starred ? '取消旗标' : '标记旗标'}
-	                          >
-	                            <Flag size={14} fill={mail.starred ? 'currentColor' : 'none'} />
-	                          </button>
-	                          <button
-	                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onToggleRead(mail.id);
-                            }}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-900 transition hover:bg-slate-100"
-                            aria-label={mail.unread ? '标为已读' : '标为未读'}
-	                            title={mail.unread ? '标为已读' : '标为未读'}
-	                          >
-	                            <Mail size={14} />
-	                          </button>
+		                          {renderMailQuickActions(mail)}
 	                        </div>
 	                        <div data-mail-sender-markers="true" className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 text-slate-500 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
-	                          {mail.starred && (
-	                            <span role="img" aria-label="旗标邮件" title="旗标邮件" className="inline-flex h-4 w-4 items-center justify-center text-red-500">
-	                              <Flag size={14} fill="currentColor" />
-	                            </span>
-	                          )}
-	                          {mail.attachments.length > 0 && (
-	                            <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className="inline-flex h-4 w-4 items-center justify-center text-slate-500">
-	                              <Paperclip size={14} />
-	                            </span>
-	                          )}
+	                          {renderMailStatusIcons(mail)}
 	                        </div>
 	                        </div>
 	                        <div data-mail-timestamp="true" className="mt-1 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-500">{formatMailListTime(mail.timestamp)}</div>
@@ -1984,7 +2053,7 @@ function MailWorkspace({
               );
             })
           )}
-          {contextMail && (
+	          {contextMail && (
             <div
               data-mail-context-menu="true"
               role="menu"
@@ -1993,46 +2062,49 @@ function MailWorkspace({
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
             >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => runMailContextAction(() => onToggleRead(contextMail.id))}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <Mail size={15} className="text-slate-400" />
-                {contextMail.unread ? '标为已读' : '标为未读'}
-              </button>
+	              <button
+	                type="button"
+	                role="menuitem"
+	                onClick={() => runMailContextAction(() => onToggleRead(contextMail.id))}
+	                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+	              >
+	                {contextMail.unread ? <MailOpen size={15} className="text-slate-400" /> : <Mail size={15} className="text-slate-400" />}
+	                {contextMail.unread ? '标为已读' : '标为未读'}
+	              </button>
               <button
                 type="button"
                 role="menuitem"
                 onClick={() => runMailContextAction(() => onToggleStar(contextMail.id))}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                <Flag size={15} fill={contextMail.starred ? 'currentColor' : 'none'} className={contextMail.starred ? 'text-red-500' : 'text-slate-400'} />
-                {contextMail.starred ? '取消旗标' : '标记旗标'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => runMailContextAction(() => onArchiveMail(contextMail.id))}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                <Archive size={15} className="text-slate-400" />
-                归档邮件
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => runMailContextAction(() => onDeleteMail(contextMail.id))}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
-              >
-                <Trash size={15} />
-                删除邮件
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+	                <Flag size={15} fill={contextMail.starred ? 'currentColor' : 'none'} className={contextMail.starred ? 'text-red-500' : 'text-slate-400'} />
+	                {contextMail.starred ? '取消旗标' : '标记旗标'}
+	              </button>
+	              <button
+	                type="button"
+	                role="menuitem"
+	                onClick={() => runMailContextAction(() => onDeleteMail(contextMail.id))}
+	                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
+	              >
+	                <Trash size={15} />
+	                删除邮件
+	              </button>
+	              <div className="my-1 h-px bg-slate-100" />
+	              <button
+	                type="button"
+	                role="menuitem"
+	                onClick={() => runMailContextAction(() => onArchiveMail(contextMail.id))}
+	                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+	              >
+	                <Archive size={15} className="text-slate-400" />
+	                归档邮件
+	              </button>
+	            </div>
+	          )}
+	            </>
+	          )}
+	        </div>
+	      </div>
 
       {!isMailReaderHidden && (
         <LayoutResizeHandle
@@ -2134,43 +2206,9 @@ function MailWorkspace({
               </div>
             </div>
           </div>
-        ) : (
-	          <MailReadingPane
-	            mail={effectiveSelectedMail}
-	            state={effectiveSelectedMail ? MAIL_READING_STATE_BY_MAIL_ID[effectiveSelectedMail.id] : undefined}
-	            folderLabel={effectiveSelectedMail ? MAIL_FOLDERS.find((item) => item.id === effectiveSelectedMail.folder)?.label : ''}
-            linkedEvent={
-              selectedLinkedEvent
-                ? {
-                    id: selectedLinkedEvent.id,
-                    status: selectedLinkedEvent.status,
-                    summary: `${selectedLinkedEvent.status || '已接受'} · ${formatEventDateTime(selectedLinkedEvent)}`,
-                  }
-                : null
-            }
-	            aiInsight={selectedAiInsight}
-	            formatMailTime={formatMailTime}
-	            onReply={() => effectiveSelectedMail && onCompose('reply', effectiveSelectedMail.id)}
-	            onReplyAll={() => effectiveSelectedMail && onCompose('replyAll', effectiveSelectedMail.id)}
-	            onForward={() => effectiveSelectedMail && onCompose('forward', effectiveSelectedMail.id)}
-	            onArchive={() => effectiveSelectedMail && onArchiveMail(effectiveSelectedMail.id)}
-	            onDelete={() => effectiveSelectedMail && onDeleteMail(effectiveSelectedMail.id)}
-	            onMove={() => effectiveSelectedMail && (onMoveMail || onArchiveMail)(effectiveSelectedMail.id)}
-	            onToggleRead={() => effectiveSelectedMail && onToggleRead(effectiveSelectedMail.id)}
-	            onToggleFollowUp={() => effectiveSelectedMail && onToggleStar(effectiveSelectedMail.id)}
-	            onCreateTask={() => effectiveSelectedMail && onCreateTaskFromMail(effectiveSelectedMail.id)}
-	            onCreateEvent={() => effectiveSelectedMail && onScheduleFromMail(effectiveSelectedMail.id)}
-	            onRetry={() => effectiveSelectedMail && onReaderRetry(effectiveSelectedMail.id)}
-	            onBackToList={() => effectiveSelectedMail && onSelectMail(effectiveSelectedMail.id)}
-	            onViewNext={() => effectiveSelectedMail && selectNextVisibleMail(effectiveSelectedMail.id)}
-	            onMarkReadAfterViewing={() => effectiveSelectedMail && onMarkReadAfterViewing(effectiveSelectedMail.id)}
-	            onPreviewAttachment={(attachment) => effectiveSelectedMail && onPreviewAttachment(effectiveSelectedMail.id, attachment)}
-	            onDownloadAttachment={(attachment) => effectiveSelectedMail && onDownloadAttachment(effectiveSelectedMail.id, attachment)}
-	            onQuickReplySend={(body) => effectiveSelectedMail && onQuickReplySend(effectiveSelectedMail.id, body)}
-	            onSecurityAction={(action) => effectiveSelectedMail && onReaderSecurityAction(effectiveSelectedMail.id, action)}
-	            onOpenLinkedEvent={() => effectiveSelectedMail?.linkedEventId && onOpenLinkedEvent(effectiveSelectedMail.linkedEventId)}
-	          />
-        )}
+	        ) : (
+		          renderMailReaderPane(effectiveSelectedMail)
+	        )}
       </div>
       )}
     </div>
@@ -7493,7 +7531,7 @@ function MainApp() {
     const willStar = !currentMail?.starred;
     setMails((prev) => prev.map((mail) => (mail.id === mailId ? { ...mail, starred: willStar, hasFollowUp: willStar } : mail)));
     triggerFeedback('L3', {
-      msg: willStar ? '已添加跟进' : '已取消跟进',
+      msg: willStar ? '已标记旗标' : '已取消旗标',
       icon: <Flag size={16} fill={willStar ? 'currentColor' : 'none'} />,
       color: 'bg-slate-900',
     });

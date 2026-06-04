@@ -140,9 +140,59 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(firstWideRow).toHaveAttribute('data-mail-row-mode', 'table');
   await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).toContainText('产品经理');
   await expect(firstWideRow.locator('[data-mail-wide-column="subject"]')).toContainText('Q2 路线评审材料已更新');
-  await expect(firstWideRow.locator('[data-mail-wide-column="status"]')).toContainText('附件 1');
-  await expect(firstWideRow.locator('[data-mail-wide-column="status"]')).toContainText('关联日程');
+  const firstWideStatus = firstWideRow.locator('[data-mail-wide-column="status"]');
+  await expect(firstWideStatus).not.toContainText('附件 1');
+  await expect(firstWideStatus).not.toContainText('关联日程');
+  await expect(firstWideStatus.getByLabel('未读邮件')).toBeVisible();
+  await expect(firstWideStatus.getByLabel('旗标邮件')).toBeVisible();
+  await expect(firstWideStatus.getByLabel('含 1 个附件')).toBeVisible();
+  await expect(firstWideStatus.getByLabel('关联日程')).toBeVisible();
   await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
+  await firstWideRow.hover();
+  const firstWideActions = firstWideRow.locator('[data-mail-hover-actions="true"]');
+  await expect
+    .poll(() =>
+      firstWideActions.evaluate((node) =>
+        Array.from(node.querySelectorAll('button'))
+          .map((button) => button.getAttribute('aria-label'))
+          .join('|'),
+      ),
+    )
+    .toBe('标为已读|取消旗标|删除邮件');
+  await firstWideRow.click();
+  await expect(firstWideRow.locator('[data-mail-read-state="read"]')).toBeVisible();
+  await firstWideRow.hover();
+  await expect
+    .poll(() =>
+      firstWideActions.evaluate((node) =>
+        Array.from(node.querySelectorAll('button'))
+          .map((button) => button.getAttribute('aria-label'))
+          .join('|'),
+      ),
+    )
+    .toBe('标为未读|取消旗标|删除邮件');
+  await firstWideRow.click({ button: 'right' });
+  const wideContextMenu = mailView.locator('[data-mail-context-menu="true"]');
+  await expect(wideContextMenu).toBeVisible();
+  await expect
+    .poll(() =>
+      wideContextMenu.evaluate((node) =>
+        Array.from(node.querySelectorAll('[role="menuitem"]'))
+          .map((button) => button.textContent.trim())
+          .slice(0, 3)
+          .join('|'),
+      ),
+    )
+    .toBe('标为未读|取消旗标|删除邮件');
+  await page.keyboard.press('Escape');
+  await firstWideRow.dblclick();
+  const listDetailPage = mailView.locator('[data-mail-list-detail-page="true"]');
+  await expect(listDetailPage).toBeVisible();
+  await expect(listDetailPage.getByRole('heading', { name: 'Q2 路线评审材料已更新' })).toBeVisible();
+  await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await listDetailPage.getByRole('button', { name: '返回邮件列表' }).click();
+  await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toBeVisible();
   await expect(mailView.getByRole('button', { name: '显示阅读区' })).toBeVisible();
   await mailView.getByRole('button', { name: '显示阅读区' }).click();
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
@@ -405,9 +455,28 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(firstMailCard.getByRole('button', { name: '删除邮件' })).toBeVisible();
   await expect(firstMailCard.getByRole('button', { name: '取消旗标' })).toBeVisible();
   await expect(firstMailCard.getByRole('button', { name: '标为已读' })).toBeVisible();
+  await expect
+    .poll(() =>
+      firstMailCard.locator('[data-mail-hover-actions="true"]').evaluate((node) =>
+        Array.from(node.querySelectorAll('button'))
+          .map((button) => button.getAttribute('aria-label'))
+          .join('|'),
+      ),
+    )
+    .toBe('标为已读|取消旗标|删除邮件');
   await firstMailCard.click({ button: 'right' });
   const mailContextMenu = mailView.locator('[data-mail-context-menu="true"]');
   await expect(mailContextMenu).toBeVisible();
+  await expect
+    .poll(() =>
+      mailContextMenu.evaluate((node) =>
+        Array.from(node.querySelectorAll('[role="menuitem"]'))
+          .map((button) => button.textContent.trim())
+          .slice(0, 3)
+          .join('|'),
+      ),
+    )
+    .toBe('标为已读|取消旗标|删除邮件');
   await expect(mailContextMenu.getByRole('menuitem', { name: '删除邮件' })).toBeVisible();
   await page.keyboard.press('Escape');
   await firstMailCard.hover();
