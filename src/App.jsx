@@ -1516,7 +1516,7 @@ function MailWorkspace({
   };
 
   const renderMailStatusIcons = (mail, { showUnread = false, showLinkedEvent = false } = {}) => {
-    const statusIconClass = 'inline-flex h-6 min-w-6 items-center justify-center rounded-md text-slate-500';
+    const statusIconClass = 'inline-flex h-6 min-w-6 items-center justify-center rounded-md';
     return (
       <>
         {showUnread && mail.unread && (
@@ -1530,13 +1530,13 @@ function MailWorkspace({
           </span>
         )}
         {mail.attachments.length > 0 && (
-          <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className={`${statusIconClass} gap-0.5`}>
+          <span role="img" aria-label={`含 ${mail.attachments.length} 个附件`} title={`含 ${mail.attachments.length} 个附件`} className={`${statusIconClass} gap-0.5 text-slate-500`}>
             <Paperclip size={14} />
             <span className="text-[11px] font-black leading-none">{mail.attachments.length}</span>
           </span>
         )}
         {showLinkedEvent && mail.linkedEventId && (
-          <span role="img" aria-label="关联日程" title="关联日程" className={statusIconClass}>
+          <span role="img" aria-label="关联日程" title="关联日程" className={`${statusIconClass} text-slate-500`}>
             <Calendar size={14} />
           </span>
         )}

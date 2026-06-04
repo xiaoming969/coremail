@@ -156,7 +156,17 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(firstWideStatus).not.toContainText('附件 1');
   await expect(firstWideStatus).not.toContainText('关联日程');
   await expect(firstWideStatus.getByLabel('未读邮件')).toBeVisible();
-  await expect(firstWideStatus.getByLabel('旗标邮件')).toBeVisible();
+  const firstWideStatusFlag = firstWideStatus.getByLabel('旗标邮件');
+  await expect(firstWideStatusFlag).toBeVisible();
+  await expect(firstWideStatusFlag).toHaveAttribute('data-mail-flag-icon-mode', 'filled');
+  await expect.poll(async () => firstWideStatusFlag.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.className = 'text-red-500';
+    document.body.appendChild(probe);
+    const expectedColor = getComputedStyle(probe).color;
+    probe.remove();
+    return getComputedStyle(node).color === expectedColor;
+  })).toBe(true);
   await expect(firstWideStatus.getByLabel('含 1 个附件')).toBeVisible();
   await expect(firstWideStatus.getByLabel('关联日程')).toHaveCount(0);
   await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
