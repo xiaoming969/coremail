@@ -138,10 +138,12 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + mailBSplitterBoxAfterSoftDrag.width / 2, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
   await page.mouse.down();
   await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + 470, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
   await page.mouse.up();
 
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
   await expect(mailReaderPane).toHaveCount(0);
+  await expect(mailBSplitter).toBeVisible();
   await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(1200);
   await expect(mailListPane).toHaveAttribute('data-mail-list-mode', 'table');
   await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toBeVisible();
@@ -200,6 +202,21 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
     )
     .toBe('标为未读|取消旗标|删除邮件');
   await page.keyboard.press('Escape');
+  const mailBRestoreSplitterBox = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBRestoreSplitterBox.x + mailBRestoreSplitterBox.width / 2, mailBRestoreSplitterBox.y + mailBRestoreSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailBRestoreSplitterBox.x - 560, mailBRestoreSplitterBox.y + mailBRestoreSplitterBox.height / 2);
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await page.mouse.up();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect(mailReaderPane).toBeVisible();
+
+  const mailBSplitterBoxForListMode = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBSplitterBoxForListMode.x + mailBSplitterBoxForListMode.width / 2, mailBSplitterBoxForListMode.y + mailBSplitterBoxForListMode.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailBSplitterBoxForListMode.x + 520, mailBSplitterBoxForListMode.y + mailBSplitterBoxForListMode.height / 2);
+  await page.mouse.up();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
   await firstWideRow.dblclick();
   const listDetailPage = mailView.locator('[data-mail-list-detail-page="true"]');
   await expect(listDetailPage).toBeVisible();
@@ -252,6 +269,37 @@ test('mail manually collapsed A column can be dragged back open', async ({ page 
   await page.mouse.up();
 
   await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+  await expect(mailSidebar.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+});
+
+test('mail A column uses mac-style drag collapse and expand thresholds', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const mailASplitter = page.locator('[data-layout-resizer="mail-a"]');
+
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(320);
+  const mailASplitterBox = await mailASplitter.boundingBox();
+  await page.mouse.move(mailASplitterBox.x + mailASplitterBox.width / 2, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailASplitterBox.x - 220, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+  await page.mouse.up();
+
+  await expect(mailSidebar.getByRole('button', { name: '展开侧边栏' })).toBeVisible();
+  await expect(mailASplitter).toBeVisible();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+
+  const collapsedSplitterBox = await mailASplitter.boundingBox();
+  await page.mouse.move(collapsedSplitterBox.x + collapsedSplitterBox.width / 2, collapsedSplitterBox.y + collapsedSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(collapsedSplitterBox.x + 220, collapsedSplitterBox.y + collapsedSplitterBox.height / 2);
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+  await page.mouse.up();
+
   await expect(mailSidebar.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
 });

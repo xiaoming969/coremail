@@ -204,11 +204,13 @@ const MAIL_LIST_MIN_WIDTH = 360;
 const MAIL_READER_DEFAULT_WIDTH = 864;
 const MAIL_READER_MIN_WIDTH = 720;
 const MAIL_LAYOUT_AB_EXPAND_RATIO = 0.7;
+const MAIL_LAYOUT_ABC_RESTORE_RATIO = 0.64;
 const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
 const MAIL_LAYOUT_MODE_AB = 'AB';
 const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
 const MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD = 160;
+const MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD = 192;
 const MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH = 1320;
 const MAIL_LAYOUT_AB_WIDTH = 1144;
 const SHOW_CALENDAR_SEARCH_ENTRY = false;
@@ -257,6 +259,16 @@ const getDefaultMailListWidth = (viewportWidth = getViewportWidth(), sidebarWidt
 
 const getMailReaderWidth = (viewportWidth, sidebarWidth, listWidth) =>
   Math.max(0, Math.round(viewportWidth - sidebarWidth - listWidth));
+
+const getMailContentWidth = (viewportWidth, sidebarWidth) => Math.max(MAIL_LIST_MIN_WIDTH, viewportWidth - sidebarWidth);
+
+const resolveMailReaderDragMode = (nextListWidth, currentLayoutMode, viewportWidth, sidebarWidth) => {
+  const contentWidth = getMailContentWidth(viewportWidth, sidebarWidth);
+  if (currentLayoutMode === MAIL_LAYOUT_MODE_AB) {
+    return nextListWidth <= contentWidth * MAIL_LAYOUT_ABC_RESTORE_RATIO ? MAIL_LAYOUT_MODE_ABC : MAIL_LAYOUT_MODE_AB;
+  }
+  return nextListWidth >= contentWidth * MAIL_LAYOUT_AB_EXPAND_RATIO ? MAIL_LAYOUT_MODE_AB : MAIL_LAYOUT_MODE_ABC;
+};
 
 const persistMailLayoutPreference = ({ layoutMode, sidebarWidth, listWidth, readerWidth = null, isACollapsed = false }, viewportWidth = getViewportWidth()) => {
   if (typeof window === 'undefined') return;
@@ -586,7 +598,7 @@ function SidebarProductDock({ activeProduct, onSelectProduct, compact = false })
   );
 }
 
-function LayoutResizeHandle({ id, label, value, min, max, active = false, onStart, onStep }) {
+function LayoutResizeHandle({ id, label, value, min, max, active = false, edgePinned = false, onStart, onStep }) {
   const handleKeyDown = (event) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
@@ -605,7 +617,9 @@ function LayoutResizeHandle({ id, label, value, min, max, active = false, onStar
       tabIndex={0}
       onMouseDown={onStart}
       onKeyDown={handleKeyDown}
-      className={`group/resize relative z-30 -mx-1 hidden w-2 shrink-0 cursor-col-resize select-none md:block focus:outline-none ${
+      className={`group/resize relative z-30 hidden shrink-0 cursor-col-resize select-none md:block focus:outline-none ${
+        edgePinned ? '-ml-4 mr-0 w-4' : '-mx-1 w-2'
+      } ${
         active ? 'bg-[#0A59F7]/[0.04]' : ''
       }`}
     >
@@ -2109,18 +2123,17 @@ function MailWorkspace({
 	        </div>
 	      </div>
 
-      {!isMailReaderHidden && (
-        <LayoutResizeHandle
-          id="mail-b"
-          label="调整邮件列表和阅读窗格宽度"
-          value={mailListWidth}
-          min={mailListBounds.min}
-          max={mailListBounds.max}
-          active={activeLayoutResize === 'mail-b'}
-          onStart={(event) => onStartLayoutResize('mail-b', event)}
-          onStep={(delta) => onStepLayoutResize('mail-b', delta)}
-        />
-      )}
+      <LayoutResizeHandle
+        id="mail-b"
+        label={isMailReaderHidden ? '拖拽恢复邮件阅读区' : '调整邮件列表和阅读窗格宽度'}
+        value={mailListWidth}
+        min={mailListBounds.min}
+        max={mailListBounds.max}
+        active={activeLayoutResize === 'mail-b'}
+        edgePinned={isMailReaderHidden}
+        onStart={(event) => onStartLayoutResize('mail-b', event)}
+        onStep={(delta) => onStepLayoutResize('mail-b', delta)}
+      />
 
       {!isMailReaderHidden && (
       <div data-mail-reader-region="true" className="min-w-0 flex-1 bg-[#f6f7f9]">
@@ -5566,6 +5579,65 @@ function MainApp() {
     persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: mailSidebarCollapsed });
   };
 
+  const applyMailSidebarResize = (nextWidth, viewportWidth, { layoutMode = mailLayoutMode, wasCollapsed = effectiveMailSidebarCollapsed } = {}) => {
+    if (wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+      return {
+        collapsed: true,
+        sidebarWidth: mailSidebarWidth,
+        layoutSidebarWidth: APP_COLLAPSED_SIDEBAR_WIDTH,
+      };
+    }
+
+    if (!wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD) {
+      const collapsedListBounds = getMailListBounds(viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, layoutMode);
+      setMailSidebarCollapsed(true);
+      setMailSidebarNarrowExpanded(false);
+      setMailListWidth((width) => clampNumber(width, collapsedListBounds.min, collapsedListBounds.max));
+      return {
+        collapsed: true,
+        sidebarWidth: mailSidebarWidth,
+        layoutSidebarWidth: APP_COLLAPSED_SIDEBAR_WIDTH,
+      };
+    }
+
+    const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+    const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, layoutMode);
+    setMailSidebarCollapsed(false);
+    setMailSidebarNarrowExpanded(viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
+    setMailSidebarWidth(nextSidebarWidth);
+    setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
+    return {
+      collapsed: false,
+      sidebarWidth: nextSidebarWidth,
+      layoutSidebarWidth: nextSidebarWidth,
+    };
+  };
+
+  const applyMailReaderResize = (nextWidth, viewportWidth, sidebarWidth, currentLayoutMode = mailLayoutMode) => {
+    const nextLayoutMode = resolveMailReaderDragMode(nextWidth, currentLayoutMode, viewportWidth, sidebarWidth);
+
+    if (nextLayoutMode === MAIL_LAYOUT_MODE_AB) {
+      const abBounds = getMailListBounds(viewportWidth, sidebarWidth, MAIL_LAYOUT_MODE_AB);
+      setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
+      setMailListWidth(abBounds.max);
+      return {
+        layoutMode: MAIL_LAYOUT_MODE_AB,
+        listWidth: abBounds.max,
+        readerWidth: 0,
+      };
+    }
+
+    const abcBounds = getMailListBounds(viewportWidth, sidebarWidth, MAIL_LAYOUT_MODE_ABC);
+    const nextListWidth = clampNumber(nextWidth, abcBounds.min, abcBounds.max);
+    setMailLayoutMode(MAIL_LAYOUT_MODE_ABC);
+    setMailListWidth(nextListWidth);
+    return {
+      layoutMode: MAIL_LAYOUT_MODE_ABC,
+      listWidth: nextListWidth,
+      readerWidth: getMailReaderWidth(viewportWidth, sidebarWidth, nextListWidth),
+    };
+  };
+
   const setLayoutWidth = (type, nextWidth, viewportWidth = getViewportWidth()) => {
     if (type === 'calendar-a') {
       const bounds = getCalendarSidebarBounds(viewportWidth);
@@ -5574,24 +5646,12 @@ function MainApp() {
     }
 
     if (type === 'mail-a') {
-      if (effectiveMailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
-        return;
-      }
-
-      const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
-      const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
-      if (effectiveMailSidebarCollapsed) {
-        setMailSidebarCollapsed(false);
-        setMailSidebarNarrowExpanded(viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
-      }
-      setMailSidebarWidth(nextSidebarWidth);
-      setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
+      applyMailSidebarResize(nextWidth, viewportWidth);
       return;
     }
 
     if (type === 'mail-b') {
-      const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
-      setMailListWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      applyMailReaderResize(nextWidth, viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
     }
   };
 
@@ -5626,40 +5686,41 @@ function MainApp() {
     const viewportWidth = getViewportWidth();
     const nextWidth =
       type === 'mail-a' && effectiveMailSidebarCollapsed && delta > 0 ? APP_SIDEBAR_MIN_WIDTH : getLayoutWidth(type) + delta;
-    setLayoutWidth(type, nextWidth, viewportWidth);
+
+    if (type === 'calendar-a') {
+      setLayoutWidth(type, nextWidth, viewportWidth);
+      return;
+    }
 
     if (type === 'mail-a') {
-      if (effectiveMailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
-        persistMailLayoutPreference(
-          {
-            layoutMode: mailLayoutMode,
-            sidebarWidth: mailSidebarWidth,
-            listWidth: mailListWidth,
-            readerWidth: getMailReaderWidth(viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, mailListWidth),
-            isACollapsed: true,
-          },
-          viewportWidth,
-        );
-        return;
-      }
-
-      const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
-      const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, mailLayoutMode);
+      const result = applyMailSidebarResize(nextWidth, viewportWidth);
+      const nextListBounds = getMailListBounds(viewportWidth, result.layoutSidebarWidth, mailLayoutMode);
       const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
       persistMailLayoutPreference(
         {
           layoutMode: mailLayoutMode,
-          sidebarWidth: nextSidebarWidth,
+          sidebarWidth: result.sidebarWidth,
           listWidth: nextListWidth,
-          readerWidth: getMailReaderWidth(viewportWidth, nextSidebarWidth, nextListWidth),
-          isACollapsed: false,
+          readerWidth: getMailReaderWidth(viewportWidth, result.layoutSidebarWidth, nextListWidth),
+          isACollapsed: result.collapsed,
         },
         viewportWidth,
       );
+      return;
     }
+
     if (type === 'mail-b') {
-      const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
-      saveMailLayoutPreference({ listWidth: clampNumber(nextWidth, bounds.min, bounds.max) });
+      const result = applyMailReaderResize(nextWidth, viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
+      persistMailLayoutPreference(
+        {
+          layoutMode: result.layoutMode,
+          sidebarWidth: mailSidebarWidth,
+          listWidth: result.listWidth,
+          readerWidth: result.readerWidth,
+          isACollapsed: mailSidebarCollapsed,
+        },
+        viewportWidth,
+      );
     }
   };
 
@@ -5714,23 +5775,17 @@ function MainApp() {
       }
 
       if (active.type === 'mail-a') {
-        if (active.mailSidebarCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
-          return;
-        }
-
-        const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
-        const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
-        if (active.mailSidebarCollapsed) {
-          setMailSidebarCollapsed(false);
-          setMailSidebarNarrowExpanded(active.viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
-        }
-        setMailSidebarWidth(nextSidebarWidth);
-        setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
+        const result = applyMailSidebarResize(nextWidth, active.viewportWidth, {
+          layoutMode: active.layoutMode,
+          wasCollapsed: active.mailSidebarCollapsed,
+        });
+        active.mailSidebarCollapsed = result.collapsed;
+        active.sidebarWidth = result.layoutSidebarWidth;
       }
 
       if (active.type === 'mail-b') {
-        const bounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, active.layoutMode);
-        setMailListWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+        const result = applyMailReaderResize(nextWidth, active.viewportWidth, active.sidebarWidth, active.layoutMode);
+        active.layoutMode = result.layoutMode;
       }
     };
 
@@ -5740,64 +5795,31 @@ function MainApp() {
 
       const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
       if (active.type === 'mail-a') {
-        if (active.mailSidebarCollapsed && finalWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
-          persistMailLayoutPreference({
-            layoutMode: active.layoutMode,
-            sidebarWidth: active.preferredSidebarWidth,
-            listWidth: active.listWidth,
-            readerWidth: getMailReaderWidth(active.viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, active.listWidth),
-            isACollapsed: true,
-          }, active.viewportWidth);
-          clearLayoutResize();
-          return;
-        }
-
-        const nextSidebarWidth = clampNumber(finalWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
-        const nextListBounds = getMailListBounds(active.viewportWidth, nextSidebarWidth, active.layoutMode);
+        const result = applyMailSidebarResize(finalWidth, active.viewportWidth, {
+          layoutMode: active.layoutMode,
+          wasCollapsed: active.mailSidebarCollapsed,
+        });
+        const nextListBounds = getMailListBounds(active.viewportWidth, result.layoutSidebarWidth, active.layoutMode);
         const nextListWidth = clampNumber(active.listWidth, nextListBounds.min, nextListBounds.max);
-        setMailSidebarCollapsed(false);
-        setMailSidebarNarrowExpanded(active.viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
-        setMailSidebarWidth(nextSidebarWidth);
         setMailListWidth(nextListWidth);
         persistMailLayoutPreference({
           layoutMode: active.layoutMode,
-          sidebarWidth: nextSidebarWidth,
+          sidebarWidth: result.sidebarWidth,
           listWidth: nextListWidth,
-          readerWidth: getMailReaderWidth(active.viewportWidth, nextSidebarWidth, nextListWidth),
-          isACollapsed: false,
+          readerWidth: getMailReaderWidth(active.viewportWidth, result.layoutSidebarWidth, nextListWidth),
+          isACollapsed: result.collapsed,
         }, active.viewportWidth);
       }
 
       if (active.type === 'mail-b') {
-        const availableMailContentWidth = Math.max(MAIL_LIST_MIN_WIDTH, active.viewportWidth - active.sidebarWidth);
-        const shouldUsePureList =
-          active.layoutMode === MAIL_LAYOUT_MODE_ABC && finalWidth >= availableMailContentWidth * MAIL_LAYOUT_AB_EXPAND_RATIO;
-
-        if (shouldUsePureList) {
-          const abBounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, MAIL_LAYOUT_MODE_AB);
-          const nextListWidth = abBounds.max;
-          setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
-          setMailListWidth(nextListWidth);
-          persistMailLayoutPreference({
-            layoutMode: MAIL_LAYOUT_MODE_AB,
-            sidebarWidth: active.sidebarWidth,
-            listWidth: nextListWidth,
-            readerWidth: 0,
-            isACollapsed: mailSidebarCollapsed,
-          }, active.viewportWidth);
-        } else {
-          const abcBounds = getMailListBounds(active.viewportWidth, active.sidebarWidth, MAIL_LAYOUT_MODE_ABC);
-          const nextListWidth = clampNumber(finalWidth, abcBounds.min, abcBounds.max);
-          setMailLayoutMode(MAIL_LAYOUT_MODE_ABC);
-          setMailListWidth(nextListWidth);
-          persistMailLayoutPreference({
-            layoutMode: MAIL_LAYOUT_MODE_ABC,
-            sidebarWidth: active.sidebarWidth,
-            listWidth: nextListWidth,
-            readerWidth: getMailReaderWidth(active.viewportWidth, active.sidebarWidth, nextListWidth),
-            isACollapsed: mailSidebarCollapsed,
-          }, active.viewportWidth);
-        }
+        const result = applyMailReaderResize(finalWidth, active.viewportWidth, active.sidebarWidth, active.layoutMode);
+        persistMailLayoutPreference({
+          layoutMode: result.layoutMode,
+          sidebarWidth: active.sidebarWidth,
+          listWidth: result.listWidth,
+          readerWidth: result.readerWidth,
+          isACollapsed: mailSidebarCollapsed,
+        }, active.viewportWidth);
       }
 
       clearLayoutResize();
