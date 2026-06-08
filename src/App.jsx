@@ -4,6 +4,7 @@ import AppIcon from './components/AppIcon';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import MailReadingPane from './features/mail/components/MailReadingPane';
 import { MAIL_READING_STATE_BY_MAIL_ID } from './features/mail/data/mockMailReadingStates';
+import { getMailRecipients, getMailSender, getRecipientSummary, getSecurityInfo, normalizeAttachments } from './features/mail/utils/mailReadingPane';
 import {
   DAY_MS,
   TODAY_DATE,
@@ -1912,6 +1913,134 @@ function MailWorkspace({
       </div>
     );
   };
+  const renderStackAddressGroup = (label, recipients) => {
+    if (recipients.length === 0) return null;
+    return (
+      <div className="grid gap-2 text-xs sm:grid-cols-[40px_minmax(0,1fr)]">
+        <div className="font-black text-slate-400">{label}</div>
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          {recipients.map((recipient) => (
+            <span key={`${label}-${recipient.email}-${recipient.name}`} className="inline-flex max-w-full items-center gap-1 rounded-md bg-slate-50 px-2 py-1 font-semibold text-slate-600 ring-1 ring-slate-200/80">
+              <span>{recipient.name || recipient.email}</span>
+              {recipient.email && <span className="text-slate-400">&lt;{recipient.email}&gt;</span>}
+              {recipient.isExternal && <span className="rounded bg-amber-50 px-1 text-[10px] font-black text-amber-700">外部</span>}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  const renderMailStackBody = (text) => {
+    if (!text) return <p className="text-sm font-semibold text-slate-400">此邮件没有正文内容</p>;
+    return text.split('\n').map((line, index) => (
+      <p key={`${index}-${line || 'blank'}`} className={line ? 'min-h-5' : 'min-h-4'}>
+        {line || ' '}
+      </p>
+    ));
+  };
+  const getMailStackTarget = (index, count) => {
+    if (count <= 1) {
+      return {
+        transform: 'translate3d(0, 0, 0) rotate(0deg) scale(1)',
+        boxShadow: '0 12px 36px rgba(15,23,42,0.10)',
+      };
+    }
+    const direction = index % 2 === 0 ? 1 : -1;
+    const x = (index + 1) * 4 * direction;
+    const y = (index + 1) * -4;
+    const rotation = ((index + 1) * 0.45 * direction).toFixed(2);
+    return {
+      transform: `translate3d(${x}px, ${y}px, 0) rotate(${rotation}deg) scale(1)`,
+      boxShadow: index === count - 1 ? '0 18px 44px rgba(15,23,42,0.18)' : `0 ${10 + index * 3}px ${28 + index * 7}px rgba(15,23,42,0.12)`,
+    };
+  };
+  const renderMailStackCard = (mail, index, count) => {
+    const sender = getMailSender(mail);
+    const attachments = normalizeAttachments(mail);
+    const security = getSecurityInfo(mail, attachments);
+    const target = getMailStackTarget(index, count);
+    const folderName = MAIL_FOLDERS.find((item) => item.id === mail.folder)?.label || folderLabel;
+    const statusLabels = [
+      folderName,
+      mail.unread ? '未读' : '',
+      mail.starred ? '旗标' : '',
+      mail.linkedEventId ? '关联日程' : '',
+      security.level !== 'none' ? '安全提示' : '',
+    ].filter(Boolean);
+
+    return (
+      <article
+        key={mail.id}
+        data-mail-stack-card="true"
+        data-mail-stack-card-id={mail.id}
+        data-mail-stack-motion="harmony-stack"
+        className="mail-stack-card relative w-full rounded-lg border border-slate-200 bg-white text-left shadow-sm"
+        style={{ ...target, zIndex: 30 + index }}
+      >
+        <header data-mail-stack-card-header="true" className="border-b border-slate-200 px-6 py-5">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            {statusLabels.map((label) => (
+              <span key={label} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">
+                {label}
+              </span>
+            ))}
+          </div>
+          <h3 className="text-xl font-black leading-snug text-slate-950">{mail.subject || '无主题'}</h3>
+          <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="font-black text-slate-900">{sender.name || sender.email || '未知发件人'}</span>
+            {sender.email && <span className="font-semibold text-slate-500">&lt;{sender.email}&gt;</span>}
+            <span className="text-slate-300">·</span>
+            <span className="font-semibold text-slate-400">{formatMailTime(mail.timestamp)}</span>
+          </div>
+        </header>
+
+        <section data-mail-stack-card-recipients="true" className="space-y-2 border-b border-slate-100 px-6 py-4">
+          <div className="text-xs font-black text-slate-400">{getRecipientSummary(mail)}</div>
+          {renderStackAddressGroup('To', getMailRecipients(mail, 'to'))}
+          {renderStackAddressGroup('Cc', getMailRecipients(mail, 'cc'))}
+          {renderStackAddressGroup('Bcc', getMailRecipients(mail, 'bcc'))}
+        </section>
+
+        {security.level !== 'none' && (
+          <section data-mail-stack-card-security="true" className="mx-6 mt-5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-950">
+            {security.message || '请注意邮件安全风险。'}
+          </section>
+        )}
+
+        {attachments.length > 0 && (
+          <section data-mail-stack-card-attachments="true" className="px-6 pt-5">
+            <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400">附件 {attachments.length}</div>
+            <div className="grid gap-2">
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-black text-slate-500 ring-1 ring-slate-200">{attachment.type}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-black text-slate-800">{attachment.name}</div>
+                    <div className="mt-0.5 text-xs font-semibold text-slate-400">{attachment.size}</div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-200">{attachment.status === 'safe' ? '安全' : '需确认'}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section data-mail-stack-card-body="true" className="px-6 py-5 text-sm font-medium leading-7 text-slate-700">
+          {renderMailStackBody(mail.body || mail.preview)}
+        </section>
+
+        {mail.quotedHistory && (
+          <section data-mail-stack-card-quoted="true" className="mx-6 mb-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium leading-6 text-slate-500">
+            {renderMailStackBody(mail.quotedHistory)}
+          </section>
+        )}
+
+        <footer data-mail-stack-card-footer="true" className="border-t border-slate-100 px-6 py-3 text-center text-[11px] font-black uppercase tracking-[0.18em] text-slate-300">
+          邮件末尾 · {index + 1} / {count}
+        </footer>
+      </article>
+    );
+  };
   const isMailReaderHidden = mailLayoutMode === MAIL_LAYOUT_MODE_AB;
   const mailListMode = isMailReaderHidden ? 'table' : 'compact';
   const mailListDetailMail = isMailReaderHidden && mailListDetailId ? visibleMails.find((mail) => mail.id === mailListDetailId) || null : null;
@@ -2362,26 +2491,35 @@ function MailWorkspace({
             </div>
 
             <div data-mail-bulk-reader-surface="true" className="flex-1 overflow-y-auto px-8 py-10">
-              <div className="mx-auto flex min-h-full max-w-[720px] items-center justify-center">
+              <div className="mx-auto flex min-h-full max-w-[820px] items-center justify-center">
                 {selectedBatchMails.length === 0 ? (
                   <div className="text-sm font-semibold text-slate-400">请选择要批量处理的邮件</div>
                 ) : (
-                  <div className="w-full text-center">
-                    <div className="text-2xl font-black text-slate-950">已选中 {selectedBatchMails.length} 封邮件</div>
-                    <div className="mt-3 text-sm font-semibold leading-6 text-slate-500">批量操作不会打开单封邮件内容，请使用上方操作栏处理当前选择。</div>
-                    <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 text-left">
-                      <div className="bg-white px-4 py-3">
-                        <div className="text-xs font-semibold text-slate-400">未读</div>
-                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.unread).length}</div>
+                  <div className="w-full">
+                    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <div className="text-2xl font-black text-slate-950">已选中 {selectedBatchMails.length} 封邮件</div>
+                        <div data-mail-stack-summary="true" className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                          堆叠预览按选择顺序展示完整邮件，批量操作使用上方操作栏。
+                        </div>
                       </div>
-                      <div className="bg-white px-4 py-3">
-                        <div className="text-xs font-semibold text-slate-400">旗标</div>
-                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.starred).length}</div>
+                      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 text-left">
+                        <div className="bg-white px-4 py-3">
+                          <div className="text-xs font-semibold text-slate-400">未读</div>
+                          <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.unread).length}</div>
+                        </div>
+                        <div className="bg-white px-4 py-3">
+                          <div className="text-xs font-semibold text-slate-400">旗标</div>
+                          <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.starred).length}</div>
+                        </div>
+                        <div className="bg-white px-4 py-3">
+                          <div className="text-xs font-semibold text-slate-400">附件</div>
+                          <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.attachments.length > 0).length}</div>
+                        </div>
                       </div>
-                      <div className="bg-white px-4 py-3">
-                        <div className="text-xs font-semibold text-slate-400">附件</div>
-                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.attachments.length > 0).length}</div>
-                      </div>
+                    </div>
+                    <div data-mail-stack-deck="true" className="space-y-7 pb-8">
+                      {selectedBatchMails.map((mail, index) => renderMailStackCard(mail, index, selectedBatchMails.length))}
                     </div>
                   </div>
                 )}

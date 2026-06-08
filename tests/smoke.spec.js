@@ -477,8 +477,23 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   const bulkReader = mailView.locator('[data-mail-bulk-reader="true"]');
   await expect(bulkReader).toBeVisible();
   await expect(bulkReader.locator('[data-mail-bulk-reader-surface="true"]')).toContainText('已选中 2 封邮件');
-  await expect(bulkReader.locator('[data-mail-bulk-reader-surface="true"]')).toContainText('批量操作不会打开单封邮件内容');
-  await expect(bulkReader.locator('[data-mail-stack-card="true"]')).toHaveCount(0);
+  const stackCards = bulkReader.locator('[data-mail-stack-card="true"]');
+  await expect(stackCards).toHaveCount(2);
+  const firstStackCard = bulkReader.locator('[data-mail-stack-card-id="m1"]');
+  await expect(firstStackCard).toHaveAttribute('data-mail-stack-motion', 'harmony-stack');
+  await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('Q2 路线评审材料已更新');
+  await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('产品经理');
+  await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('pm@calendarpro.io');
+  await expect(firstStackCard.locator('[data-mail-stack-card-recipients="true"]')).toContainText('发给我等 2 人');
+  await expect(firstStackCard.locator('[data-mail-stack-card-attachments="true"]')).toContainText('Q2_路线评审_v4.pptx');
+  await expect(firstStackCard.locator('[data-mail-stack-card-body="true"]')).toContainText('Hi，');
+  await expect(firstStackCard.locator('[data-mail-stack-card-body="true"]')).toContainText('附件里是最新版本。');
+  await expect(firstStackCard.locator('[data-mail-stack-card-body="true"]')).toContainText('Thanks,');
+  await expect(firstStackCard.locator('[data-mail-stack-card-footer="true"]')).toContainText('邮件末尾');
+  await expect
+    .poll(() => firstStackCard.evaluate((node) => window.getComputedStyle(node).transform !== 'none'))
+    .toBe(true);
+  await expect(bulkReader.locator('[data-mail-stack-summary="true"]')).toContainText('堆叠预览');
   await expect(bulkReader.locator('[data-mail-batch-actions="true"]')).toBeVisible();
   await expect(bulkReader.getByRole('button', { name: '批量标为未读' })).toBeVisible();
   await expect(bulkReader.getByRole('button', { name: '批量标记旗标' })).toBeVisible();

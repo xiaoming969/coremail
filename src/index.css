@@ -16,3 +16,30 @@ body {
     'Segoe UI',
     sans-serif;
 }
+
+@keyframes mail-stack-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.mail-stack-card {
+  animation: mail-stack-enter 420ms cubic-bezier(0.175, 0.885, 0.32, 1.08) both;
+  transform-origin: 50% 50%;
+  transition:
+    transform 360ms cubic-bezier(0.175, 0.885, 0.32, 1.08),
+    box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mail-stack-card {
+    animation: none;
+    transition: none;
+  }
+}
