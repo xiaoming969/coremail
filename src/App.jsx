@@ -1623,6 +1623,20 @@ function MailWorkspace({
     );
   };
 
+  const renderMailSelectedActionBar = (mail) => {
+    if (!mail) return null;
+    return (
+      <div data-mail-selected-action-bar="true" className="flex min-h-11 items-center justify-between gap-3 rounded-lg bg-[#0A59F7]/[0.04] px-3 py-2 ring-1 ring-[#0A59F7]/10">
+        <div className="flex min-w-0 items-center gap-2 text-sm font-black text-slate-700">
+          <span className="inline-flex h-6 shrink-0 items-center rounded-md bg-white px-2 text-[#0A59F7] ring-1 ring-[#0A59F7]/15">已选中 1 封</span>
+          <span className="min-w-0 truncate text-slate-950">{mail.subject}</span>
+          <span className="hidden shrink-0 text-xs font-semibold text-slate-500 md:inline">当前邮件操作</span>
+        </div>
+        {renderMailSelectedActions(mail)}
+      </div>
+    );
+  };
+
   const renderMailReaderPane = (mail, { onBackToList } = {}) => {
     const linkedEvent = mail?.linkedEventId ? linkedEventLookup[mail.linkedEventId] || null : null;
     return (
@@ -1872,8 +1886,7 @@ function MailWorkspace({
 	                    {mailListSummary}
 	                  </div>
 	                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {isMailReaderHidden && !mailSelectionMode && effectiveSelectedMail && renderMailSelectedActions(effectiveSelectedMail)}
+                <div data-mail-folder-toolbar="true" className="flex shrink-0 items-center gap-1.5">
                   {isMailReaderHidden && (
                     <button
                       type="button"
@@ -1966,6 +1979,7 @@ function MailWorkspace({
                 </div>
               </div>
             )}
+            {!mailSelectionMode && isMailReaderHidden && effectiveSelectedMail && renderMailSelectedActionBar(effectiveSelectedMail)}
           </div>
 
         </div>

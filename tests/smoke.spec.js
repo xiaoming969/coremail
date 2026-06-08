@@ -170,7 +170,12 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(firstWideStatus.getByLabel('含 1 个附件')).toBeVisible();
   await expect(firstWideStatus.getByLabel('关联日程')).toHaveCount(0);
   await expect(firstWideRow.locator('[data-mail-wide-column="time"]')).toContainText('09:20');
-  const selectedActions = mailView.locator('[data-mail-selected-actions="true"]');
+  const selectedActionBar = mailView.locator('[data-mail-selected-action-bar="true"]');
+  await expect(selectedActionBar).toBeVisible();
+  await expect(selectedActionBar).toContainText('已选中 1 封');
+  await expect(selectedActionBar).toContainText('Q2 路线评审材料已更新');
+  await expect(mailView.locator('[data-mail-folder-toolbar="true"] [data-mail-selected-actions="true"]')).toHaveCount(0);
+  const selectedActions = selectedActionBar.locator('[data-mail-selected-actions="true"]');
   await expect(selectedActions).toBeVisible();
   await expect(selectedActions.getByRole('button', { name: '标为已读' })).toBeVisible();
   await expect(selectedActions.getByRole('button', { name: '取消旗标' })).toBeVisible();
