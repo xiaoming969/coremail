@@ -1262,6 +1262,7 @@ function MailWorkspace({
   onOpenLinkedEvent,
   onSetMailListFilter,
   onSetMailSortOrder,
+  onExportMailBatch,
   linkedEventLookup,
   mailListWidth,
   mailListBounds,
@@ -1830,6 +1831,87 @@ function MailWorkspace({
         .map((id) => visibleMails.find((mail) => mail.id === id))
         .filter(Boolean)
     : [];
+  const selectedBatchCount = selectedBatchMails.length;
+  const runMailBatchAction = (handler, { closeAfter = false } = {}) => {
+    if (selectedBatchCount === 0) return;
+    handler();
+    if (closeAfter) exitMailSelectionMode();
+  };
+  const renderMailBatchActions = ({ density = 'default' } = {}) => {
+    const compact = density === 'compact';
+    const batchActionClass = `inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+      compact ? 'gap-1.5' : ''
+    }`;
+    const batchActions = [
+      {
+        id: 'mark-read',
+        label: '标为已读',
+        aria: '批量标为已读',
+        icon: MailOpen,
+        onClick: () => runMailBatchAction(() => selectedBatchMails.filter((mail) => mail.unread).forEach((mail) => onToggleRead(mail.id))),
+      },
+      {
+        id: 'mark-unread',
+        label: '标为未读',
+        aria: '批量标为未读',
+        icon: Mail,
+        onClick: () => runMailBatchAction(() => selectedBatchMails.filter((mail) => !mail.unread).forEach((mail) => onToggleRead(mail.id))),
+      },
+      {
+        id: 'flag',
+        label: '标记旗标',
+        aria: '批量标记旗标',
+        icon: Flag,
+        onClick: () => runMailBatchAction(() => selectedBatchMails.filter((mail) => !mail.starred).forEach((mail) => onToggleStar(mail.id))),
+      },
+      {
+        id: 'archive',
+        label: '归档',
+        aria: '批量归档',
+        icon: Archive,
+        onClick: () => runMailBatchAction(() => selectedBatchMails.forEach((mail) => onArchiveMail(mail.id)), { closeAfter: true }),
+      },
+      {
+        id: 'export',
+        label: '导出',
+        aria: '批量导出',
+        icon: Save,
+        onClick: () => runMailBatchAction(() => onExportMailBatch?.(selectedBatchMails.map((mail) => mail.id))),
+      },
+      {
+        id: 'delete',
+        label: '删除',
+        aria: '批量删除',
+        icon: Trash,
+        danger: true,
+        onClick: () => runMailBatchAction(() => selectedBatchMails.forEach((mail) => onDeleteMail(mail.id)), { closeAfter: true }),
+      },
+    ];
+
+    return (
+      <div data-mail-batch-actions="true" className={`flex min-w-0 shrink-0 items-center gap-1 ${compact ? 'overflow-x-auto' : 'overflow-hidden'}`}>
+        {batchActions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <button
+              key={action.id}
+              type="button"
+              aria-label={action.aria}
+              title={action.label}
+              disabled={selectedBatchCount === 0}
+              onClick={action.onClick}
+              className={`${batchActionClass} ${
+                action.danger ? 'text-red-600 hover:bg-red-50 hover:text-red-700' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+              }`}
+            >
+              <Icon size={16} className="shrink-0" />
+              <span>{action.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
   const isMailReaderHidden = mailLayoutMode === MAIL_LAYOUT_MODE_AB;
   const mailListMode = isMailReaderHidden ? 'table' : 'compact';
   const mailListDetailMail = isMailReaderHidden && mailListDetailId ? visibleMails.find((mail) => mail.id === mailListDetailId) || null : null;
@@ -1863,11 +1945,12 @@ function MailWorkspace({
             </div>
 
             {mailSelectionMode ? (
-              <div data-mail-selection-bar="true" className="flex h-12 items-center justify-between gap-3">
+              <div data-mail-selection-bar="true" className="flex min-h-12 items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2 text-lg font-black text-slate-950">
                   <SquareCheck size={22} className="shrink-0 fill-[#0A59F7] text-[#0A59F7]" />
                   <span>已选中 <span className="text-[#0A59F7]">{selectedMailIds.length}</span> 封邮件</span>
                 </div>
+                {isMailReaderHidden && renderMailBatchActions({ density: 'compact' })}
                 <button
                   type="button"
                   aria-label="退出多选"
@@ -2271,82 +2354,35 @@ function MailWorkspace({
           <div data-mail-bulk-reader="true" className="flex h-full flex-col bg-[#f6f7f9]">
             <div className="flex shrink-0 flex-nowrap items-center border-b border-slate-200 bg-white px-6 py-4">
               <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap pr-2">
-                {[
-                  { label: '标为已读', icon: Mail, aria: '批量标为已读' },
-                  { label: '标为未读', icon: Mail, aria: '批量标为未读' },
-                  { label: '标记旗标', icon: Flag, aria: '批量标记旗标' },
-                  { label: '移动', icon: Archive, aria: '批量移动' },
-                  { label: '导出', icon: Save, aria: '批量导出' },
-                  { label: '删除', icon: Trash, aria: '批量删除', danger: true },
-                ].map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <button
-                      key={action.aria}
-                      type="button"
-                      aria-label={action.aria}
-                      className={`inline-flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm font-bold transition ${
-                        action.danger ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
-                      }`}
-                    >
-                      <Icon size={16} className="mr-1.5" fill={action.label.includes('旗标') ? 'currentColor' : 'none'} />
-                      {action.label}
-                    </button>
-                  );
-                })}
+                {renderMailBatchActions()}
               </div>
               <button type="button" aria-label="更多批量操作" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-700 transition hover:bg-slate-100">
                 <MoreHorizontal size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-8 py-10">
-              <div className="mx-auto flex min-h-full max-w-[960px] items-center justify-center">
+            <div data-mail-bulk-reader-surface="true" className="flex-1 overflow-y-auto px-8 py-10">
+              <div className="mx-auto flex min-h-full max-w-[720px] items-center justify-center">
                 {selectedBatchMails.length === 0 ? (
                   <div className="text-sm font-semibold text-slate-400">请选择要批量处理的邮件</div>
                 ) : (
-                  <div className="relative h-[560px] w-full max-w-[820px]">
-                    {selectedBatchMails.slice(0, 3).map((mail, index) => (
-                      <article
-                        key={mail.id}
-                        data-mail-stack-card="true"
-                        className="absolute left-1/2 top-1/2 origin-center rounded-xl border border-slate-200 bg-white px-8 py-6 shadow-[0_18px_48px_rgba(15,23,42,0.16)]"
-                        style={{
-                          width: 'clamp(420px, calc(100% - 32px), 760px)',
-                          transform: `translate(-50%, calc(-50% + ${index * 28}px)) rotate(${index === 0 ? -1.2 : index === 1 ? 1.1 : -0.6}deg)`,
-                          zIndex: 20 - index,
-                        }}
-                      >
-                        <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-xl font-black text-slate-950">{mail.subject}</h3>
-                            <div className="mt-2 text-sm font-semibold text-slate-600">{mail.fromName}</div>
-                            <div className="mt-1 truncate text-xs font-medium text-slate-400">
-                              {mail.fromEmail} · {formatMailTime(mail.timestamp)}
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2 text-slate-400">
-                            {mail.starred && <FlagFilled size={16} className="text-red-500" />}
-                            {mail.attachments.length > 0 && <Paperclip size={16} />}
-                            {mail.linkedEventId && <Calendar size={16} className="text-emerald-600" />}
-                          </div>
-                        </div>
-                        <p className="text-sm font-medium leading-6 text-slate-600">{mail.body || mail.preview}</p>
-                        {mail.attachments.length > 0 && (
-                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                            {mail.attachments.slice(0, 2).map((attachment) => (
-                              <div key={attachment.name} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
-                                <Paperclip size={15} className="text-slate-400" />
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-bold text-slate-700">{attachment.name}</div>
-                                  <div className="text-xs text-slate-400">{attachment.size}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </article>
-                    ))}
+                  <div className="w-full text-center">
+                    <div className="text-2xl font-black text-slate-950">已选中 {selectedBatchMails.length} 封邮件</div>
+                    <div className="mt-3 text-sm font-semibold leading-6 text-slate-500">批量操作不会打开单封邮件内容，请使用上方操作栏处理当前选择。</div>
+                    <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 text-left">
+                      <div className="bg-white px-4 py-3">
+                        <div className="text-xs font-semibold text-slate-400">未读</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.unread).length}</div>
+                      </div>
+                      <div className="bg-white px-4 py-3">
+                        <div className="text-xs font-semibold text-slate-400">旗标</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.starred).length}</div>
+                      </div>
+                      <div className="bg-white px-4 py-3">
+                        <div className="text-xs font-semibold text-slate-400">附件</div>
+                        <div className="mt-1 text-lg font-black text-slate-950">{selectedBatchMails.filter((mail) => mail.attachments.length > 0).length}</div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -7861,6 +7897,14 @@ function MainApp() {
     });
   };
 
+  const exportMailBatch = (mailIds) => {
+    triggerFeedback('L3', {
+      msg: `已准备导出 ${mailIds.length} 封邮件`,
+      icon: <Save size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
   const createTaskFromMail = (mailId) => {
     const mail = mails.find((item) => item.id === mailId);
     triggerFeedback('L3', {
@@ -10467,6 +10511,7 @@ function MainApp() {
               onOpenLinkedEvent={(eventId) => navTo('details', eventId)}
               onSetMailListFilter={setMailListFilter}
               onSetMailSortOrder={setMailSortOrder}
+              onExportMailBatch={exportMailBatch}
               linkedEventLookup={allEventLookup}
               mailListWidth={mailListWidth}
               mailListBounds={mailListBounds}
