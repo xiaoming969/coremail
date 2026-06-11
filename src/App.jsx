@@ -9858,19 +9858,24 @@ function MainApp() {
                         )}
 
                         {activeAccounts.length > MAX_SPLIT_ACCOUNTS && effectiveAccountDisplayMode === 'split' && (
-                          <div className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-lg bg-gray-100 p-[3px] space-x-1">
+                          <div
+                            className="hidden xl:flex items-center max-w-[320px] overflow-x-auto rounded-lg bg-gray-100 p-[3px] space-x-1"
+                            data-calendar-split-account-filter="true"
+                          >
                             {activeAccounts.map((account) => {
                               const selected = splitAccountIds.includes(account.id);
+                              const splitSourceMeta = getCalendarSplitSourceMeta(account, calendarMap, accountMap);
                               return (
                                 <button
                                   key={account.id}
                                   onClick={() => toggleSplitAccount(account.id)}
+                                  aria-label={`${selected ? '隐藏' : '显示'}${splitSourceMeta.name}拆分列`}
                                   className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition ${
                                     selected ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                   }`}
-                                  title={account.name}
+                                  title={`${splitSourceMeta.name} · ${splitSourceMeta.sourceType}`}
                                 >
-                                  <span className="inline-block max-w-[120px] truncate align-bottom">{account.name}</span>
+                                  <span className="inline-block max-w-[120px] truncate align-bottom">{splitSourceMeta.name}</span>
                                 </button>
                               );
                             })}

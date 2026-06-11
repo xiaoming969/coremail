@@ -72,6 +72,11 @@ test('calendar split headers use localized source names', async ({ page }) => {
   await expect(splitHeader).not.toContainText('@calendarpro.io');
   await expect(splitHeader).not.toContainText('huawei-calendar');
   await expect(page.locator('[data-calendar-day-all-day-empty="true"]').first()).toContainText('暂无全天日程');
+  const splitAccountFilter = page.locator('[data-calendar-split-account-filter="true"]');
+  await expect(splitAccountFilter).toBeVisible();
+  await expect(splitAccountFilter).toContainText('华为日历');
+  await expect(splitAccountFilter).not.toContainText('@calendarpro.io');
+  await expect(splitAccountFilter).not.toContainText('huawei-calendar');
 
   await page.getByRole('button', { name: '周', exact: true }).click();
   const weekSplitHeader = page.locator('[data-calendar-week-split-header="true"]');
