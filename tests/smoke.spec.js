@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('calendar shell renders with search entry hidden', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');
   await page.getByRole('button', { name: '日历' }).click();
 
@@ -189,6 +190,50 @@ test('app A column width and collapse state are shared across modules', async ({
   await page.getByRole('button', { name: '通讯录', exact: true }).click();
   await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBe(64);
   await expect(contactsSidebar.getByRole('button', { name: '展开侧边栏' })).toBeVisible();
+});
+
+test('app A column keeps narrow visual collapse state across modules', async ({ page }) => {
+  await page.setViewportSize({ width: 1159, height: 860 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+  const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  await expect(calendarSidebar).toBeVisible();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(64);
+  await expect(calendarSidebar.getByRole('button', { name: '展开侧边栏' })).toBeVisible();
+
+  await calendarSidebar.getByRole('button', { name: '展开侧边栏' }).click();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+
+  await page.getByRole('button', { name: '邮件', exact: true }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+  await mailSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(64);
+});
+
+test('layout resize keeps tracking while the mouse button is held', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailListPane = page.locator('[data-mail-list-pane="true"]');
+  const mailBSplitter = page.locator('[data-layout-resizer="mail-b"]');
+  const initialWidth = Math.round((await mailListPane.boundingBox()).width);
+  const splitterBox = await mailBSplitter.boundingBox();
+
+  await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(splitterBox.x + 90, splitterBox.y + splitterBox.height / 2);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(initialWidth + 50);
+  const widthAfterFirstMove = Math.round((await mailListPane.boundingBox()).width);
+  await page.mouse.move(splitterBox.x + 220, splitterBox.y + splitterBox.height / 2);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(widthAfterFirstMove + 40);
+  await page.mouse.up();
 });
 
 test('mail favorites keep stable row geometry when switching folders', async ({ page }) => {
