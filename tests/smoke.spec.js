@@ -165,8 +165,20 @@ test('app A column width and collapse state are shared across modules', async ({
   const contactsSidebar = page.locator('[data-app-sidebar="contacts"]');
   await expect(contactsSidebar).toBeVisible();
   await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBe(resizedMailWidth);
+  const appASplitter = page.locator('[data-layout-resizer="app-a"]');
+  await expect(appASplitter).toBeVisible();
+  await expect.poll(() => appASplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
+
+  const contactsSplitterBox = await appASplitter.boundingBox();
+  await page.mouse.move(contactsSplitterBox.x + contactsSplitterBox.width / 2, contactsSplitterBox.y + contactsSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(contactsSplitterBox.x + 56, contactsSplitterBox.y + contactsSplitterBox.height / 2);
+  await page.mouse.up();
+  const draggedSharedWidth = Math.round((await contactsSidebar.boundingBox()).width);
+  await expect.poll(async () => draggedSharedWidth).toBeGreaterThan(resizedMailWidth + 20);
 
   await page.getByRole('button', { name: '邮件', exact: true }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(draggedSharedWidth);
   await mailSidebar.getByRole('button', { name: '收起侧边栏' }).click();
   await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
 
@@ -225,22 +237,30 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBe(544);
   await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBe(864);
 
+  const initialMailListWidth = Math.round((await mailListPane.boundingBox()).width);
   const mailBSplitterBox = await mailBSplitter.boundingBox();
   await page.mouse.move(mailBSplitterBox.x + mailBSplitterBox.width / 2, mailBSplitterBox.y + mailBSplitterBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(mailBSplitterBox.x + 340, mailBSplitterBox.y + mailBSplitterBox.height / 2);
+  await page.mouse.move(mailBSplitterBox.x + 520, mailBSplitterBox.y + mailBSplitterBox.height / 2);
   await page.mouse.up();
 
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
   await expect(mailReaderPane).toBeVisible();
+  const mailListWidthAfterRightDrag = Math.round((await mailListPane.boundingBox()).width);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(initialMailListWidth + 100);
+  await expect.poll(async () => Math.round((await mailReaderPane.boundingBox()).width)).toBeGreaterThanOrEqual(720);
 
-  const mailBSplitterBoxAfterSoftDrag = await mailBSplitter.boundingBox();
-  await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + mailBSplitterBoxAfterSoftDrag.width / 2, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
+  const mailBSplitterBoxAfterRightDrag = await mailBSplitter.boundingBox();
+  await page.mouse.move(mailBSplitterBoxAfterRightDrag.x + mailBSplitterBoxAfterRightDrag.width / 2, mailBSplitterBoxAfterRightDrag.y + mailBSplitterBoxAfterRightDrag.height / 2);
   await page.mouse.down();
-  await page.mouse.move(mailBSplitterBoxAfterSoftDrag.x + 470, mailBSplitterBoxAfterSoftDrag.y + mailBSplitterBoxAfterSoftDrag.height / 2);
-  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
+  await page.mouse.move(mailBSplitterBoxAfterRightDrag.x - 420, mailBSplitterBoxAfterRightDrag.y + mailBSplitterBoxAfterRightDrag.height / 2);
   await page.mouse.up();
+  await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
+  await expect(mailReaderPane).toBeVisible();
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeLessThan(mailListWidthAfterRightDrag - 100);
+  await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThanOrEqual(360);
 
+  await mailView.locator('[data-mail-reader-window-controls="true"]').getByRole('button', { name: '隐藏阅读区' }).click();
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
   await expect(mailReaderPane).toHaveCount(0);
   await expect(mailBSplitter).toBeVisible();
@@ -355,11 +375,7 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'ABC');
   await expect(mailReaderPane).toBeVisible();
 
-  const mailBSplitterBoxForListMode = await mailBSplitter.boundingBox();
-  await page.mouse.move(mailBSplitterBoxForListMode.x + mailBSplitterBoxForListMode.width / 2, mailBSplitterBoxForListMode.y + mailBSplitterBoxForListMode.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(mailBSplitterBoxForListMode.x + 520, mailBSplitterBoxForListMode.y + mailBSplitterBoxForListMode.height / 2);
-  await page.mouse.up();
+  await mailView.locator('[data-mail-reader-window-controls="true"]').getByRole('button', { name: '隐藏阅读区' }).click();
   await expect(mailView).toHaveAttribute('data-mail-layout-mode', 'AB');
   await firstWideRow.dblclick();
   const listDetailPage = mailView.locator('[data-mail-list-detail-page="true"]');
@@ -759,7 +775,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
           .join('|'),
       ),
     )
-    .toBe('客服帮助|最小化窗口|全屏窗口|关闭窗口');
+    .toBe('客服帮助|最小化窗口|全屏窗口|隐藏阅读区');
   await readerMoreButton.click();
   const readerMoreMenu = readerToolbar.locator('[data-mail-reader-more-menu="true"]');
   await expect(readerMoreMenu).toBeVisible();

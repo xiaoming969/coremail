@@ -34,6 +34,7 @@ type MailReadingPaneProps = MailReaderActionHandlers & {
   aiInsight?: MailAiInsight | null;
   formatMailTime: (timestamp?: number) => string;
   onOpenLinkedEvent?: () => void;
+  onHideReader?: () => void;
 };
 
 type IconButtonProps = {
@@ -75,12 +76,14 @@ function MailActionBar({
   onToggleFollowUp,
   onCreateTask,
   onCreateEvent,
+  onHideReader,
 }: {
   mail: MailReadingPaneMail;
   disabled: boolean;
   moreOpen: boolean;
   setMoreOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   moreRef: React.RefObject<HTMLDivElement | null>;
+  onHideReader?: () => void;
 } & Pick<
   MailReaderActionHandlers,
   'onReply' | 'onReplyAll' | 'onForward' | 'onArchive' | 'onDelete' | 'onMove' | 'onToggleRead' | 'onToggleFollowUp' | 'onCreateTask' | 'onCreateEvent'
@@ -189,7 +192,7 @@ function MailActionBar({
         <button type="button" aria-label="全屏窗口" title="全屏" className={iconOnlyButtonClass}>
           <AppIcon name="lucide:maximize-2" size={16} />
         </button>
-        <button type="button" aria-label="关闭窗口" title="关闭" className={iconOnlyButtonClass}>
+        <button type="button" aria-label="隐藏阅读区" title="隐藏阅读区" onClick={onHideReader} className={iconOnlyButtonClass}>
           <AppIcon name="lucide:x" size={17} />
         </button>
       </div>
@@ -849,6 +852,7 @@ export default function MailReadingPane({
   onQuickReplySend,
   onSecurityAction,
   onOpenLinkedEvent,
+  onHideReader,
 }: MailReadingPaneProps) {
   const [recipientExpanded, setRecipientExpanded] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -934,6 +938,7 @@ export default function MailReadingPane({
             onToggleFollowUp={onToggleFollowUp}
             onCreateTask={onCreateTask}
             onCreateEvent={onCreateEvent}
+            onHideReader={onHideReader}
           />
           <MailHeader
             mail={mail}

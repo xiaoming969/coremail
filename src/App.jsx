@@ -234,7 +234,6 @@ const MAIL_LIST_DEFAULT_WIDTH = 544;
 const MAIL_LIST_MIN_WIDTH = 360;
 const MAIL_READER_DEFAULT_WIDTH = 864;
 const MAIL_READER_MIN_WIDTH = 720;
-const MAIL_LAYOUT_AB_EXPAND_RATIO = 0.7;
 const MAIL_LAYOUT_ABC_RESTORE_RATIO = 0.64;
 const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
@@ -302,13 +301,7 @@ const getMailReaderWidth = (viewportWidth, sidebarWidth, listWidth) =>
 
 const getMailContentWidth = (viewportWidth, sidebarWidth) => Math.max(MAIL_LIST_MIN_WIDTH, viewportWidth - sidebarWidth);
 
-const resolveMailReaderDragMode = (nextListWidth, currentLayoutMode, viewportWidth, sidebarWidth) => {
-  const contentWidth = getMailContentWidth(viewportWidth, sidebarWidth);
-  if (currentLayoutMode === MAIL_LAYOUT_MODE_AB) {
-    return nextListWidth <= contentWidth * MAIL_LAYOUT_ABC_RESTORE_RATIO ? MAIL_LAYOUT_MODE_ABC : MAIL_LAYOUT_MODE_AB;
-  }
-  return nextListWidth >= contentWidth * MAIL_LAYOUT_AB_EXPAND_RATIO ? MAIL_LAYOUT_MODE_AB : MAIL_LAYOUT_MODE_ABC;
-};
+const isSharedAppSidebarResize = (type) => type === 'calendar-a' || type === 'app-a';
 
 const persistMailLayoutPreference = ({ layoutMode, sidebarWidth, listWidth, readerWidth = null, isACollapsed = false }, viewportWidth = getViewportWidth()) => {
   if (typeof window === 'undefined') return;
@@ -1342,6 +1335,7 @@ function MailWorkspace({
   onStartLayoutResize,
   onStepLayoutResize,
   onRestoreMailReader,
+  onHideMailReader,
 }) {
   const [mailSearchQuery, setMailSearchQuery] = useState('');
   const [readerMoreOpen, setReaderMoreOpen] = useState(false);
@@ -1746,6 +1740,7 @@ function MailWorkspace({
         onQuickReplySend={(body) => mail && onQuickReplySend(mail.id, body)}
         onSecurityAction={(action) => mail && onReaderSecurityAction(mail.id, action)}
         onOpenLinkedEvent={() => mail?.linkedEventId && onOpenLinkedEvent(mail.linkedEventId)}
+        onHideReader={onHideMailReader}
       />
     );
   };
@@ -1888,7 +1883,7 @@ function MailWorkspace({
           <button type="button" aria-label="全屏窗口" title="全屏" className={windowButtonClass}>
             <Maximize2 size={16} />
           </button>
-          <button type="button" aria-label="关闭窗口" title="关闭" className={windowButtonClass}>
+          <button type="button" aria-label="隐藏阅读区" title="隐藏阅读区" onClick={onHideMailReader} className={windowButtonClass}>
             <X size={17} />
           </button>
         </div>
@@ -6021,9 +6016,8 @@ function MainApp() {
   };
 
   const applyMailReaderResize = (nextWidth, viewportWidth, sidebarWidth, currentLayoutMode = mailLayoutMode) => {
-    const nextLayoutMode = resolveMailReaderDragMode(nextWidth, currentLayoutMode, viewportWidth, sidebarWidth);
-
-    if (nextLayoutMode === MAIL_LAYOUT_MODE_AB) {
+    const contentWidth = getMailContentWidth(viewportWidth, sidebarWidth);
+    if (currentLayoutMode === MAIL_LAYOUT_MODE_AB && nextWidth > contentWidth * MAIL_LAYOUT_ABC_RESTORE_RATIO) {
       const abBounds = getMailListBounds(viewportWidth, sidebarWidth, MAIL_LAYOUT_MODE_AB);
       setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
       setMailListWidth(abBounds.max);
@@ -6046,7 +6040,7 @@ function MainApp() {
   };
 
   const setLayoutWidth = (type, nextWidth, viewportWidth = getViewportWidth()) => {
-    if (type === 'calendar-a') {
+    if (isSharedAppSidebarResize(type)) {
       const bounds = getCalendarSidebarBounds(viewportWidth);
       setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
       return;
@@ -6063,7 +6057,7 @@ function MainApp() {
   };
 
   const getLayoutWidth = (type) => {
-    if (type === 'calendar-a') return appSidebarWidth;
+    if (isSharedAppSidebarResize(type)) return appSidebarWidth;
     if (type === 'mail-a') return mailLayoutSidebarWidth;
     return mailListWidth;
   };
@@ -6094,7 +6088,7 @@ function MainApp() {
     const nextWidth =
       type === 'mail-a' && effectiveMailSidebarCollapsed && delta > 0 ? APP_SIDEBAR_MIN_WIDTH : getLayoutWidth(type) + delta;
 
-    if (type === 'calendar-a') {
+    if (isSharedAppSidebarResize(type)) {
       setLayoutWidth(type, nextWidth, viewportWidth);
       return;
     }
@@ -6180,7 +6174,7 @@ function MainApp() {
       active.lastClientX = event.clientX;
       const nextWidth = active.startWidth + event.clientX - active.startX;
 
-      if (active.type === 'calendar-a') {
+      if (isSharedAppSidebarResize(active.type)) {
         const bounds = getCalendarSidebarBounds(active.viewportWidth);
         setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
       }
@@ -6205,7 +6199,7 @@ function MainApp() {
       if (!active) return;
 
       const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
-      if (active.type === 'calendar-a') {
+      if (isSharedAppSidebarResize(active.type)) {
         const bounds = getCalendarSidebarBounds(active.viewportWidth);
         const nextSidebarWidth = clampNumber(finalWidth, bounds.min, bounds.max);
         setAppSidebarWidth(nextSidebarWidth);
@@ -6273,6 +6267,25 @@ function MainApp() {
       listWidth: preferredListWidth,
       readerWidth,
     });
+  };
+
+  const hideMailReader = () => {
+    const viewportWidth = getViewportWidth();
+    const bounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, MAIL_LAYOUT_MODE_AB);
+    const nextListWidth = bounds.max;
+
+    setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
+    setMailListWidth(nextListWidth);
+    persistMailLayoutPreference(
+      {
+        layoutMode: MAIL_LAYOUT_MODE_AB,
+        sidebarWidth: appSidebarWidth,
+        listWidth: nextListWidth,
+        readerWidth: 0,
+        isACollapsed: appSidebarCollapsed,
+      },
+      viewportWidth,
+    );
   };
 
   const handleToggleAppSidebarCollapsed = () => {
@@ -9654,16 +9667,16 @@ function MainApp() {
         />
       )}
 
-      {activeProduct === 'calendar' && !appSidebarCollapsed && (
+      {activeProduct !== 'mail' && !appSidebarCollapsed && (
         <LayoutResizeHandle
-          id="calendar-a"
-          label="调整日历 A 栏宽度"
+          id={activeProduct === 'calendar' ? 'calendar-a' : 'app-a'}
+          label="调整 A 栏宽度"
           value={appSidebarWidth}
           min={calendarSidebarBounds.min}
           max={calendarSidebarBounds.max}
-          active={activeLayoutResize === 'calendar-a'}
-          onStart={(event) => startLayoutResize('calendar-a', event)}
-          onStep={(delta) => stepLayoutResize('calendar-a', delta)}
+          active={activeLayoutResize === (activeProduct === 'calendar' ? 'calendar-a' : 'app-a')}
+          onStart={(event) => startLayoutResize(activeProduct === 'calendar' ? 'calendar-a' : 'app-a', event)}
+          onStep={(delta) => stepLayoutResize(activeProduct === 'calendar' ? 'calendar-a' : 'app-a', delta)}
         />
       )}
 
@@ -10807,6 +10820,7 @@ function MainApp() {
               onStartLayoutResize={startLayoutResize}
               onStepLayoutResize={stepLayoutResize}
               onRestoreMailReader={restoreMailReader}
+              onHideMailReader={hideMailReader}
             />
           ) : activeProduct === 'settings' ? (
             <CalendarReminderSettingsPage
