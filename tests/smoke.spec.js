@@ -54,6 +54,33 @@ test('calendar shell renders with search entry hidden', async ({ page }) => {
     .toBe(0);
 });
 
+test('calendar split headers use localized source names', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+  await page.getByRole('button', { name: '日', exact: true }).click();
+  await page.getByRole('button', { name: '拆分视图', exact: true }).click();
+
+  const splitHeader = page.locator('[data-calendar-day-split-header="true"]');
+  const splitColumns = page.locator('[data-calendar-day-split-column-header="true"]');
+  await expect(splitHeader).toBeVisible();
+  await expect(splitColumns).toHaveCount(3);
+  await expect(splitColumns.nth(0)).toContainText('小华');
+  await expect(splitColumns.nth(1)).toContainText('华为日历');
+  await expect(splitColumns.nth(2)).toContainText('张三');
+  await expect(splitColumns.first()).toContainText(/1月\d+日 周[一二三四五六日]/);
+  await expect(splitHeader).not.toContainText('@calendarpro.io');
+  await expect(splitHeader).not.toContainText('huawei-calendar');
+  await expect(page.locator('[data-calendar-day-all-day-empty="true"]').first()).toContainText('暂无全天日程');
+
+  await page.getByRole('button', { name: '周', exact: true }).click();
+  const weekSplitHeader = page.locator('[data-calendar-week-split-header="true"]');
+  await expect(weekSplitHeader).toBeVisible();
+  await expect(weekSplitHeader).toContainText('华为日历');
+  await expect(weekSplitHeader).not.toContainText('@calendarpro.io');
+  await expect(weekSplitHeader).not.toContainText('huawei-calendar');
+});
+
 test('workspace splitters resize calendar and mail panes', async ({ page }) => {
   await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');

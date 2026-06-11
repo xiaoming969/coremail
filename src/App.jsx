@@ -138,6 +138,37 @@ const createIconifyIcon = (name) =>
   };
 
 const createLucideIcon = (name) => createIconifyIcon(`lucide:${name}`);
+
+const DAY_HEADER_WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+const formatCalendarSplitDayLabel = (date) =>
+  `${date.getMonth() + 1}月${date.getDate()}日 ${DAY_HEADER_WEEKDAY_LABELS[date.getDay()]}`;
+
+const getCalendarSplitSourceMeta = (lane, calendarMap, accountMap = {}) => {
+  const account = accountMap[lane.id] || lane;
+  const accountCalendars = Object.values(calendarMap || {}).filter((calendar) => calendar.accountId === lane.id);
+  const primaryCalendar =
+    accountCalendars.find((calendar) => calendar.isPrimary) ||
+    accountCalendars.find((calendar) => calendar.checked) ||
+    accountCalendars[0];
+  const rawName = primaryCalendar?.name || getAccountDisplayLabel(account) || account?.displayName || lane.name || '';
+  const name = rawName.includes('@') ? getAccountDisplayLabel(account) || rawName.split('@')[0] : rawName;
+  const sourceType =
+    primaryCalendar?.id === HUAWEI_CALENDAR_ID
+      ? '节假日日历'
+      : primaryCalendar?.type === 'shared' || account?.ownership === 'shared'
+        ? '共享日历'
+        : account?.ownership === 'room'
+          ? '资源日历'
+          : account?.ownership === 'group'
+            ? '群组日历'
+            : '我的日历';
+
+  return {
+    name: name || '当前日历',
+    sourceType,
+  };
+};
 const resolveIconComponent = (icon) => (typeof icon === 'string' ? createIconifyIcon(icon) : icon);
 
 const AlertCircle = createLucideIcon('circle-alert');
@@ -3052,7 +3083,11 @@ function WeekView({
             <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
               <div className="flex border-b border-gray-200 bg-white">
                 <div className="shrink-0 border-r border-gray-200 bg-white" style={{ width: '64px', height: '82px' }}></div>
-                <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
+                <div
+                  className="grid flex-1 bg-white"
+                  style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}
+                  data-calendar-week-split-header="true"
+                >
                   {days.map((day) => (
                     <div
                       key={day.date.toISOString()}
@@ -3079,15 +3114,20 @@ function WeekView({
                         className="grid h-[34px] border-t border-gray-200 bg-white"
                         style={{ gridTemplateColumns: `repeat(${weekAccounts.length}, minmax(0, 1fr))` }}
                       >
-                        {weekAccounts.map((account, accountIndex) => (
-                          <div
-                            key={`${day.date.toISOString()}-${account.id}-label`}
-                            className={`flex min-w-0 items-center gap-1.5 px-2 ${accountIndex < weekAccounts.length - 1 ? 'border-r border-gray-100' : ''}`}
-                          >
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${account.color}`}></span>
-                            <span className="truncate text-[11px] font-bold text-gray-600">{account.email || account.name}</span>
-                          </div>
-                        ))}
+                        {weekAccounts.map((account, accountIndex) => {
+                          const splitSourceMeta = getCalendarSplitSourceMeta(account, calendarMap, accountMap);
+                          return (
+                            <div
+                              key={`${day.date.toISOString()}-${account.id}-label`}
+                              className={`flex min-w-0 items-center gap-1.5 px-2 ${accountIndex < weekAccounts.length - 1 ? 'border-r border-gray-100' : ''}`}
+                              title={`${splitSourceMeta.name} · ${splitSourceMeta.sourceType}`}
+                              data-calendar-week-split-source-name="true"
+                            >
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${account.color}`}></span>
+                              <span className="truncate text-xs font-bold text-gray-600">{splitSourceMeta.name}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -3787,6 +3827,7 @@ function DayView({
     [calendarMap, isSplit, lanes, timedEvents],
   );
   const showOverlayAccountLabel = !isSplit && activeAccounts.length > 1;
+  const splitDayLabel = formatCalendarSplitDayLabel(focusDate);
 
   useLayoutEffect(() => {
     const target = scrollRef?.current;
@@ -3823,13 +3864,21 @@ function DayView({
           <div className="sticky top-0 z-30 shrink-0 border-b border-gray-200 bg-white">
             <div className="flex border-b border-gray-200 bg-white">
               <div className="border-r border-gray-200 shrink-0 bg-white" style={{ width: '64px', height: `${TIMELINE_HEADER_HEIGHT}px` }}></div>
-              <div className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'} style={splitGridStyle}>
-                {lanes.map((lane) => (
-                  <div
-                    key={`${lane.id}-date-header`}
-                    className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
-                    style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
-                  >
+              <div
+                className={isSplit ? 'flex-1 grid min-w-0 bg-white' : 'flex-1 flex bg-white min-w-0'}
+                style={splitGridStyle}
+                data-calendar-day-split-header={isSplit ? 'true' : undefined}
+              >
+                {lanes.map((lane) => {
+                  const splitSourceMeta = isSplit ? getCalendarSplitSourceMeta(lane, calendarMap, accountMap) : null;
+                  const sourceName = splitSourceMeta?.name || lane.name || '当前日历';
+                  return (
+                    <div
+                      key={`${lane.id}-date-header`}
+                      className={`${isSplit ? 'shrink-0' : 'flex-1'} border-r border-gray-200 min-w-0`}
+                      style={isSplit ? { minWidth: `${dayPaneMinWidth}px` } : { flex: 1, minWidth: 0 }}
+                      data-calendar-day-split-column-header={isSplit ? 'true' : undefined}
+                    >
                     <div
                       className={`flex h-14 items-center px-4 ${
                         showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(focusDate)
@@ -3840,12 +3889,23 @@ function DayView({
                       }`}
                     >
                       <div className="flex min-w-0 items-center justify-between gap-3 w-full">
-                        <div className="min-w-0 flex items-center gap-2">
+                        <div className="min-w-0 flex flex-1 items-center gap-2.5">
                           {isSplit && <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${lane.color}`}></div>}
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-gray-500">{isSplit ? (lane.email || lane.name) : sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
-                            <div className="inline-flex items-center gap-1 text-lg font-black text-gray-900">
-                              {isSplit ? `${focusDate.getMonth() + 1}月${focusDate.getDate()}日` : `${focusDate.getDate()}日`}
+                          <div className="min-w-0 flex-1">
+                            {isSplit ? (
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span data-calendar-day-split-source-name="true" className="truncate text-base font-black text-gray-900">
+                                  {sourceName}
+                                </span>
+                                <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-500">
+                                  {splitSourceMeta.sourceType}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="text-xs font-bold text-gray-500">{sameDay(focusDate, TODAY_DATE) ? '今日' : '所选日期'}</div>
+                            )}
+                            <div className={`${isSplit ? 'mt-0.5 text-sm font-bold text-gray-500' : 'inline-flex items-center gap-1 text-lg font-black text-gray-900'}`}>
+                              {isSplit ? splitDayLabel : `${focusDate.getDate()}日`}
                               {showHuaweiWorkdayBadges && isHuaweiMakeupWorkday(focusDate) && (
                                 <span className="rounded-full bg-white/80 px-1 text-[9px] font-bold leading-4 text-red-500">班</span>
                               )}
@@ -3857,8 +3917,8 @@ function DayView({
                             type="button"
                             onClick={() => onHideAccount?.(lane.id)}
                             className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-gray-700"
-                            title={`隐藏 ${lane.email || lane.name}`}
-                            aria-label={`隐藏 ${lane.email || lane.name}`}
+                            title={`隐藏 ${sourceName}`}
+                            aria-label={`隐藏 ${sourceName} 拆分列`}
                           >
                             <X size={14} />
                           </button>
@@ -3866,7 +3926,8 @@ function DayView({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
             <div className="flex bg-white">
@@ -3925,7 +3986,12 @@ function DayView({
                           );
                         })}
                       {allDayEvents.filter((event) => lane.id === 'overlay' || calendarMap[event.calId]?.accountId === lane.id).length === 0 && (
-                        <div className="text-xs text-gray-400 px-2 py-1">无全天事件</div>
+                        <div
+                          data-calendar-day-all-day-empty="true"
+                          className="flex h-8 items-center rounded-md px-2 text-xs font-medium text-slate-400"
+                        >
+                          暂无全天日程
+                        </div>
                       )}
                     </div>
                   </div>
