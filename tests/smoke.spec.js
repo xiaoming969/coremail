@@ -96,7 +96,7 @@ test('workspace splitters resize calendar and mail panes', async ({ page }) => {
   await expect(calendarSidebar).toBeVisible();
   await expect(calendarSplitter).toBeVisible();
   await expect.poll(() => calendarSplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
-  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(276);
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(320);
 
   const calendarWidthBefore = Math.round((await calendarSidebar.boundingBox()).width);
   const calendarSplitterBox = await calendarSplitter.boundingBox();
@@ -120,7 +120,7 @@ test('workspace splitters resize calendar and mail panes', async ({ page }) => {
   await expect(mailBSplitter).toBeVisible();
   await expect.poll(() => mailASplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
   await expect.poll(() => mailBSplitter.evaluate((node) => window.getComputedStyle(node).cursor)).toBe('col-resize');
-  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(320);
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBeLessThan(300);
   await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBe(544);
 
   const mailSidebarWidthBefore = Math.round((await mailSidebar.boundingBox()).width);
@@ -139,6 +139,74 @@ test('workspace splitters resize calendar and mail panes', async ({ page }) => {
   await page.mouse.up();
   await expect.poll(async () => Math.round((await mailListPane.boundingBox()).width)).toBeGreaterThan(mailListWidthBefore + 40);
   await expect(page.locator('[data-mail-reading-pane="true"]')).toBeVisible();
+});
+
+test('app A column width and collapse state are shared across modules', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  await expect(mailSidebar).toBeVisible();
+  const mailASplitter = page.locator('[data-layout-resizer="mail-a"]');
+  const mailASplitterBox = await mailASplitter.boundingBox();
+  await page.mouse.move(mailASplitterBox.x + mailASplitterBox.width / 2, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mailASplitterBox.x - 58, mailASplitterBox.y + mailASplitterBox.height / 2);
+  await page.mouse.up();
+  const resizedMailWidth = Math.round((await mailSidebar.boundingBox()).width);
+  await expect.poll(async () => resizedMailWidth).toBeLessThan(280);
+
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+  const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  await expect(calendarSidebar).toBeVisible();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(resizedMailWidth);
+
+  await page.getByRole('button', { name: '通讯录', exact: true }).click();
+  const contactsSidebar = page.locator('[data-app-sidebar="contacts"]');
+  await expect(contactsSidebar).toBeVisible();
+  await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBe(resizedMailWidth);
+
+  await page.getByRole('button', { name: '邮件', exact: true }).click();
+  await mailSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await mailSidebar.boundingBox()).width)).toBe(64);
+
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(64);
+  await expect(calendarSidebar.getByRole('button', { name: '展开侧边栏' })).toBeVisible();
+
+  await page.getByRole('button', { name: '通讯录', exact: true }).click();
+  await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBe(64);
+  await expect(contactsSidebar.getByRole('button', { name: '展开侧边栏' })).toBeVisible();
+});
+
+test('mail favorites keep stable row geometry when switching folders', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const favoriteRows = mailSidebar.locator('[data-mail-favorite]');
+  const favoriteCount = await favoriteRows.count();
+  expect(favoriteCount).toBeGreaterThan(0);
+  await expect(mailSidebar.locator('[data-mail-favorite-count-slot="true"]')).toHaveCount(favoriteCount);
+
+  const getFavoriteGeometry = () =>
+    favoriteRows.evaluateAll((rows) =>
+      rows.map((row) => {
+        const rect = row.getBoundingClientRect();
+        const countSlot = row.querySelector('[data-mail-favorite-count-slot="true"]')?.getBoundingClientRect();
+        return {
+          top: Math.round(rect.top),
+          height: Math.round(rect.height),
+          countSlotWidth: Math.round(countSlot?.width || 0),
+        };
+      }),
+    );
+
+  const before = await getFavoriteGeometry();
+  await mailSidebar.locator('[data-mailbox-folder="sent"]').first().click();
+  await mailSidebar.locator('[data-mailbox-folder="drafts"]').first().click();
+  await mailSidebar.locator('[data-mailbox-folder="deleted"]').first().click();
+  await expect.poll(getFavoriteGeometry).toEqual(before);
 });
 
 test('mail layout switches between ABC and AB reading modes', async ({ page }) => {

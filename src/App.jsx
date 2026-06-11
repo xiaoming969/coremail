@@ -229,7 +229,6 @@ const MailComposerModal = lazy(() => import('./features/mail/MailComposerModal.j
 const APP_SIDEBAR_WIDTH = 'clamp(240px, 18.52vw, 320px)';
 const APP_SIDEBAR_MIN_WIDTH = 240;
 const APP_SIDEBAR_MAX_WIDTH = 320;
-const CALENDAR_SIDEBAR_DEFAULT_WIDTH = 276;
 const MAIL_SIDEBAR_DEFAULT_WIDTH = 320;
 const MAIL_LIST_DEFAULT_WIDTH = 544;
 const MAIL_LIST_MIN_WIDTH = 360;
@@ -262,22 +261,19 @@ const SHOW_CALENDAR_SEARCH_ENTRY = false;
 const getViewportWidth = () => (typeof window === 'undefined' ? 1280 : window.innerWidth);
 
 const getDefaultAppSidebarWidth = (viewportWidth = getViewportWidth()) =>
-  clampNumber(Math.round(viewportWidth * 0.1852), APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
-
-const getDefaultMailSidebarWidth = (viewportWidth = getViewportWidth()) =>
   clampNumber(viewportWidth >= 1600 ? MAIL_SIDEBAR_DEFAULT_WIDTH : Math.round(viewportWidth * 0.1852), APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
 
-const getCalendarSidebarBounds = (viewportWidth = getViewportWidth()) => {
-  const max = clampNumber(Math.round(viewportWidth * 0.28), 248, APP_SIDEBAR_MAX_WIDTH);
-  return {
-    min: Math.min(APP_SIDEBAR_MIN_WIDTH, max),
-    max,
-  };
-};
+const getDefaultMailSidebarWidth = (viewportWidth = getViewportWidth()) =>
+  getDefaultAppSidebarWidth(viewportWidth);
+
+const getCalendarSidebarBounds = () => ({
+  min: APP_SIDEBAR_MIN_WIDTH,
+  max: APP_SIDEBAR_MAX_WIDTH,
+});
 
 const getDefaultCalendarSidebarWidth = (viewportWidth = getViewportWidth()) => {
   const bounds = getCalendarSidebarBounds(viewportWidth);
-  return clampNumber(CALENDAR_SIDEBAR_DEFAULT_WIDTH, bounds.min, bounds.max);
+  return clampNumber(getDefaultAppSidebarWidth(viewportWidth), bounds.min, bounds.max);
 };
 
 const getMailListBounds = (viewportWidth = getViewportWidth(), sidebarWidth = getDefaultMailSidebarWidth(viewportWidth), layoutMode = MAIL_LAYOUT_MODE_ABC) => {
@@ -351,6 +347,7 @@ const loadMailLayoutPreferences = () => {
       layoutMode: MAIL_LAYOUT_MODE_ABC,
       sidebarWidth: defaultSidebarWidth,
       listWidth: defaultListWidth,
+      isACollapsed: false,
     };
   }
 
@@ -361,6 +358,7 @@ const loadMailLayoutPreferences = () => {
         layoutMode: MAIL_LAYOUT_MODE_ABC,
         sidebarWidth: defaultSidebarWidth,
         listWidth: defaultListWidth,
+        isACollapsed: false,
       };
     }
 
@@ -374,12 +372,14 @@ const loadMailLayoutPreferences = () => {
       layoutMode,
       sidebarWidth,
       listWidth,
+      isACollapsed: Boolean(parsed.isACollapsed),
     };
   } catch {
     return {
       layoutMode: MAIL_LAYOUT_MODE_ABC,
       sidebarWidth: defaultSidebarWidth,
       listWidth: defaultListWidth,
+      isACollapsed: false,
     };
   }
 };
@@ -979,15 +979,48 @@ function AccountColorMenuItem({ colors, currentColor, onSelect }) {
   );
 }
 
-function UtilitySidebar({ activeProduct, onSelectProduct }) {
+function UtilitySidebar({ activeProduct, collapsed, width = APP_SIDEBAR_WIDTH, onToggleCollapsed, onSelectProduct }) {
+  if (collapsed) {
+    return (
+      <aside
+        data-app-sidebar={activeProduct}
+        className="relative z-10 hidden shrink-0 flex-col border-r border-slate-200 bg-[#f1f3f5] md:flex"
+        style={{ width: APP_COLLAPSED_SIDEBAR_WIDTH }}
+      >
+        <div className="flex flex-col items-center border-b border-slate-200 px-3 py-4">
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 transition hover:bg-white"
+            title="展开侧边栏"
+            aria-label="展开侧边栏"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        <div className="flex-1 bg-[#f1f3f5]"></div>
+        <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} compact />
+      </aside>
+    );
+  }
+
   return (
     <aside
       data-app-sidebar={activeProduct}
       className="relative z-10 hidden shrink-0 flex-col border-r border-slate-200 bg-[#f1f3f5] md:flex"
-      style={{ width: APP_SIDEBAR_WIDTH }}
+      style={{ width }}
     >
-      <div className="border-b border-slate-200 bg-[#f1f3f5] p-6">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-[#f1f3f5] p-6">
         <div className="text-lg font-black text-gray-900">{MODULE_COPY[activeProduct]?.title || '模块'}</div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-white/85 text-gray-600 transition hover:bg-white"
+          title="收起侧边栏"
+          aria-label="收起侧边栏"
+        >
+          <ChevronLeft size={18} />
+        </button>
       </div>
       <div className="flex-1 bg-[#f1f3f5] p-5"></div>
       <SidebarProductDock activeProduct={activeProduct} onSelectProduct={onSelectProduct} />
@@ -1117,11 +1150,17 @@ function MailSidebar({
                 onClick={onClick}
                 className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200/70 hover:text-slate-950"
               >
-                <span className="flex min-w-0 items-center">
+                <span className="flex min-w-0 flex-1 items-center">
                   <Icon size={17} className="mr-3 shrink-0 text-slate-500" />
                   <span className="truncate">{label}</span>
                 </span>
-                {count > 0 && <span className="ml-3 shrink-0 text-xs font-semibold text-slate-500">{count}</span>}
+                <span
+                  data-mail-favorite-count-slot="true"
+                  className="ml-3 inline-flex w-8 shrink-0 justify-end text-xs font-semibold tabular-nums text-slate-500"
+                  aria-hidden={count > 0 ? undefined : 'true'}
+                >
+                  {count > 0 ? count : ''}
+                </span>
               </button>
             ))}
           </div>
@@ -5797,13 +5836,11 @@ function MainApp() {
   const [events, setEvents] = useState(MOCK_EVENTS);
   const [mails, setMails] = useState(MOCK_MAILS);
   const [focusDate, setFocusDate] = useState(stripTime(TODAY_DATE));
-  const [calendarSidebarCollapsed, setCalendarSidebarCollapsed] = useState(false);
-  const [mailSidebarCollapsed, setMailSidebarCollapsed] = useState(false);
-  const [mailSidebarNarrowExpanded, setMailSidebarNarrowExpanded] = useState(false);
   const [initialMailLayout] = useState(() => loadMailLayoutPreferences());
+  const [appSidebarCollapsed, setAppSidebarCollapsed] = useState(() => initialMailLayout.isACollapsed);
+  const [mailSidebarNarrowExpanded, setMailSidebarNarrowExpanded] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => getViewportWidth());
-  const [calendarSidebarWidth, setCalendarSidebarWidth] = useState(() => getDefaultCalendarSidebarWidth());
-  const [mailSidebarWidth, setMailSidebarWidth] = useState(() => initialMailLayout.sidebarWidth);
+  const [appSidebarWidth, setAppSidebarWidth] = useState(() => initialMailLayout.sidebarWidth);
   const [mailListWidth, setMailListWidth] = useState(() => initialMailLayout.listWidth);
   const [mailLayoutMode, setMailLayoutMode] = useState(() => initialMailLayout.layoutMode);
   const [activeLayoutResize, setActiveLayoutResize] = useState(null);
@@ -5921,8 +5958,8 @@ function MainApp() {
   const activeAccountIds = useMemo(() => accounts.filter((account) => account.checked).map((account) => account.id), [accounts]);
   const activeAccounts = useMemo(() => accounts.filter((account) => account.checked), [accounts]);
   const mailResponsiveSidebarCollapsed = viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && !mailSidebarNarrowExpanded;
-  const effectiveMailSidebarCollapsed = mailSidebarCollapsed || mailResponsiveSidebarCollapsed;
-  const mailLayoutSidebarWidth = effectiveMailSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : mailSidebarWidth;
+  const effectiveMailSidebarCollapsed = appSidebarCollapsed || mailResponsiveSidebarCollapsed;
+  const mailLayoutSidebarWidth = effectiveMailSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : appSidebarWidth;
   const calendarSidebarBounds = getCalendarSidebarBounds(viewportWidth);
   const mailSidebarBounds = { min: APP_SIDEBAR_MIN_WIDTH, max: APP_SIDEBAR_MAX_WIDTH };
   const mailListBounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
@@ -5945,36 +5982,36 @@ function MainApp() {
     }
   }, [skipReminderDismissAllConfirm]);
 
-  const saveMailLayoutPreference = ({ layoutMode = mailLayoutMode, sidebarWidth = mailSidebarWidth, listWidth = mailListWidth, readerWidth = null } = {}) => {
-    persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: mailSidebarCollapsed });
+  const saveMailLayoutPreference = ({ layoutMode = mailLayoutMode, sidebarWidth = appSidebarWidth, listWidth = mailListWidth, readerWidth = null } = {}) => {
+    persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: appSidebarCollapsed });
   };
 
   const applyMailSidebarResize = (nextWidth, viewportWidth, { layoutMode = mailLayoutMode, wasCollapsed = effectiveMailSidebarCollapsed } = {}) => {
     if (wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
       return {
         collapsed: true,
-        sidebarWidth: mailSidebarWidth,
+        sidebarWidth: appSidebarWidth,
         layoutSidebarWidth: APP_COLLAPSED_SIDEBAR_WIDTH,
       };
     }
 
     if (!wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD) {
       const collapsedListBounds = getMailListBounds(viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, layoutMode);
-      setMailSidebarCollapsed(true);
+      setAppSidebarCollapsed(true);
       setMailSidebarNarrowExpanded(false);
       setMailListWidth((width) => clampNumber(width, collapsedListBounds.min, collapsedListBounds.max));
       return {
         collapsed: true,
-        sidebarWidth: mailSidebarWidth,
+        sidebarWidth: appSidebarWidth,
         layoutSidebarWidth: APP_COLLAPSED_SIDEBAR_WIDTH,
       };
     }
 
     const nextSidebarWidth = clampNumber(nextWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
     const nextListBounds = getMailListBounds(viewportWidth, nextSidebarWidth, layoutMode);
-    setMailSidebarCollapsed(false);
+    setAppSidebarCollapsed(false);
     setMailSidebarNarrowExpanded(viewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH);
-    setMailSidebarWidth(nextSidebarWidth);
+    setAppSidebarWidth(nextSidebarWidth);
     setMailListWidth((width) => clampNumber(width, nextListBounds.min, nextListBounds.max));
     return {
       collapsed: false,
@@ -6011,7 +6048,7 @@ function MainApp() {
   const setLayoutWidth = (type, nextWidth, viewportWidth = getViewportWidth()) => {
     if (type === 'calendar-a') {
       const bounds = getCalendarSidebarBounds(viewportWidth);
-      setCalendarSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
       return;
     }
 
@@ -6026,7 +6063,7 @@ function MainApp() {
   };
 
   const getLayoutWidth = (type) => {
-    if (type === 'calendar-a') return calendarSidebarWidth;
+    if (type === 'calendar-a') return appSidebarWidth;
     if (type === 'mail-a') return mailLayoutSidebarWidth;
     return mailListWidth;
   };
@@ -6041,7 +6078,7 @@ function MainApp() {
       startWidth: getLayoutWidth(type),
       viewportWidth: getViewportWidth(),
       sidebarWidth: mailLayoutSidebarWidth,
-      preferredSidebarWidth: mailSidebarWidth,
+      preferredSidebarWidth: appSidebarWidth,
       listWidth: mailListWidth,
       layoutMode: mailLayoutMode,
       mailSidebarCollapsed: effectiveMailSidebarCollapsed,
@@ -6084,10 +6121,10 @@ function MainApp() {
       persistMailLayoutPreference(
         {
           layoutMode: result.layoutMode,
-          sidebarWidth: mailSidebarWidth,
+          sidebarWidth: appSidebarWidth,
           listWidth: result.listWidth,
           readerWidth: result.readerWidth,
-          isACollapsed: mailSidebarCollapsed,
+          isACollapsed: appSidebarCollapsed,
         },
         viewportWidth,
       );
@@ -6097,7 +6134,7 @@ function MainApp() {
   useLayoutEffect(() => {
     const clampLayoutWidths = () => {
       const nextViewportWidth = getViewportWidth();
-      const nextCalendarBounds = getCalendarSidebarBounds(nextViewportWidth);
+      const nextSidebarBounds = getCalendarSidebarBounds(nextViewportWidth);
       const nextNarrowExpanded = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && mailSidebarNarrowExpanded;
       const nextResponsiveMailCollapsed = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && !nextNarrowExpanded;
 
@@ -6105,9 +6142,8 @@ function MainApp() {
       if (nextViewportWidth >= MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH && mailSidebarNarrowExpanded) {
         setMailSidebarNarrowExpanded(false);
       }
-      setCalendarSidebarWidth((width) => clampNumber(width, nextCalendarBounds.min, nextCalendarBounds.max));
-      setMailSidebarWidth((width) => {
-        const nextSidebarWidth = clampNumber(width, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+      setAppSidebarWidth((width) => {
+        const nextSidebarWidth = clampNumber(width, nextSidebarBounds.min, nextSidebarBounds.max);
         const nextLayoutMode = nextViewportWidth < MAIL_LAYOUT_AB_WIDTH || nextNarrowExpanded ? MAIL_LAYOUT_MODE_AB : mailLayoutMode;
         const nextLayoutSidebarWidth = nextResponsiveMailCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : nextSidebarWidth;
         const nextMailListBounds = getMailListBounds(nextViewportWidth, nextLayoutSidebarWidth, nextLayoutMode);
@@ -6121,6 +6157,11 @@ function MainApp() {
     window.addEventListener('resize', clampLayoutWidths);
     return () => window.removeEventListener('resize', clampLayoutWidths);
   }, [mailLayoutMode, mailSidebarNarrowExpanded]);
+
+  useEffect(() => {
+    const nextListBounds = getMailListBounds(viewportWidth, mailLayoutSidebarWidth, mailLayoutMode);
+    setMailListWidth((listWidth) => clampNumber(listWidth, nextListBounds.min, nextListBounds.max));
+  }, [mailLayoutMode, mailLayoutSidebarWidth, viewportWidth]);
 
   useEffect(() => {
     const clearLayoutResize = () => {
@@ -6141,7 +6182,7 @@ function MainApp() {
 
       if (active.type === 'calendar-a') {
         const bounds = getCalendarSidebarBounds(active.viewportWidth);
-        setCalendarSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+        setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
       }
 
       if (active.type === 'mail-a') {
@@ -6164,6 +6205,19 @@ function MainApp() {
       if (!active) return;
 
       const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
+      if (active.type === 'calendar-a') {
+        const bounds = getCalendarSidebarBounds(active.viewportWidth);
+        const nextSidebarWidth = clampNumber(finalWidth, bounds.min, bounds.max);
+        setAppSidebarWidth(nextSidebarWidth);
+        persistMailLayoutPreference({
+          layoutMode: mailLayoutMode,
+          sidebarWidth: nextSidebarWidth,
+          listWidth: mailListWidth,
+          readerWidth: getMailReaderWidth(active.viewportWidth, nextSidebarWidth, mailListWidth),
+          isACollapsed: false,
+        }, active.viewportWidth);
+      }
+
       if (active.type === 'mail-a') {
         const result = applyMailSidebarResize(finalWidth, active.viewportWidth, {
           layoutMode: active.layoutMode,
@@ -6188,7 +6242,7 @@ function MainApp() {
           sidebarWidth: active.sidebarWidth,
           listWidth: result.listWidth,
           readerWidth: result.readerWidth,
-          isACollapsed: mailSidebarCollapsed,
+          isACollapsed: appSidebarCollapsed,
         }, active.viewportWidth);
       }
 
@@ -6203,7 +6257,7 @@ function MainApp() {
       window.removeEventListener('mouseup', handleMouseUp);
       if (layoutResizeRef.current) clearLayoutResize();
     };
-  }, [mailSidebarCollapsed]);
+  }, [appSidebarCollapsed, appSidebarWidth, mailLayoutMode, mailLayoutSidebarWidth, mailListWidth]);
 
   const restoreMailReader = () => {
     const viewportWidth = getViewportWidth();
@@ -6215,23 +6269,41 @@ function MainApp() {
     setMailListWidth(preferredListWidth);
     saveMailLayoutPreference({
       layoutMode: MAIL_LAYOUT_MODE_ABC,
-      sidebarWidth: mailSidebarWidth,
+      sidebarWidth: appSidebarWidth,
       listWidth: preferredListWidth,
       readerWidth,
     });
+  };
+
+  const handleToggleAppSidebarCollapsed = () => {
+    const nextViewportWidth = getViewportWidth();
+    const nextCollapsed = !appSidebarCollapsed;
+
+    setMailSidebarNarrowExpanded(false);
+    setAppSidebarCollapsed(nextCollapsed);
+    persistMailLayoutPreference(
+      {
+        layoutMode: mailLayoutMode,
+        sidebarWidth: appSidebarWidth,
+        listWidth: mailListWidth,
+        readerWidth: getMailReaderWidth(nextViewportWidth, nextCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : appSidebarWidth, mailListWidth),
+        isACollapsed: nextCollapsed,
+      },
+      nextViewportWidth,
+    );
   };
 
   const handleToggleMailSidebarCollapsed = () => {
     const nextViewportWidth = getViewportWidth();
     const isNarrowDesktop = nextViewportWidth < MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH;
 
-    if (isNarrowDesktop && effectiveMailSidebarCollapsed && !mailSidebarCollapsed) {
-      const nextSidebarWidth = clampNumber(mailSidebarWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
+    if (isNarrowDesktop && effectiveMailSidebarCollapsed && !appSidebarCollapsed) {
+      const nextSidebarWidth = clampNumber(appSidebarWidth, APP_SIDEBAR_MIN_WIDTH, APP_SIDEBAR_MAX_WIDTH);
       const nextListBounds = getMailListBounds(nextViewportWidth, nextSidebarWidth, MAIL_LAYOUT_MODE_AB);
       const nextListWidth = nextListBounds.max;
 
       setMailSidebarNarrowExpanded(true);
-      setMailSidebarCollapsed(false);
+      setAppSidebarCollapsed(false);
       setMailLayoutMode(MAIL_LAYOUT_MODE_AB);
       setMailListWidth(nextListWidth);
       persistMailLayoutPreference(
@@ -6254,13 +6326,13 @@ function MainApp() {
         nextLayoutMode === MAIL_LAYOUT_MODE_AB ? nextListBounds.max : clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
 
       setMailSidebarNarrowExpanded(false);
-      setMailSidebarCollapsed(false);
+      setAppSidebarCollapsed(true);
       setMailLayoutMode(nextLayoutMode);
       setMailListWidth(nextListWidth);
       persistMailLayoutPreference(
         {
           layoutMode: nextLayoutMode,
-          sidebarWidth: mailSidebarWidth,
+          sidebarWidth: appSidebarWidth,
           listWidth: nextListWidth,
           readerWidth: nextLayoutMode === MAIL_LAYOUT_MODE_AB ? 0 : getMailReaderWidth(nextViewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, nextListWidth),
           isACollapsed: true,
@@ -6270,18 +6342,18 @@ function MainApp() {
       return;
     }
 
-    const nextCollapsed = !mailSidebarCollapsed;
-    const nextLayoutSidebarWidth = nextCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : mailSidebarWidth;
+    const nextCollapsed = !appSidebarCollapsed;
+    const nextLayoutSidebarWidth = nextCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : appSidebarWidth;
     const nextListBounds = getMailListBounds(nextViewportWidth, nextLayoutSidebarWidth, mailLayoutMode);
     const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
 
     setMailSidebarNarrowExpanded(false);
-    setMailSidebarCollapsed(nextCollapsed);
+    setAppSidebarCollapsed(nextCollapsed);
     setMailListWidth(nextListWidth);
     persistMailLayoutPreference(
       {
         layoutMode: mailLayoutMode,
-        sidebarWidth: mailSidebarWidth,
+        sidebarWidth: appSidebarWidth,
         listWidth: nextListWidth,
         readerWidth: getMailReaderWidth(nextViewportWidth, nextLayoutSidebarWidth, nextListWidth),
         isACollapsed: nextCollapsed,
@@ -9539,8 +9611,8 @@ function MainApp() {
           showHuaweiWorkdayBadges={showHuaweiWorkdayBadges}
           focusDate={focusDate}
           calendarLayout={calendarLayout}
-          collapsed={calendarSidebarCollapsed}
-          width={calendarSidebarWidth}
+          collapsed={appSidebarCollapsed}
+          width={appSidebarWidth}
           onNewEvent={() => navTo('create')}
           onShiftMonth={(delta) => setFocusDate((prev) => stripTime(addMonths(prev, delta)))}
           onSelectDate={(date) => selectDate(date, calendarLayout === 'month' ? 'day' : null)}
@@ -9549,7 +9621,7 @@ function MainApp() {
           onOpenSharedCalendarAccess={openSharedCalendarAccess}
           onOpenSharingSettings={handleOpenSharingSettings}
           onAddSharedCalendar={handleAddSharedCalendar}
-          onToggleCollapsed={() => setCalendarSidebarCollapsed((prev) => !prev)}
+          onToggleCollapsed={handleToggleAppSidebarCollapsed}
           onAccountContextMenu={handleAccountContextMenu}
           onFocusAccount={handleFocusAccount}
           onAccountMenu={handleAccountMenu}
@@ -9565,7 +9637,7 @@ function MainApp() {
 	          mailFolder={mailFolder}
 	          selectedMailAccountId={selectedMailAccountId}
 	          collapsed={effectiveMailSidebarCollapsed}
-	          width={mailSidebarWidth}
+	          width={appSidebarWidth}
 		          onToggleCollapsed={handleToggleMailSidebarCollapsed}
 	          onSelectFolder={selectMailboxFolder}
           onCompose={openMailComposer}
@@ -9573,14 +9645,20 @@ function MainApp() {
           onSelectProduct={handleProductSelect}
         />
       ) : (
-        <UtilitySidebar activeProduct={activeProduct} onSelectProduct={handleProductSelect} />
+        <UtilitySidebar
+          activeProduct={activeProduct}
+          collapsed={appSidebarCollapsed}
+          width={appSidebarWidth}
+          onToggleCollapsed={handleToggleAppSidebarCollapsed}
+          onSelectProduct={handleProductSelect}
+        />
       )}
 
-      {activeProduct === 'calendar' && !calendarSidebarCollapsed && (
+      {activeProduct === 'calendar' && !appSidebarCollapsed && (
         <LayoutResizeHandle
           id="calendar-a"
           label="调整日历 A 栏宽度"
-          value={calendarSidebarWidth}
+          value={appSidebarWidth}
           min={calendarSidebarBounds.min}
           max={calendarSidebarBounds.max}
           active={activeLayoutResize === 'calendar-a'}
@@ -9589,7 +9667,7 @@ function MainApp() {
         />
       )}
 
-	      {activeProduct === 'mail' && (!effectiveMailSidebarCollapsed || mailSidebarCollapsed) && (
+	      {activeProduct === 'mail' && (!effectiveMailSidebarCollapsed || appSidebarCollapsed) && (
 	        <LayoutResizeHandle
           id="mail-a"
           label="调整邮箱 A 栏宽度"
