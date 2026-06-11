@@ -306,6 +306,40 @@ test('mail favorites keep stable row geometry when switching folders', async ({ 
   await expect.poll(getFavoriteGeometry).toEqual(before);
 });
 
+test('mail favorites context menu removes and restores favorite folders', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const favoriteSent = mailSidebar.locator('[data-mail-favorite="sent-all"]');
+  await expect(favoriteSent).toBeVisible();
+
+  await favoriteSent.click({ button: 'right' });
+  const favoriteMenu = page.locator('[data-mail-sidebar-context-menu="true"]');
+  await expect(favoriteMenu).toBeVisible();
+  await expect(favoriteMenu).toContainText('已发送');
+  await favoriteMenu.getByRole('menuitem', { name: '从收藏夹移除' }).click();
+  await expect(favoriteSent).toHaveCount(0);
+  await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已从收藏夹移除');
+  await page.reload();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toHaveCount(0);
+
+  const accountSent = mailSidebar.locator('[data-mailbox-folder="sent"]').first();
+  await accountSent.click({ button: 'right' });
+  const folderMenu = page.locator('[data-mail-sidebar-context-menu="true"]');
+  await expect(folderMenu).toBeVisible();
+  await folderMenu.getByRole('menuitem', { name: '添加到收藏夹' }).click();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+  await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已添加到收藏夹');
+  await page.reload();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+
+  await mailSidebar.getByRole('button', { name: '收起收藏夹' }).click();
+  await expect(mailSidebar.locator('[data-mail-favorite]')).toHaveCount(0);
+  await mailSidebar.getByRole('button', { name: '展开收藏夹' }).click();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+});
+
 test('mail layout switches between ABC and AB reading modes', async ({ page }) => {
   await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');
@@ -611,7 +645,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
     .toBe(0);
   await expect(page.locator('[data-mail-favorites="true"]').getByText('收藏夹')).toBeVisible();
   await expect(page.locator('[data-mail-favorite="inbox-acc1"]').getByText('收件箱 · me@calendarpro.io')).toBeVisible();
-  await expect(page.locator('[data-mail-favorite="drafts"]').getByText('草稿')).toBeVisible();
+  await expect(page.locator('[data-mail-favorite="drafts-all"]').getByText('草稿')).toBeVisible();
   await expect(page.getByText('共享邮箱')).toHaveCount(0);
   await expect(page.getByText('华为日历')).toHaveCount(0);
   await expect(page.locator('[data-product-tab="mail"]').first()).toHaveClass(/text-slate-950/);

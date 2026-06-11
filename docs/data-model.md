@@ -566,6 +566,22 @@ startAt + endAt + timezone
 - 邮件详情可打开关联日程。
 - 从邮件生成日程时，应写入来源邮件信息。
 
+### 15.5 MailFavorite
+
+邮箱收藏夹表示 A 栏的快捷范围入口，不是独立邮件文件夹。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 收藏项 ID，建议由 `folderId` 和 `accountId` 组合生成 |
+| `folderId` | string | 是 | 指向的邮件文件夹或派生范围，例如 inbox、sent、drafts、deleted |
+| `accountId` | string | 是 | 指向的账号；`all` 表示全账号聚合范围 |
+
+规则：
+
+- `accountId = all` 表示聚合范围，展示数量和打开后的邮件列表都必须覆盖所有账号。
+- `从收藏夹移除` 只删除 `MailFavorite` 入口，不改变 `Mail.folder`、邮件内容或账号权限。
+- 收藏夹添加 / 移除属于本地偏好，必须用短反馈说明结果。
+
 ## 16. MailDraft
 
 写信草稿用于写邮件、回复、全部回复、转发和编辑草稿。
