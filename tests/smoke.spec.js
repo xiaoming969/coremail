@@ -236,6 +236,46 @@ test('layout resize keeps tracking while the mouse button is held', async ({ pag
   await page.mouse.up();
 });
 
+test('calendar and contacts collapsed A column can be dragged open with hysteresis', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+
+  const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  await calendarSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(64);
+
+  const calendarSplitter = page.locator('[data-layout-resizer="calendar-a"]');
+  await expect(calendarSplitter).toBeVisible();
+  let splitterBox = await calendarSplitter.boundingBox();
+  await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(splitterBox.x + 120, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBe(64);
+
+  splitterBox = await calendarSplitter.boundingBox();
+  await page.mouse.move(splitterBox.x + splitterBox.width / 2, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(splitterBox.x + 240, splitterBox.y + splitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await calendarSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+
+  await page.getByRole('button', { name: '通讯录', exact: true }).click();
+  const contactsSidebar = page.locator('[data-app-sidebar="contacts"]');
+  await contactsSidebar.getByRole('button', { name: '收起侧边栏' }).click();
+  await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBe(64);
+
+  const contactsSplitter = page.locator('[data-layout-resizer="app-a"]');
+  await expect(contactsSplitter).toBeVisible();
+  const contactsSplitterBox = await contactsSplitter.boundingBox();
+  await page.mouse.move(contactsSplitterBox.x + contactsSplitterBox.width / 2, contactsSplitterBox.y + contactsSplitterBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(contactsSplitterBox.x + 240, contactsSplitterBox.y + contactsSplitterBox.height / 2);
+  await page.mouse.up();
+  await expect.poll(async () => Math.round((await contactsSidebar.boundingBox()).width)).toBeGreaterThanOrEqual(240);
+});
+
 test('mail favorites keep stable row geometry when switching folders', async ({ page }) => {
   await page.setViewportSize({ width: 1728, height: 900 });
   await page.goto('/');

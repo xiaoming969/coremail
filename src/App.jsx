@@ -239,8 +239,8 @@ const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
 const MAIL_LAYOUT_MODE_AB = 'AB';
 const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
-const MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD = 160;
-const MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD = 192;
+const APP_SIDEBAR_DRAG_COLLAPSE_THRESHOLD = 160;
+const APP_SIDEBAR_DRAG_EXPAND_THRESHOLD = 224;
 const MAIL_SIDEBAR_AUTO_COLLAPSE_WIDTH = 1320;
 const MAIL_LAYOUT_AB_WIDTH = 1144;
 const MAIL_TABLE_COLUMN_DEFAULTS = {
@@ -5988,8 +5988,8 @@ function MainApp() {
     persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: appSidebarCollapsed });
   };
 
-  const applyMailSidebarResize = (nextWidth, viewportWidth, { layoutMode = mailLayoutMode, wasCollapsed = effectiveMailSidebarCollapsed } = {}) => {
-    if (wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
+  const applyAppSidebarResize = (nextWidth, viewportWidth, { layoutMode = mailLayoutMode, wasCollapsed = effectiveAppSidebarCollapsed } = {}) => {
+    if (wasCollapsed && nextWidth < APP_SIDEBAR_DRAG_EXPAND_THRESHOLD) {
       return {
         collapsed: true,
         sidebarWidth: appSidebarWidth,
@@ -5997,7 +5997,7 @@ function MainApp() {
       };
     }
 
-    if (!wasCollapsed && nextWidth < MAIL_SIDEBAR_DRAG_COLLAPSE_THRESHOLD) {
+    if (!wasCollapsed && nextWidth < APP_SIDEBAR_DRAG_COLLAPSE_THRESHOLD) {
       const collapsedListBounds = getMailListBounds(viewportWidth, APP_COLLAPSED_SIDEBAR_WIDTH, layoutMode);
       setAppSidebarCollapsed(true);
       setMailSidebarNarrowExpanded(false);
@@ -6048,13 +6048,12 @@ function MainApp() {
 
   const setLayoutWidth = (type, nextWidth, viewportWidth = getViewportWidth()) => {
     if (isSharedAppSidebarResize(type)) {
-      const bounds = getCalendarSidebarBounds(viewportWidth);
-      setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+      applyAppSidebarResize(nextWidth, viewportWidth);
       return;
     }
 
     if (type === 'mail-a') {
-      applyMailSidebarResize(nextWidth, viewportWidth);
+      applyAppSidebarResize(nextWidth, viewportWidth);
       return;
     }
 
@@ -6064,7 +6063,7 @@ function MainApp() {
   };
 
   const getLayoutWidth = (type) => {
-    if (isSharedAppSidebarResize(type)) return appSidebarWidth;
+    if (isSharedAppSidebarResize(type)) return effectiveAppSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : appSidebarWidth;
     if (type === 'mail-a') return mailLayoutSidebarWidth;
     return mailListWidth;
   };
@@ -6096,12 +6095,24 @@ function MainApp() {
       type === 'mail-a' && effectiveMailSidebarCollapsed && delta > 0 ? APP_SIDEBAR_MIN_WIDTH : getLayoutWidth(type) + delta;
 
     if (isSharedAppSidebarResize(type)) {
-      setLayoutWidth(type, nextWidth, viewportWidth);
+      const result = applyAppSidebarResize(nextWidth, viewportWidth);
+      const nextListBounds = getMailListBounds(viewportWidth, result.layoutSidebarWidth, mailLayoutMode);
+      const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
+      persistMailLayoutPreference(
+        {
+          layoutMode: mailLayoutMode,
+          sidebarWidth: result.sidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: getMailReaderWidth(viewportWidth, result.layoutSidebarWidth, nextListWidth),
+          isACollapsed: result.collapsed,
+        },
+        viewportWidth,
+      );
       return;
     }
 
     if (type === 'mail-a') {
-      const result = applyMailSidebarResize(nextWidth, viewportWidth);
+      const result = applyAppSidebarResize(nextWidth, viewportWidth);
       const nextListBounds = getMailListBounds(viewportWidth, result.layoutSidebarWidth, mailLayoutMode);
       const nextListWidth = clampNumber(mailListWidth, nextListBounds.min, nextListBounds.max);
       persistMailLayoutPreference(
@@ -6136,7 +6147,7 @@ function MainApp() {
   layoutRuntimeRef.current = {
     appSidebarCollapsed,
     applyMailReaderResize,
-    applyMailSidebarResize,
+    applyAppSidebarResize,
     mailLayoutMode,
     mailListWidth,
   };
@@ -6192,12 +6203,16 @@ function MainApp() {
       const nextWidth = active.startWidth + event.clientX - active.startX;
 
       if (isSharedAppSidebarResize(active.type)) {
-        const bounds = getCalendarSidebarBounds(active.viewportWidth);
-        setAppSidebarWidth(clampNumber(nextWidth, bounds.min, bounds.max));
+        const result = runtime.applyAppSidebarResize(nextWidth, active.viewportWidth, {
+          layoutMode: active.layoutMode,
+          wasCollapsed: active.mailSidebarCollapsed,
+        });
+        active.mailSidebarCollapsed = result.collapsed;
+        active.sidebarWidth = result.layoutSidebarWidth;
       }
 
       if (active.type === 'mail-a') {
-        const result = runtime.applyMailSidebarResize(nextWidth, active.viewportWidth, {
+        const result = runtime.applyAppSidebarResize(nextWidth, active.viewportWidth, {
           layoutMode: active.layoutMode,
           wasCollapsed: active.mailSidebarCollapsed,
         });
@@ -6218,20 +6233,24 @@ function MainApp() {
 
       const finalWidth = active.startWidth + (active.lastClientX ?? active.startX) - active.startX;
       if (isSharedAppSidebarResize(active.type)) {
-        const bounds = getCalendarSidebarBounds(active.viewportWidth);
-        const nextSidebarWidth = clampNumber(finalWidth, bounds.min, bounds.max);
-        setAppSidebarWidth(nextSidebarWidth);
+        const result = runtime.applyAppSidebarResize(finalWidth, active.viewportWidth, {
+          layoutMode: active.layoutMode,
+          wasCollapsed: active.mailSidebarCollapsed,
+        });
+        const nextListBounds = getMailListBounds(active.viewportWidth, result.layoutSidebarWidth, active.layoutMode);
+        const nextListWidth = clampNumber(active.listWidth, nextListBounds.min, nextListBounds.max);
+        setMailListWidth(nextListWidth);
         persistMailLayoutPreference({
-          layoutMode: runtime.mailLayoutMode,
-          sidebarWidth: nextSidebarWidth,
-          listWidth: runtime.mailListWidth,
-          readerWidth: getMailReaderWidth(active.viewportWidth, nextSidebarWidth, runtime.mailListWidth),
-          isACollapsed: false,
+          layoutMode: active.layoutMode,
+          sidebarWidth: result.sidebarWidth,
+          listWidth: nextListWidth,
+          readerWidth: getMailReaderWidth(active.viewportWidth, result.layoutSidebarWidth, nextListWidth),
+          isACollapsed: result.collapsed,
         }, active.viewportWidth);
       }
 
       if (active.type === 'mail-a') {
-        const result = runtime.applyMailSidebarResize(finalWidth, active.viewportWidth, {
+        const result = runtime.applyAppSidebarResize(finalWidth, active.viewportWidth, {
           layoutMode: active.layoutMode,
           wasCollapsed: active.mailSidebarCollapsed,
         });
@@ -9689,12 +9708,12 @@ function MainApp() {
         />
       )}
 
-      {activeProduct !== 'mail' && !effectiveAppSidebarCollapsed && (
+      {activeProduct !== 'mail' && (
         <LayoutResizeHandle
           id={activeProduct === 'calendar' ? 'calendar-a' : 'app-a'}
           label="调整 A 栏宽度"
-          value={appSidebarWidth}
-          min={calendarSidebarBounds.min}
+          value={effectiveAppSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : appSidebarWidth}
+          min={effectiveAppSidebarCollapsed ? APP_COLLAPSED_SIDEBAR_WIDTH : calendarSidebarBounds.min}
           max={calendarSidebarBounds.max}
           active={activeLayoutResize === (activeProduct === 'calendar' ? 'calendar-a' : 'app-a')}
           onStart={(event) => startLayoutResize(activeProduct === 'calendar' ? 'calendar-a' : 'app-a', event)}
