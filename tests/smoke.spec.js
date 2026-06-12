@@ -349,13 +349,13 @@ test('mail sidebar context menus expose account and folder operations without ac
 
   await mailSidebar.locator('[data-mailbox-account="acc1"]').click({ button: 'right' });
   await expect(contextMenu).toBeVisible();
-  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
+  await expect(contextMenu).not.toContainText('打开');
   await expect(contextMenu).toContainText('创建子文件夹');
   await expect(contextMenu).toContainText('导入归档');
   await expect(contextMenu).not.toContainText('me@calendarpro.io');
-  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toHaveCount(0);
   await expect(contextMenu.locator('[data-mail-context-menu-group="organize"]')).toBeVisible();
-  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(1);
+  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(0);
   await contextMenu.getByRole('menuitem', { name: '创建子文件夹' }).click();
   await expect(mailSidebar.locator('[data-mailbox-custom-folder="custom-acc1-1"]')).toContainText('新建文件夹 1');
   await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已创建子文件夹');
@@ -369,8 +369,8 @@ test('mail sidebar context menus expose account and folder operations without ac
   await expect(mailSidebar.locator('[data-mailbox-custom-folder="import-acc1-1"]')).toContainText('导入归档');
 
   await mailSidebar.locator('[data-mailbox-folder="unread"]').first().click({ button: 'right' });
-  await expect(contextMenu.getByRole('menuitem')).toHaveCount(2);
-  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu).not.toContainText('打开');
   await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
   await expect(contextMenu).not.toContainText('创建子文件夹');
   await expect(contextMenu).not.toContainText('清空文件夹');
@@ -379,25 +379,34 @@ test('mail sidebar context menus expose account and folder operations without ac
 
   await page.keyboard.press('Escape');
   await mailSidebar.locator('[data-mailbox-folder="flagged"]').first().click({ button: 'right' });
-  await expect(contextMenu.getByRole('menuitem')).toHaveCount(2);
-  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu).not.toContainText('打开');
   await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
   await expect(contextMenu).not.toContainText('创建子文件夹');
   await expect(contextMenu).not.toContainText('清空文件夹');
 
   await page.keyboard.press('Escape');
   await mailSidebar.locator('[data-mailbox-folder="outbox"]').first().click({ button: 'right' });
+  await expect(contextMenu).toHaveCount(0);
+
+  await mailSidebar.locator('[data-mailbox-folder="inbox"]').first().click({ button: 'right' });
   await expect(contextMenu).toBeVisible();
+  await expect(contextMenu).not.toContainText('打开');
   await expect(contextMenu).toContainText('全部标记为已读');
   await expect(contextMenu).toContainText('创建子文件夹');
   await expect(contextMenu).toContainText('清空文件夹');
   await expect(contextMenu).not.toContainText('me@calendarpro.io');
-  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toHaveCount(0);
   await expect(contextMenu.locator('[data-mail-context-menu-group="state"]')).toBeVisible();
   await expect(contextMenu.locator('[data-mail-context-menu-group="organize"]')).toBeVisible();
   await expect(contextMenu.locator('[data-mail-context-menu-group="danger"]')).toBeVisible();
-  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(3);
+  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(2);
+  await expect.poll(() => contextMenu.evaluate((node) => Number(window.getComputedStyle(node).zIndex))).toBeGreaterThan(90);
   await expect(contextMenu.getByRole('menuitem', { name: '创建子文件夹' }).locator('[data-mail-context-menu-icon="folder-plus"]')).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem', { name: '从收藏夹移除' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await mailSidebar.locator('[data-mailbox-folder="sent"]').first().click({ button: 'right' });
   await expect(contextMenu.getByRole('menuitem', { name: '添加到收藏夹' }).locator('[data-mail-context-menu-icon="star"]')).toBeVisible();
 
   await page.keyboard.press('Escape');
@@ -407,6 +416,66 @@ test('mail sidebar context menus expose account and folder operations without ac
   await expect(page.getByText(/只影响当前账号的该文件夹/)).toBeVisible();
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('heading', { name: '清空文件夹？' })).toHaveCount(0);
+});
+
+test('mail folders can be dragged to reorder within an account', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailbox = page.locator('[data-mailbox-id="acc1"]');
+  const getFolderOrder = () =>
+    mailbox.locator('[data-mailbox-folder]').evaluateAll((rows) =>
+      rows.map((row) => row.getAttribute('data-mailbox-folder')),
+    );
+
+  await expect.poll(getFolderOrder).toEqual([
+    'inbox',
+    'unread',
+    'flagged',
+    'drafts',
+    'sent',
+    'deleted',
+    'junk',
+    'outbox',
+    'archive',
+    'conversation',
+  ]);
+
+  const drafts = mailbox.locator('[data-mailbox-folder="drafts"]');
+  const unread = mailbox.locator('[data-mailbox-folder="unread"]');
+  const draftsBox = await drafts.boundingBox();
+  const unreadBox = await unread.boundingBox();
+  await page.mouse.move(draftsBox.x + draftsBox.width / 2, draftsBox.y + draftsBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(unreadBox.x + unreadBox.width / 2, unreadBox.y + unreadBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  await expect.poll(getFolderOrder).toEqual([
+    'inbox',
+    'drafts',
+    'unread',
+    'flagged',
+    'sent',
+    'deleted',
+    'junk',
+    'outbox',
+    'archive',
+    'conversation',
+  ]);
+
+  await page.reload();
+  await expect.poll(getFolderOrder).toEqual([
+    'inbox',
+    'drafts',
+    'unread',
+    'flagged',
+    'sent',
+    'deleted',
+    'junk',
+    'outbox',
+    'archive',
+    'conversation',
+  ]);
 });
 
 test('mail favorites distinguish same folder from multiple accounts', async ({ page }) => {

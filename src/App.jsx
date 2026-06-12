@@ -240,6 +240,7 @@ const MAIL_LAYOUT_ABC_RESTORE_RATIO = 0.64;
 const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_FAVORITES_STORAGE_KEY = 'coremail.mailFavorites';
 const MAIL_CUSTOM_FOLDERS_STORAGE_KEY = 'coremail.mailCustomFolders';
+const MAIL_FOLDER_ORDER_STORAGE_KEY = 'coremail.mailFolderOrder';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
 const MAIL_LAYOUT_MODE_AB = 'AB';
 const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
@@ -655,6 +656,80 @@ const persistMailCustomFolders = (folders) => {
   } catch {
     // Ignore private browsing or storage quota failures; current session folders still work.
   }
+};
+
+const normalizeMailFolderOrder = (items, accounts) => {
+  if (!items || typeof items !== 'object' || Array.isArray(items)) return {};
+
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const normalized = {};
+  Object.entries(items).forEach(([accountId, folderIds]) => {
+    if (!accountIds.has(accountId) || !Array.isArray(folderIds)) return;
+    const seen = new Set();
+    const orderedIds = folderIds.filter((folderId) => {
+      if (typeof folderId !== 'string' || seen.has(folderId)) return false;
+      seen.add(folderId);
+      return true;
+    });
+    if (orderedIds.length > 0) normalized[accountId] = orderedIds;
+  });
+  return normalized;
+};
+
+const loadMailFolderOrder = (accounts) => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(MAIL_FOLDER_ORDER_STORAGE_KEY);
+    if (raw === null) return {};
+    return normalizeMailFolderOrder(JSON.parse(raw), accounts);
+  } catch {
+    return {};
+  }
+};
+
+const persistMailFolderOrder = (folderOrder) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(MAIL_FOLDER_ORDER_STORAGE_KEY, JSON.stringify(folderOrder));
+  } catch {
+    // Ignore private browsing or storage quota failures; current drag order still applies.
+  }
+};
+
+const mergeOrderedMailFolderIds = (folderIds, savedOrder = []) => {
+  const availableIds = new Set(folderIds);
+  const seen = new Set();
+  const orderedIds = [];
+
+  if (Array.isArray(savedOrder)) {
+    savedOrder.forEach((folderId) => {
+      if (!availableIds.has(folderId) || seen.has(folderId)) return;
+      seen.add(folderId);
+      orderedIds.push(folderId);
+    });
+  }
+
+  folderIds.forEach((folderId) => {
+    if (seen.has(folderId)) return;
+    seen.add(folderId);
+    orderedIds.push(folderId);
+  });
+
+  return orderedIds;
+};
+
+const reorderMailFolderIds = (folderIds, sourceFolderId, targetFolderId) => {
+  if (sourceFolderId === targetFolderId) return folderIds;
+  const sourceIndex = folderIds.indexOf(sourceFolderId);
+  const targetIndex = folderIds.indexOf(targetFolderId);
+  if (sourceIndex < 0 || targetIndex < 0) return folderIds;
+
+  const nextIds = [...folderIds];
+  const [movedId] = nextIds.splice(sourceIndex, 1);
+  nextIds.splice(nextIds.indexOf(targetFolderId), 0, movedId);
+  return nextIds;
 };
 
 const mailMatchesFolder = (mail, folderId) => {
@@ -1172,10 +1247,15 @@ function MailSidebar({
   onImportMailArchive,
   onMarkMailFolderRead,
   onClearMailFolder,
+  mailFolderOrder = {},
+  onReorderMailFolders = () => {},
   activeProduct,
   onSelectProduct,
 }) {
   const [sidebarContextMenu, setSidebarContextMenu] = useState(null);
+  const [mailFolderDragState, setMailFolderDragState] = useState(null);
+  const mailFolderDragRef = useRef(null);
+  const suppressMailFolderClickRef = useRef(false);
   const mailAccountIds = new Set(mails.map((mail) => mail.accountId));
   const mailboxes = accounts.filter((account) => mailAccountIds.has(account.id));
   const accountMap = Object.fromEntries(accounts.map((account) => [account.id, account]));
@@ -1223,6 +1303,8 @@ function MailSidebar({
     };
   }, [sidebarContextMenu]);
 
+  const closeSidebarContextMenu = () => setSidebarContextMenu(null);
+
   const openSidebarContextMenu = (event, payload) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1231,6 +1313,88 @@ function MailSidebar({
       x: Math.min(event.clientX, window.innerWidth - 220),
       y: Math.min(event.clientY, window.innerHeight - 180),
     });
+  };
+
+  const suppressSidebarContextMenu = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeSidebarContextMenu();
+  };
+
+  const startMailFolderDrag = (event, accountId, folderId) => {
+    if (event.button !== 0) return;
+
+    const dragOrigin = {
+      accountId,
+      folderId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      targetFolderId: null,
+    };
+    mailFolderDragRef.current = dragOrigin;
+
+    const clearDragListeners = (handleMove, handleUp) => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+
+    const handleMove = (moveEvent) => {
+      const currentDrag = mailFolderDragRef.current;
+      if (!currentDrag) return;
+
+      const distance = Math.hypot(moveEvent.clientX - currentDrag.startX, moveEvent.clientY - currentDrag.startY);
+      if (!currentDrag.dragging && distance < 6) return;
+
+      moveEvent.preventDefault();
+      if (!currentDrag.dragging) {
+        currentDrag.dragging = true;
+        suppressMailFolderClickRef.current = true;
+        closeSidebarContextMenu();
+      }
+
+      const targetNode = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+      const targetFolderNode = targetNode?.closest?.('[data-mailbox-folder]');
+      const targetAccountNode = targetFolderNode?.closest?.('[data-mailbox-id]');
+      const targetAccountId = targetAccountNode?.getAttribute('data-mailbox-id') || null;
+      const targetFolderId = targetFolderNode?.getAttribute('data-mailbox-folder') || null;
+      const isValidTarget =
+        targetAccountId === currentDrag.accountId && targetFolderId && targetFolderId !== currentDrag.folderId;
+
+      currentDrag.targetFolderId = isValidTarget ? targetFolderId : null;
+      setMailFolderDragState({
+        accountId: currentDrag.accountId,
+        sourceFolderId: currentDrag.folderId,
+        targetFolderId: currentDrag.targetFolderId,
+      });
+    };
+
+    const handleUp = (upEvent) => {
+      const currentDrag = mailFolderDragRef.current;
+      clearDragListeners(handleMove, handleUp);
+      mailFolderDragRef.current = null;
+      setMailFolderDragState(null);
+
+      if (!currentDrag?.dragging) return;
+
+      upEvent.preventDefault();
+      const targetNode = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+      const targetFolderNode = targetNode?.closest?.('[data-mailbox-folder]');
+      const targetAccountNode = targetFolderNode?.closest?.('[data-mailbox-id]');
+      const targetAccountId = targetAccountNode?.getAttribute('data-mailbox-id') || null;
+      const targetFolderId = targetFolderNode?.getAttribute('data-mailbox-folder') || currentDrag.targetFolderId;
+
+      if (targetAccountId === currentDrag.accountId && targetFolderId && targetFolderId !== currentDrag.folderId) {
+        onReorderMailFolders(currentDrag.accountId, currentDrag.folderId, targetFolderId);
+      }
+
+      window.setTimeout(() => {
+        suppressMailFolderClickRef.current = false;
+      }, 0);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
   };
 
   const runSidebarContextAction = (handler) => {
@@ -1245,17 +1409,6 @@ function MailSidebar({
 
     if (type === 'account') {
       return [
-        {
-          id: 'primary',
-          items: [
-            {
-              label: '打开',
-              icon: Mail,
-              iconName: 'mail',
-              onClick: () => onSelectFolder('inbox', item.accountId),
-            },
-          ],
-        },
         {
           id: 'organize',
           items: [
@@ -1279,17 +1432,6 @@ function MailSidebar({
     if (type === 'favorite') {
       return [
         {
-          id: 'primary',
-          items: [
-            {
-              label: '打开',
-              icon: Mail,
-              iconName: 'mail',
-              onClick: () => onSelectFolder(item.folderId, item.accountId),
-            },
-          ],
-        },
-        {
           id: 'organize',
           items: [
             {
@@ -1305,17 +1447,6 @@ function MailSidebar({
 
     if (MAIL_DERIVED_FOLDER_IDS.has(item.folderId)) {
       return [
-        {
-          id: 'primary',
-          items: [
-            {
-              label: '打开',
-              icon: Mail,
-              iconName: 'mail',
-              onClick: () => onSelectFolder(item.folderId, item.accountId),
-            },
-          ],
-        },
         {
           id: 'state',
           items: [
@@ -1358,17 +1489,6 @@ function MailSidebar({
     }
 
     return [
-      {
-        id: 'primary',
-        items: [
-          {
-            label: '打开',
-            icon: Mail,
-            iconName: 'mail',
-            onClick: () => onSelectFolder(item.folderId, item.accountId),
-          },
-        ],
-      },
       {
         id: 'state',
         items: [
@@ -1534,23 +1654,48 @@ function MailSidebar({
               </button>
 
               <div className="mt-1 space-y-0.5">
-                {[
+                {(() => {
+                  const accountFolders = [
                   ...MAIL_SIDEBAR_FOLDERS,
                   ...mailCustomFolders
                     .filter((folder) => folder.accountId === account.id)
                     .map((folder) => ({ ...folder, icon: FileText, custom: true })),
-                ].map(({ id, label, icon: Icon, custom }) => {
+                  ];
+                  const folderById = Object.fromEntries(accountFolders.map((folder) => [folder.id, folder]));
+                  return mergeOrderedMailFolderIds(
+                    accountFolders.map((folder) => folder.id),
+                    mailFolderOrder[account.id],
+                  )
+                    .map((folderId) => folderById[folderId])
+                    .filter(Boolean);
+                })().map(({ id, label, icon: Icon, custom }) => {
                   const selected = selectedMailAccountId === account.id && mailFolder === id;
                   const count = getFolderCount(account.id, id);
                   const favoriteTarget = getMailFavoriteTarget(id, account.id);
+                  const isDragging = mailFolderDragState?.accountId === account.id && mailFolderDragState.sourceFolderId === id;
+                  const isDragTarget = mailFolderDragState?.accountId === account.id && mailFolderDragState.targetFolderId === id;
                   return (
                     <button
                       key={id}
                       data-mailbox-folder={id}
                       data-mailbox-custom-folder={custom ? id : undefined}
+                      data-mailbox-folder-dragging={isDragging ? 'true' : undefined}
+                      data-mailbox-folder-drag-over={isDragTarget ? 'true' : undefined}
                       type="button"
-                      onClick={() => onSelectFolder(id, account.id)}
-                      onContextMenu={(event) =>
+                      onMouseDown={(event) => startMailFolderDrag(event, account.id, id)}
+                      onClick={(event) => {
+                        if (suppressMailFolderClickRef.current) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          return;
+                        }
+                        onSelectFolder(id, account.id);
+                      }}
+                      onContextMenu={(event) => {
+                        if (id === 'outbox') {
+                          suppressSidebarContextMenu(event);
+                          return;
+                        }
                         openSidebarContextMenu(event, {
                           type: 'folder',
                           item: {
@@ -1562,10 +1707,16 @@ function MailSidebar({
                             favoriteLabel: getMailFavoriteLabel(favoriteTarget, accountMap),
                             isCustom: Boolean(custom),
                           },
-                        })
-                      }
-                      className={`flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-semibold transition ${
-                        selected ? 'bg-slate-200/80 text-slate-950' : 'text-slate-700 hover:bg-slate-200/60 hover:text-slate-950'
+                        });
+                      }}
+                      className={`flex h-9 w-full cursor-grab items-center justify-between rounded-lg px-2 text-sm font-semibold transition active:cursor-grabbing ${
+                        isDragging
+                          ? 'bg-slate-300/70 text-slate-950 opacity-70'
+                          : isDragTarget
+                            ? 'bg-white text-slate-950 ring-2 ring-[#0A59F7]/35'
+                            : selected
+                              ? 'bg-slate-200/80 text-slate-950'
+                              : 'text-slate-700 hover:bg-slate-200/60 hover:text-slate-950'
                       }`}
                     >
                       <span className="flex min-w-0 items-center">
@@ -1591,7 +1742,7 @@ function MailSidebar({
         <div
           data-mail-sidebar-context-menu="true"
           role="menu"
-          className="fixed z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
+          className="fixed z-[120] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
           style={{ top: sidebarContextMenu.y, left: sidebarContextMenu.x }}
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -6326,6 +6477,7 @@ function MainApp() {
   const [mailFavorites, setMailFavorites] = useState(() => loadMailFavorites(MOCK_ACCOUNTS, MOCK_MAILS));
   const [mailFavoritesCollapsed, setMailFavoritesCollapsed] = useState(false);
   const [mailCustomFolders, setMailCustomFolders] = useState(() => loadMailCustomFolders(MOCK_ACCOUNTS));
+  const [mailFolderOrder, setMailFolderOrder] = useState(() => loadMailFolderOrder(MOCK_ACCOUNTS));
   const [mailComposer, setMailComposer] = useState({
     open: false,
     mode: 'new',
@@ -6403,6 +6555,10 @@ function MainApp() {
   useEffect(() => {
     persistMailCustomFolders(mailCustomFolders);
   }, [mailCustomFolders]);
+
+  useEffect(() => {
+    persistMailFolderOrder(mailFolderOrder);
+  }, [mailFolderOrder]);
 
   const saveMailLayoutPreference = ({ layoutMode = mailLayoutMode, sidebarWidth = appSidebarWidth, listWidth = mailListWidth, readerWidth = null } = {}) => {
     persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: appSidebarCollapsed });
@@ -7311,6 +7467,22 @@ function MainApp() {
       msg: importedFolder?.label ? `已导入归档：${importedFolder.label}` : '已导入归档',
       icon: <Archive size={16} />,
       color: 'bg-slate-900',
+    });
+  };
+
+  const reorderMailFolders = (accountId, sourceFolderId, targetFolderId) => {
+    setMailFolderOrder((prev) => {
+      const availableFolderIds = [
+        ...MAIL_SIDEBAR_FOLDERS.map((folder) => folder.id),
+        ...mailCustomFolders.filter((folder) => folder.accountId === accountId).map((folder) => folder.id),
+      ];
+      const currentFolderIds = mergeOrderedMailFolderIds(availableFolderIds, prev[accountId]);
+      const nextFolderIds = reorderMailFolderIds(currentFolderIds, sourceFolderId, targetFolderId);
+      if (nextFolderIds.every((folderId, index) => folderId === currentFolderIds[index])) return prev;
+      return {
+        ...prev,
+        [accountId]: nextFolderIds,
+      };
     });
   };
 
@@ -10261,6 +10433,8 @@ function MainApp() {
           onImportMailArchive={importMailArchive}
           onMarkMailFolderRead={markMailFolderRead}
           onClearMailFolder={clearMailFolder}
+          mailFolderOrder={mailFolderOrder}
+          onReorderMailFolders={reorderMailFolders}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
         />
