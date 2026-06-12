@@ -26,10 +26,12 @@ export const normalizeAddress = (value: string | MailAddress): MailAddress => {
 
 export const getMailSender = (mail: MailReadingPaneMail): MailAddress => {
   if (mail.from) return normalizeAddress(mail.from);
+  const fromScope = mail.fromScope;
 
   return normalizeAddress({
     name: mail.fromName || mail.fromEmail || '未知发件人',
     email: mail.fromEmail || '',
+    isExternal: fromScope === 'external' ? true : fromScope === 'internal' || fromScope === 'system' ? false : undefined,
   });
 };
 

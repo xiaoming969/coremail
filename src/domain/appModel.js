@@ -2593,7 +2593,84 @@ export const MOCK_EVENTS = [
   },
 ];
 
-export const MOCK_MAILS = [
+const INTERNAL_MAIL_DOMAIN = 'calendarpro.io';
+const DISALLOWED_MAIL_SENDER_NAME_RE = /(老师|经理|总监|主管|工程师|代表|顾问|助理|团队|部门|人力资源|负责人|开发|博士|总|工|同学|CFO)$/;
+const PERSONAL_MAIL_SENDER_NAME_RE = /^[\u4e00-\u9fa5]{2,4}$/;
+const FALLBACK_MAIL_SENDER_NAMES = [
+  '小华',
+  '陈晨',
+  '张伟',
+  '李娜',
+  '王磊',
+  '赵敏',
+  '孙莉',
+  '胡洁',
+  '刘洋',
+  '马超',
+  '吴芳',
+  '郑宇',
+  '周强',
+  '朱军',
+  '何明',
+  '钱宁',
+  '林涛',
+  '黄蓉',
+  '郭靖',
+  '杨帆',
+];
+const MAIL_SENDER_NAME_BY_EMAIL = {
+  'me@calendarpro.io': '小华',
+  'pm@calendarpro.io': '陈晨',
+  'boss@calendarpro.io': '张伟',
+  'sales@calendarpro.io': '李四',
+  'ea@calendarpro.io': '张三',
+  'ea-team@calendarpro.io': '吴芳',
+  'finance@calendarpro.io': '王敏',
+  'hr@calendarpro.io': '周强',
+  'design@calendarpro.io': '赵敏',
+  'rd@calendarpro.io': '刘洋',
+  'qa@calendarpro.io': '郭靖',
+  'ops@calendarpro.io': '朱军',
+  'admin@calendarpro.io': '杨帆',
+  'support@calendarpro.io': '胡洁',
+  'dev@calendarpro.io': '郑宇',
+  'advisor@vendor.com': '赵磊',
+};
+
+const isExternalMailSender = (email = '') => {
+  const normalized = email.toLowerCase();
+  return Boolean(normalized && !normalized.endsWith(`@${INTERNAL_MAIL_DOMAIN}`));
+};
+
+const hashMailSenderEmail = (email = '') =>
+  Array.from(email).reduce((total, char, index) => total + char.charCodeAt(0) * (index + 1), 0);
+
+const isPersonalMailSenderName = (name = '') =>
+  PERSONAL_MAIL_SENDER_NAME_RE.test(name) && !DISALLOWED_MAIL_SENDER_NAME_RE.test(name);
+
+const resolveMailSenderName = (mail) => {
+  const normalizedEmail = String(mail.fromEmail || '').toLowerCase();
+  if (MAIL_SENDER_NAME_BY_EMAIL[normalizedEmail]) return MAIL_SENDER_NAME_BY_EMAIL[normalizedEmail];
+  if (isPersonalMailSenderName(mail.fromName)) return mail.fromName;
+  return FALLBACK_MAIL_SENDER_NAMES[hashMailSenderEmail(normalizedEmail || mail.id) % FALLBACK_MAIL_SENDER_NAMES.length];
+};
+
+const normalizeMockMailSender = (mail) => {
+  const isExternalSender = isExternalMailSender(mail.fromEmail);
+  return {
+    ...mail,
+    fromName: resolveMailSenderName(mail),
+    fromScope: isExternalSender ? 'external' : 'internal',
+    security: mail.security
+      ? {
+          ...mail.security,
+          isExternalSender: Boolean(mail.security.isExternalSender || isExternalSender),
+        }
+      : mail.security,
+  };
+};
+
+const RAW_MOCK_MAILS = [
   {
     id: 'm1', accountId: 'acc1', folder: 'inbox', category: 'focused',
     unread: true, starred: true,
@@ -4473,7 +4550,9 @@ export const MOCK_MAILS = [
     attachments: [{"name": "代码审查报告.html", "size": "320 KB"}],
     timestamp: new Date(2026, 0, 8, 13, 0, 0).getTime(),
   },
-];;
+];
+
+export const MOCK_MAILS = RAW_MOCK_MAILS.map(normalizeMockMailSender);
 
 export const buildMailDraft = ({ mode = 'new', mail = null, fallbackAccountId = 'acc1' }) => {
   if (mode === 'editDraft' && mail) {

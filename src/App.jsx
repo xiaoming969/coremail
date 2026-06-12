@@ -2898,7 +2898,8 @@ function MailWorkspace({
               }
 
               const mail = row.mail;
-	              const selected = effectiveSelectedMail?.id === mail.id;
+              const sender = getMailSender(mail);
+              const selected = effectiveSelectedMail?.id === mail.id;
               const selectedInBatch = selectedMailIds.includes(mail.id);
               if (isMailReaderHidden) {
                 return (
@@ -2943,7 +2944,18 @@ function MailWorkspace({
                       )}
                     </div>
                     <div data-mail-wide-column="sender" className="min-w-0">
-                      <div data-mail-sender-name="true" className="truncate text-sm font-black text-slate-950">{mail.fromName}</div>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div data-mail-sender-name="true" className="truncate text-sm font-black text-slate-950">{sender.name}</div>
+                        {sender.isExternal && (
+                          <span
+                            data-mail-external-sender-badge="true"
+                            title="外部发件人"
+                            className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-700"
+                          >
+                            外部
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div data-mail-wide-column="subject" data-mail-row-content="true" className="min-w-0">
                       <div data-mail-title-time="true" className="flex min-w-0 items-center gap-1.5">
@@ -3002,7 +3014,18 @@ function MailWorkspace({
 	                  <div data-mail-row-content="true" className="min-w-0">
 	                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-3">
 	                      <div className="min-w-0">
-                          <div data-mail-sender-name="true" className="min-w-0 truncate text-sm font-black text-slate-950">{mail.fromName}</div>
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <div data-mail-sender-name="true" className="min-w-0 truncate text-sm font-black text-slate-950">{sender.name}</div>
+                            {sender.isExternal && (
+                              <span
+                                data-mail-external-sender-badge="true"
+                                title="外部发件人"
+                                className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-700"
+                              >
+                                外部
+                              </span>
+                            )}
+                          </div>
 	                        <div data-mail-title-time="true" className="mt-1 flex min-w-0 items-center gap-1">
 	                          {mailSelectionMode && (
 	                            <input

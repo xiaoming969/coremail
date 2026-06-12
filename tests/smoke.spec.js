@@ -1,4 +1,43 @@
 import { expect, test } from '@playwright/test';
+import { MOCK_MAILS } from '../src/domain/appModel.js';
+
+const DISALLOWED_MAIL_SENDER_NAME_RE = /(老师|经理|总监|主管|工程师|代表|顾问|助理|团队|部门|人力资源|负责人|开发|博士|总|工|同学|CFO)$/;
+const PERSONAL_MAIL_SENDER_NAME_RE = /^[\u4e00-\u9fa5]{2,4}$/;
+const isExternalMailAddress = (email = '') => Boolean(email && !email.toLowerCase().endsWith('@calendarpro.io'));
+
+test('mail mock data uses personal sender names and explicit sender scope', () => {
+  const invalidSenderNames = MOCK_MAILS.filter((mail) => {
+    const senderName = mail.fromName || '';
+    return !PERSONAL_MAIL_SENDER_NAME_RE.test(senderName) || DISALLOWED_MAIL_SENDER_NAME_RE.test(senderName);
+  }).map((mail) => `${mail.id}:${mail.fromName}<${mail.fromEmail}>`);
+
+  expect(invalidSenderNames).toEqual([]);
+
+  const invalidSenderScopes = MOCK_MAILS.filter((mail) => !['internal', 'external', 'system'].includes(mail.fromScope)).map(
+    (mail) => `${mail.id}:${mail.fromName}<${mail.fromEmail}>:${mail.fromScope}`,
+  );
+  expect(invalidSenderScopes).toEqual([]);
+
+  const mismatchedScopes = MOCK_MAILS.filter((mail) => mail.fromScope !== (isExternalMailAddress(mail.fromEmail) ? 'external' : 'internal')).map(
+    (mail) => `${mail.id}:${mail.fromName}<${mail.fromEmail}>:${mail.fromScope}`,
+  );
+  expect(mismatchedScopes).toEqual([]);
+});
+
+test('mail list distinguishes external senders before opening detail', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailView = page.locator('[data-mail-workspace="true"]');
+  await mailView.getByPlaceholder('搜索邮件').fill('partner.example.com');
+
+  const externalMailRow = mailView.locator('[data-mail-list-card="m7"]');
+  await expect(externalMailRow).toBeVisible();
+  await expect(externalMailRow.locator('[data-mail-sender-name="true"]')).toContainText('孙莉');
+  await expect(externalMailRow.locator('[data-mail-sender-name="true"]')).not.toContainText('@');
+  await expect(externalMailRow.locator('[data-mail-external-sender-badge="true"]')).toContainText('外部');
+  await expect(externalMailRow.locator('[data-mail-external-sender-badge="true"]')).toHaveAttribute('title', '外部发件人');
+});
 
 test('calendar shell renders with search entry hidden', async ({ page }) => {
   await page.setViewportSize({ width: 1728, height: 900 });
@@ -544,7 +583,7 @@ test('mail layout switches between ABC and AB reading modes', async ({ page }) =
   await expect(mailView.locator('[data-mail-wide-list-header="true"]')).toBeVisible();
   const firstWideRow = mailView.locator('[data-mail-list-card="m1"]');
   await expect(firstWideRow).toHaveAttribute('data-mail-row-mode', 'table');
-  await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).toContainText('产品经理');
+  await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).toContainText('陈晨');
   await expect(firstWideRow.locator('[data-mail-wide-column="sender"]')).not.toContainText('@');
   await expect(firstWideRow.locator('[data-mail-wide-column="subject"]')).toContainText('Q2 路线评审材料已更新');
   const firstWideStatus = firstWideRow.locator('[data-mail-wide-column="status"]');
@@ -873,7 +912,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   const firstStackCard = bulkReader.locator('[data-mail-stack-card-id="m1"]');
   await expect(firstStackCard).toHaveAttribute('data-mail-stack-motion', 'harmony-stack');
   await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('Q2 路线评审材料已更新');
-  await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('产品经理');
+  await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('陈晨');
   await expect(firstStackCard.locator('[data-mail-stack-card-header="true"]')).toContainText('pm@calendarpro.io');
   await expect(firstStackCard.locator('[data-mail-stack-card-recipients="true"]')).toContainText('发给我等 2 人');
   await expect(firstStackCard.locator('[data-mail-stack-card-attachments="true"]')).toContainText('Q2_路线评审_v4.pptx');
@@ -1075,7 +1114,7 @@ test('mail workspace uses a focused inbox layout', async ({ page }) => {
   await expect(readerToolbarActions.getByRole('button', { name: '移动' })).toHaveCount(0);
   await expect(mailView.getByRole('heading', { name: 'Q2 路线评审材料已更新' })).toBeVisible();
   const readerSenderMeta = mailView.locator('[data-mail-reader-sender-meta="true"]');
-  await expect(readerSenderMeta).toContainText('产品经理');
+  await expect(readerSenderMeta).toContainText('陈晨');
   await expect(readerSenderMeta).toContainText('01/09 09:20');
   await expect(readerSenderMeta).not.toContainText('小华');
   await expect(readerSenderMeta.locator('[data-mail-avatar-image="true"]')).toHaveCount(0);
@@ -1155,7 +1194,7 @@ test('mail reading pane surfaces enterprise body states and interactions', async
   const reader = mailView.locator('[data-mail-reading-pane="true"]');
   await expect(reader).toBeVisible();
   await expect(reader.locator('[data-mail-reader-action-bar="true"]')).toBeVisible();
-  await expect(reader.locator('[data-mail-reader-header="true"]')).toContainText('产品经理');
+  await expect(reader.locator('[data-mail-reader-header="true"]')).toContainText('陈晨');
   await expect(reader.locator('[data-mail-recipient-summary="true"]')).toContainText('发给我');
   await expect(reader.locator('[data-mail-attachment-list="true"]')).toContainText('Q2_路线评审_v4.pptx');
   await expect(reader.locator('[data-mail-quick-reply="true"]')).toBeVisible();

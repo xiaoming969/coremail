@@ -51,6 +51,7 @@ export type MailReadingPaneMail = {
   subject: string;
   fromName?: string;
   fromEmail?: string;
+  fromScope?: 'internal' | 'external' | 'system';
   from?: MailAddress;
   to?: Array<string | MailAddress>;
   cc?: Array<string | MailAddress>;

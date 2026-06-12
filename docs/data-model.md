@@ -527,7 +527,7 @@ startAt + endAt + timezone
 | `subject` | string | 是 | 主题 |
 | `fromName` | string | 是 | 发件人名称 |
 | `fromEmail` | string | 是 | 发件人邮箱 |
-| `fromScope` | string | 否 | 发件人范围，例如 internal、external、system |
+| `fromScope` | string | 是 | 发件人范围，例如 internal、external、system |
 | `to` | string[] | 是 | 收件人 |
 | `cc` | string[] | 否 | 抄送人 |
 | `preview` | string | 否 | 列表摘要 |
@@ -551,7 +551,17 @@ startAt + endAt + timezone
 - `outbox`
 - `conversation`
 
-### 15.3 `category`
+### 15.3 发件人字段
+
+规则：
+
+- `fromName` 必须是完整个人姓名。不能使用部门、岗位、团队、职级、称谓或角色代替，例如 `人力资源`、`产品经理`、`销售团队`、`周老师`、`李经理` 都不是合格发件人姓名。
+- 当前用户作为发件人时，也应写入真实姓名，例如 `小华`，不要把 `我` 作为邮件数据中的发件人名称。
+- `fromEmail` 保留邮箱地址，列表默认不重复展示；详情、悬停补充和搜索来源说明可以展示。
+- `fromScope` 应明确写入 `internal`、`external` 或 `system`，展示层据此区分内外部邮件和系统邮件。
+- 无后端的 mock 数据也必须遵守上述规则，不能用岗位或部门名占位。
+
+### 15.4 `category`
 
 推荐取值：
 
@@ -560,7 +570,7 @@ startAt + endAt + timezone
 
 该字段只用于收件箱重点/其他分类，不等于业务标签。
 
-### 15.4 关联日程
+### 15.5 关联日程
 
 `linkedEventId` 建立邮件与日程的关系。
 
@@ -570,7 +580,7 @@ startAt + endAt + timezone
 - 邮件详情可打开关联日程。
 - 从邮件生成日程时，应写入来源邮件信息。
 
-### 15.5 MailFavorite
+### 15.6 MailFavorite
 
 邮箱收藏夹表示 A 栏的快捷范围入口，不是独立邮件文件夹。
 
@@ -588,7 +598,7 @@ startAt + endAt + timezone
 - `从收藏夹移除` 只删除 `MailFavorite` 入口，不改变 `Mail.folder`、邮件内容或账号权限。
 - 收藏夹添加 / 移除属于本地偏好，必须用短反馈说明结果。
 
-### 15.6 MailCustomFolder
+### 15.7 MailCustomFolder
 
 邮箱自定义文件夹表示账号下由用户创建或导入的本地文件夹节点。
 
@@ -607,7 +617,7 @@ startAt + endAt + timezone
 - 在无后端的原型中，自定义文件夹至少应作为本地偏好保存，刷新后不能立即丢失。
 - 自定义文件夹的右键操作应遵循普通实体文件夹规则；清空时仍需确认影响范围。
 
-### 15.7 MailFolderOrder
+### 15.8 MailFolderOrder
 
 邮箱文件夹排序表示用户在 A 栏对某个账号下文件夹顺序的本地偏好。
 
