@@ -183,6 +183,17 @@ const getCalendarSlotSurfaceClass = (date, hour, { transparentWorkHour = false }
   return 'border-slate-200 bg-slate-50 hover:bg-slate-100';
 };
 const shouldShowChinaMakeupBadge = (showHolidayCalendar, date) => showHolidayCalendar && isChinaMakeupWorkday(date);
+function CalendarCurrentTimeAxisLabel({ top, label }) {
+  return (
+    <div
+      data-calendar-current-time-label="true"
+      className="pointer-events-none absolute right-1 z-20 min-w-[42px] -translate-y-1/2 rounded-md bg-white px-1.5 py-0.5 text-right text-[11px] font-black leading-none text-red-500 shadow-sm ring-1 ring-red-100"
+      style={{ top: `${top}px` }}
+    >
+      {label}
+    </div>
+  );
+}
 const scheduleTimelineScrollToWorkStart = (target, scrollTop = getWorkdayScrollTop()) => {
   if (!target || typeof window === 'undefined') return () => {};
 
@@ -3646,6 +3657,10 @@ function WeekView({
   const splitWeekPaneHeaderHeight = isSplit ? SPLIT_WEEK_PANE_HEADER_HEIGHT : 0;
   const weekTimelineHeaderHeight = TIMELINE_HEADER_HEIGHT;
   const getWeekTimeTop = (hour) => (hour - DAY_START_HOUR) * CELL_HEIGHT;
+  const currentTimeHour = getCurrentTimeHour();
+  const currentTimeTop = getWeekTimeTop(currentTimeHour);
+  const currentTimeLabel = formatHour(currentTimeHour);
+  const weekShowsToday = days.some((day) => day.isToday);
   const paneGap = 0;
   const paneMinWidth = isSplit ? (weekAccounts.length >= 3 ? 400 : 440) : 0;
   const paneData = useMemo(() => {
@@ -3832,12 +3847,13 @@ function WeekView({
             </div>
 
             <div className="flex-1 min-h-0 bg-white flex relative">
-              <div className="flex shrink-0 flex-col border-r border-gray-200 bg-white" style={{ width: '64px' }}>
+              <div className="relative flex shrink-0 flex-col border-r border-gray-200 bg-white" style={{ width: '64px' }}>
                 {HOURS.map((hour) => (
                   <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                     <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
                   </div>
                 ))}
+                {weekShowsToday && <CalendarCurrentTimeAxisLabel top={currentTimeTop} label={currentTimeLabel} />}
               </div>
 
               <div className="grid flex-1 bg-white" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(${splitDayMinWidth}px, 1fr))` }}>
@@ -4017,7 +4033,11 @@ function WeekView({
                     </div>
 
                     {day.isToday && (
-                      <div className="pointer-events-none absolute left-0 right-0" style={{ top: `${getWeekTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
+                      <div
+                        data-calendar-current-time-line="true"
+                        className="pointer-events-none absolute left-0 right-0"
+                        style={{ top: `${currentTimeTop}px`, zIndex: 15 }}
+                      >
                         <div className="absolute -left-1 -mt-1 h-2 w-2 rounded-full bg-red-500"></div>
                         <div className="w-full border-t-2 border-red-500"></div>
                       </div>
@@ -4169,12 +4189,13 @@ function WeekView({
           </div>
 
           <div className="flex-1 min-h-0 bg-white flex relative">
-            <div className="border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
+            <div className="relative border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
               {HOURS.map((hour) => (
                 <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                   <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
                 </div>
               ))}
+              {weekShowsToday && <CalendarCurrentTimeAxisLabel top={currentTimeTop} label={currentTimeLabel} />}
             </div>
 
             <div
@@ -4376,7 +4397,11 @@ function WeekView({
                             })}
 
                           {day.isToday && (
-                            <div className="absolute left-0 right-0 pointer-events-none" style={{ top: `${getWeekTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
+                            <div
+                              data-calendar-current-time-line="true"
+                              className="absolute left-0 right-0 pointer-events-none"
+                              style={{ top: `${currentTimeTop}px`, zIndex: 15 }}
+                            >
                               <div className="absolute left-0 w-2 h-2 rounded-full bg-red-500 -mt-1 -ml-1"></div>
                               <div className="border-t-2 border-red-500 w-full relative"></div>
                             </div>
@@ -4454,6 +4479,10 @@ function DayView({
   const showOverlayAccountLabel = !isSplit && activeAccounts.length > 1;
   const splitDayLabel = formatCalendarSplitDayLabel(focusDate);
   const dayScrollKey = `${stripTime(focusDate).getTime()}|${isSplit ? 'split' : 'overlay'}|${lanes.map((lane) => lane.id).join('-')}`;
+  const currentTimeHour = getCurrentTimeHour();
+  const currentTimeTop = getTimeTop(currentTimeHour);
+  const currentTimeLabel = formatHour(currentTimeHour);
+  const dayShowsToday = sameDay(focusDate, TODAY_DATE);
 
   useLayoutEffect(() => {
     const target = scrollRef?.current;
@@ -4599,12 +4628,13 @@ function DayView({
           </div>
 
 		          <div className="flex-1 min-h-0 bg-white flex relative">
-            <div className="border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
+            <div className="relative border-r border-gray-200 flex flex-col shrink-0 bg-white" style={{ width: '64px' }}>
               {HOURS.map((hour) => (
                 <div key={hour} className={`h-24 border-b relative ${isWorkHour(hour) ? 'border-gray-100 bg-white' : 'border-slate-200 bg-slate-50'}`}>
                   <span className="absolute -top-2.5 right-2 text-xs text-gray-500 font-bold">{hour}:00</span>
                 </div>
               ))}
+              {dayShowsToday && <CalendarCurrentTimeAxisLabel top={currentTimeTop} label={currentTimeLabel} />}
             </div>
             <div className="flex-1 min-w-0">
               <div className={isSplit ? 'grid bg-white min-w-full' : 'flex bg-white min-w-full'} style={splitGridStyle}>
@@ -4784,8 +4814,12 @@ function DayView({
                                 </div>
                               );
                       })}
-                    {sameDay(focusDate, TODAY_DATE) && (
-                      <div className="pointer-events-none absolute left-0 right-0" style={{ top: `${getTimeTop(getCurrentTimeHour())}px`, zIndex: 15 }}>
+                    {dayShowsToday && (
+                      <div
+                        data-calendar-current-time-line="true"
+                        className="pointer-events-none absolute left-0 right-0"
+                        style={{ top: `${currentTimeTop}px`, zIndex: 15 }}
+                      >
                         <div className="absolute -left-1 -mt-1 h-2 w-2 rounded-full bg-red-500"></div>
                         <div className="w-full border-t-2 border-red-500"></div>
                       </div>

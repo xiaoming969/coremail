@@ -5,6 +5,28 @@ const DISALLOWED_MAIL_SENDER_NAME_RE = /(老师|经理|总监|主管|工程师|�
 const PERSONAL_MAIL_SENDER_NAME_RE = /^[\u4e00-\u9fa5]{2,4}$/;
 const isExternalMailAddress = (email = '') => Boolean(email && !email.toLowerCase().endsWith('@calendarpro.io'));
 
+const expectCalendarCurrentTimeMarker = async (page) => {
+  const label = page.locator('[data-calendar-current-time-label="true"]').first();
+  const line = page.locator('[data-calendar-current-time-line="true"]').first();
+
+  await expect(label).toBeVisible();
+  await expect(label).toHaveText('10:30');
+  await expect(line).toBeVisible();
+  await expect.poll(() => label.evaluate((node) => node.className.includes('text-red-500'))).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const markerLabel = document.querySelector('[data-calendar-current-time-label="true"]');
+        const markerLine = document.querySelector('[data-calendar-current-time-line="true"]');
+        if (!markerLabel || !markerLine) return 999;
+        const labelRect = markerLabel.getBoundingClientRect();
+        const lineRect = markerLine.getBoundingClientRect();
+        return Math.abs(labelRect.top + labelRect.height / 2 - lineRect.top);
+      }),
+    )
+    .toBeLessThanOrEqual(2);
+};
+
 test('mail mock data uses personal sender names and explicit sender scope', () => {
   const invalidSenderNames = MOCK_MAILS.filter((mail) => {
     const senderName = mail.fromName || '';
@@ -134,7 +156,15 @@ test('calendar timeline opens at work hours and greys China rest days', async ({
   const weekScroller = page.locator('[data-timeline-scroll="week"]').first();
   await expect(weekScroller).toBeVisible();
   await expect.poll(() => weekScroller.evaluate((node) => Math.round(node.scrollTop))).toBe(WORK_START_HOUR * CELL_HEIGHT);
+  await expectCalendarCurrentTimeMarker(page);
 
+  await page.getByRole('button', { name: '日', exact: true }).click();
+  const todayDayScroller = page.locator('[data-timeline-scroll="day"]').first();
+  await expect(todayDayScroller).toBeVisible();
+  await expect.poll(() => todayDayScroller.evaluate((node) => Math.round(node.scrollTop))).toBe(WORK_START_HOUR * CELL_HEIGHT);
+  await expectCalendarCurrentTimeMarker(page);
+
+  await page.getByRole('button', { name: '周', exact: true }).click();
   const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
   await calendarSidebar.locator('[data-calendar-mini-date="2026-01-01"]').click();
   await page.getByRole('button', { name: '日', exact: true }).click();
