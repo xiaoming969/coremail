@@ -256,14 +256,28 @@ export const getDraftEndMeta = (date, startH, durationH) => {
     hour: end.getHours() + (end.getMinutes() >= 30 ? 0.5 : 0),
   };
 };
-export const isHuaweiMakeupWorkday = (date) => {
-  const target = stripTime(date);
-  return target.getDay() === 6 && addDays(target, 7).getMonth() !== target.getMonth();
-};
 export const isWeekendDate = (date) => {
   const day = date.getDay();
   return day === 0 || day === 6;
 };
+export const CHINA_2026_HOLIDAY_RANGES = [
+  { id: 'new-year', label: '元旦假期', start: new Date(2026, 0, 1), end: new Date(2026, 0, 3) },
+  { id: 'spring-festival', label: '春节假期', start: new Date(2026, 1, 15), end: new Date(2026, 1, 23) },
+  { id: 'qingming', label: '清明节假期', start: new Date(2026, 3, 4), end: new Date(2026, 3, 6) },
+  { id: 'labor', label: '劳动节假期', start: new Date(2026, 4, 1), end: new Date(2026, 4, 5) },
+  { id: 'dragon-boat', label: '端午节假期', start: new Date(2026, 5, 19), end: new Date(2026, 5, 21) },
+  { id: 'mid-autumn', label: '中秋节假期', start: new Date(2026, 8, 25), end: new Date(2026, 8, 27) },
+  { id: 'national-day', label: '国庆假期', start: new Date(2026, 9, 1), end: new Date(2026, 9, 7) },
+];
+export const CHINA_2026_MAKEUP_WORKDAY_KEYS = new Set(['2026-01-04', '2026-02-14', '2026-02-28', '2026-05-09', '2026-09-20', '2026-10-10']);
+export const getChinaHolidayRange = (date) => {
+  const target = stripTime(date).getTime();
+  return CHINA_2026_HOLIDAY_RANGES.find((range) => target >= stripTime(range.start).getTime() && target <= stripTime(range.end).getTime()) || null;
+};
+export const isChinaHolidayDate = (date) => Boolean(getChinaHolidayRange(date));
+export const isChinaMakeupWorkday = (date) => CHINA_2026_MAKEUP_WORKDAY_KEYS.has(formatDateLabel(date));
+export const isChinaRestDay = (date) => !isChinaMakeupWorkday(date) && (isWeekendDate(date) || isChinaHolidayDate(date));
+export const isHuaweiMakeupWorkday = isChinaMakeupWorkday;
 export const createAllDayCalendarEvent = ({ id, title, date, span = 1, calId, description = '', type = 'normal' }) => {
   const parts = dateToEventParts(date);
 
@@ -1140,6 +1154,8 @@ export const buildWeekDays = (focusDate) => {
       short: WEEKDAY_NAMES[index],
       dayNumber: date.getDate(),
       isToday: sameDay(date, TODAY_DATE),
+      isRestDay: isChinaRestDay(date),
+      isMakeupWorkday: isChinaMakeupWorkday(date),
     };
   });
 };
@@ -1158,6 +1174,8 @@ export const buildMiniMonthCells = (focusDate) => {
       date,
       isCurrentMonth: date.getMonth() === focusDate.getMonth(),
       isToday: sameDay(date, TODAY_DATE),
+      isRestDay: isChinaRestDay(date),
+      isMakeupWorkday: isChinaMakeupWorkday(date),
     };
   });
 };
@@ -1766,45 +1784,49 @@ export const MOCK_CALENDARS = [
 export const HUAWEI_HOLIDAY_EVENTS = [
   createAllDayCalendarEvent({
     id: 'huawei-holiday-2026-new-year',
-    title: '元旦',
+    title: '元旦假期',
     date: new Date(2026, 0, 1),
+    span: 3,
     calId: HUAWEI_CALENDAR_ID,
     type: 'holiday',
   }),
   createAllDayCalendarEvent({
     id: 'huawei-holiday-2026-spring-festival',
     title: '春节假期',
-    date: new Date(2026, 1, 16),
-    span: 7,
+    date: new Date(2026, 1, 15),
+    span: 9,
     calId: HUAWEI_CALENDAR_ID,
     type: 'holiday',
   }),
   createAllDayCalendarEvent({
     id: 'huawei-holiday-2026-qingming',
-    title: '清明节',
-    date: new Date(2026, 3, 5),
-    calId: HUAWEI_CALENDAR_ID,
-    type: 'holiday',
-  }),
-  createAllDayCalendarEvent({
-    id: 'huawei-holiday-2026-labor',
-    title: '劳动节',
-    date: new Date(2026, 4, 1),
+    title: '清明节假期',
+    date: new Date(2026, 3, 4),
     span: 3,
     calId: HUAWEI_CALENDAR_ID,
     type: 'holiday',
   }),
   createAllDayCalendarEvent({
+    id: 'huawei-holiday-2026-labor',
+    title: '劳动节假期',
+    date: new Date(2026, 4, 1),
+    span: 5,
+    calId: HUAWEI_CALENDAR_ID,
+    type: 'holiday',
+  }),
+  createAllDayCalendarEvent({
     id: 'huawei-holiday-2026-dragon-boat',
-    title: '端午节',
+    title: '端午节假期',
     date: new Date(2026, 5, 19),
+    span: 3,
     calId: HUAWEI_CALENDAR_ID,
     type: 'holiday',
   }),
   createAllDayCalendarEvent({
     id: 'huawei-holiday-2026-mid-autumn',
-    title: '中秋节',
+    title: '中秋节假期',
     date: new Date(2026, 8, 25),
+    span: 3,
     calId: HUAWEI_CALENDAR_ID,
     type: 'holiday',
   }),

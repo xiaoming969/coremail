@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { MOCK_MAILS } from '../src/domain/appModel.js';
+import { CELL_HEIGHT, MOCK_MAILS, WORK_START_HOUR } from '../src/domain/appModel.js';
 
 const DISALLOWED_MAIL_SENDER_NAME_RE = /(老师|经理|总监|主管|工程师|代表|顾问|助理|团队|部门|人力资源|负责人|开发|博士|总|工|同学|CFO)$/;
 const PERSONAL_MAIL_SENDER_NAME_RE = /^[\u4e00-\u9fa5]{2,4}$/;
@@ -124,6 +124,31 @@ test('calendar split headers use localized source names', async ({ page }) => {
   await expect(weekSplitHeader).toContainText('华为日历');
   await expect(weekSplitHeader).not.toContainText('@calendarpro.io');
   await expect(weekSplitHeader).not.toContainText('huawei-calendar');
+});
+
+test('calendar timeline opens at work hours and greys China rest days', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+
+  const weekScroller = page.locator('[data-timeline-scroll="week"]').first();
+  await expect(weekScroller).toBeVisible();
+  await expect.poll(() => weekScroller.evaluate((node) => Math.round(node.scrollTop))).toBe(WORK_START_HOUR * CELL_HEIGHT);
+
+  const calendarSidebar = page.locator('[data-app-sidebar="calendar"]');
+  await calendarSidebar.locator('[data-calendar-mini-date="2026-01-01"]').click();
+  await page.getByRole('button', { name: '日', exact: true }).click();
+
+  const dayScroller = page.locator('[data-timeline-scroll="day"]').first();
+  await expect(dayScroller).toBeVisible();
+  await expect.poll(() => dayScroller.evaluate((node) => Math.round(node.scrollTop))).toBe(WORK_START_HOUR * CELL_HEIGHT);
+
+  await expect(page.locator('[data-calendar-day-header-rest="true"]').first()).toBeVisible();
+  const restDaySlot = page
+    .locator('[data-calendar-slot="true"][data-calendar-rest-day="true"][data-slot-hour="9"]')
+    .first();
+  await expect(restDaySlot).toBeVisible();
+  await expect.poll(() => restDaySlot.evaluate((node) => node.className.includes('bg-slate-100'))).toBe(true);
 });
 
 test('workspace splitters resize calendar and mail panes', async ({ page }) => {
