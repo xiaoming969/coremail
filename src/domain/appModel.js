@@ -463,6 +463,26 @@ export const formatAgendaEventLabel = (event) => {
   const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
   return `${date.getMonth() + 1}/${date.getDate()} ${WEEKDAY_NAMES[dayIndex]} · ${event.isAllDay ? '全天' : formatTimeRange(event.startH || WORK_START_HOUR, event.durationH || 1)}`;
 };
+export const getWeekdayName = (date) => {
+  const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+  return WEEKDAY_NAMES[dayIndex] || '';
+};
+export const formatRepeatRuleLabel = (event) => {
+  const repeat = event?.repeat || 'does_not_repeat';
+  if (repeat === 'does_not_repeat') return '不重复';
+  if (repeat === 'every_day') return '每天';
+  if (repeat === 'weekdays' || repeat === 'workdays') return '每个工作日';
+  if (repeat === 'every_week') {
+    const repeatDate = event?.date instanceof Date ? event.date : event ? eventToDate(event) : null;
+    const weekday = repeatDate ? getWeekdayName(repeatDate) : '';
+    return weekday ? `每${weekday}` : '每周';
+  }
+  if (repeat === 'every_month') {
+    const date = event?.date instanceof Date ? event.date : event ? eventToDate(event) : null;
+    return date ? `每月${date.getDate()}日` : '每月';
+  }
+  return REPEAT_LABELS[repeat] || '重复';
+};
 export const getAgendaStatusTone = (status) => {
   if (status === '待响应') return 'bg-[#0A59F7]/[0.08] text-[#0A59F7] border-[#0A59F7]/25';
   if (status === '草稿') return 'bg-slate-100 text-slate-700 border-slate-200';

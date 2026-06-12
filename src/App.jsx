@@ -35,7 +35,7 @@ import {
   VISIBILITY_OPTIONS,
   INITIAL_CREATE_DRAFT_PANELS,
   MEETING_PROVIDER_LABELS,
-  REPEAT_LABELS,
+  formatRepeatRuleLabel,
   REMINDER_LABELS,
   stripTime,
   addDays,
@@ -5052,11 +5052,13 @@ function EventPreviewCard({
   const title = isBusyOnly ? '忙碌' : event.title || '无标题';
   const organizer = !isBusyOnly ? event.organizer || getAccountDisplayLabel(account) || '' : '';
   const isRecurring = !isBusyOnly && event.repeat && event.repeat !== 'does_not_repeat';
+  const repeatRuleLabel = isRecurring ? formatRepeatRuleLabel(event) : '';
   const joinable = !isBusyOnly && canJoinCalendarEvent(event);
   const titleTone = getToneClasses(isBusyOnly ? { ...event, type: 'busy_only' } : event, calendar?.color || account?.color || 'bg-gray-500');
 
   return (
     <div
+      data-calendar-event-preview="true"
       className="pointer-events-none fixed z-[70] w-80 max-w-[calc(100vw-32px)]"
       style={{ top: `${y}px`, left: `${x}px` }}
     >
@@ -5079,11 +5081,14 @@ function EventPreviewCard({
             {isRecurring && (
               <span
                 className="group/recurrence relative mt-0.5 inline-flex shrink-0 text-slate-400"
-                title={`循环：${REPEAT_LABELS[event.repeat] || '重复'}`}
+                title={`循环：${repeatRuleLabel}`}
               >
                 <RefreshCw size={14} aria-label="循环会议" />
-                <span className="pointer-events-none absolute right-0 top-6 z-10 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 opacity-0 shadow-md transition group-hover/recurrence:opacity-100">
-                  循环：{REPEAT_LABELS[event.repeat] || '重复'}
+                <span
+                  data-calendar-preview-recurrence-label="true"
+                  className="pointer-events-none absolute right-0 top-6 z-10 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 opacity-0 shadow-md transition group-hover/recurrence:opacity-100"
+                >
+                  循环：{repeatRuleLabel}
                 </span>
               </span>
             )}
@@ -6418,10 +6423,10 @@ function ShortcutHelpModal({ open, onClose }) {
 function MainApp() {
   const [activeProduct, setActiveProduct] = useState('mail');
   const [currentScreen, setCurrentScreen] = useState('calendar');
-  const [calendarReturnScreen, setCalendarReturnScreen] = useState('calendar');
   const [calendarLayout, setCalendarLayout] = useState('week');
   const [accountDisplayMode, setAccountDisplayMode] = useState('overlay');
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [eventDetailOpen, setEventDetailOpen] = useState(false);
   const [flashingEventId, setFlashingEventId] = useState(null);
   const [accounts, setAccounts] = useState(MOCK_ACCOUNTS);
   const [calendars, setCalendars] = useState(MOCK_CALENDARS);
@@ -7173,7 +7178,7 @@ function MainApp() {
     : '';
   const selectedEventRuleLabel = selectedEvent
     ? [
-        selectedEvent.repeat && selectedEvent.repeat !== 'does_not_repeat' ? `循环：${REPEAT_LABELS[selectedEvent.repeat]}` : '不循环',
+        selectedEvent.repeat && selectedEvent.repeat !== 'does_not_repeat' ? `循环：${formatRepeatRuleLabel(selectedEvent)}` : '不循环',
         getEffectiveEventReminder(selectedEvent, calendarReminderSettings, currentUserIdentities) !== 'none'
           ? `提醒：${REMINDER_LABELS[getEffectiveEventReminder(selectedEvent, calendarReminderSettings, currentUserIdentities)]}`
           : '不提醒',
@@ -7820,7 +7825,7 @@ function MainApp() {
     setEvents((prev) => prev.filter((event) => !accountCalendarIdSet.has(event.calId)));
     if (selectedEventId && events.some((event) => event.id === selectedEventId && accountCalendarIdSet.has(event.calId))) {
       setSelectedEventId(null);
-      if (currentScreen === 'details') setCurrentScreen('calendar');
+      setEventDetailOpen(false);
     }
     triggerFeedback('L3', {
       msg: `已删除 ${getAccountDisplayLabel(account)} 的日历`,
@@ -8298,6 +8303,7 @@ function MainApp() {
       return;
     }
     if (notification.action === 'event_details' && notification.eventId) {
+      setReminderDialogOpen(false);
       navTo('details', notification.eventId);
       return;
     }
@@ -8642,7 +8648,6 @@ function MainApp() {
     setFocusDate(stripTime(eventToDate(targetEvent)));
     setSelectedEventId(eventId);
     setCurrentScreen('calendar');
-    setCalendarReturnScreen('calendar');
 
     const scrollToLocatedEvent = () => {
       const target = document.querySelector(`[data-event-card-id="${eventId}"]`);
@@ -8663,7 +8668,6 @@ function MainApp() {
 
     if (!nextQuery) {
       setCurrentScreen('calendar');
-      setCalendarReturnScreen('calendar');
       return;
     }
 
@@ -8674,13 +8678,11 @@ function MainApp() {
     hideEventPreview();
     setSelectedEventId(null);
     setCurrentScreen('search');
-    setCalendarReturnScreen('search');
   };
   const clearCalendarSearch = () => {
     setCalendarSearchQuery('');
     setCalendarSearchPopoverOpen(false);
     setCurrentScreen('calendar');
-    setCalendarReturnScreen('calendar');
   };
 
   const adjustSelectionDuration = (durationH) => {
@@ -9513,6 +9515,11 @@ function MainApp() {
     setFocusDate(stripTime(nextDraft.date));
   };
 
+  const closeEventDetails = () => {
+    setEventDetailOpen(false);
+    setSelectedEventId(null);
+  };
+
   const navTo = (screen, eventId = null, draftSlot = null) => {
     const proceed = () => {
       setActiveProduct('calendar');
@@ -9523,19 +9530,19 @@ function MainApp() {
       setEventInteraction(null);
       setSelectedEventId(eventId);
 
-      if (screen === 'create') {
-        openCreateView(eventId, draftSlot);
-      } else if (screen === 'details' && eventId) {
-        setFocusDate(stripTime(eventToDate(events.find((event) => event.id === eventId) || { weekOffset: 0, day: 0 })));
+      if (screen === 'details') {
+        if (!eventId) return;
         resetDraftState();
-      } else {
-        resetDraftState();
+        setEventDetailOpen(true);
+        return;
       }
 
-      if (screen === 'details') {
-        setCalendarReturnScreen(currentScreen === 'search' ? 'search' : 'calendar');
-      } else if (screen === 'calendar' || screen === 'search') {
-        setCalendarReturnScreen(screen);
+      setEventDetailOpen(false);
+
+      if (screen === 'create') {
+        openCreateView(eventId, draftSlot);
+      } else {
+        resetDraftState();
       }
 
       setCurrentScreen(screen);
@@ -9584,7 +9591,6 @@ function MainApp() {
     setCalendarLayout('week');
     setAccountDisplayMode('overlay');
     setCalendarSearchQuery('');
-    setCalendarReturnScreen('calendar');
     setFocusDate(stripTime(TODAY_DATE));
     setSelectedEventId(null);
     queueTimelineScrollToWorkStart('week');
@@ -9822,7 +9828,7 @@ function MainApp() {
     setEvents((prev) => prev.filter((event) => event.id !== id));
     hideEventPreview(id);
     if (selectedEventId === id) setSelectedEventId(null);
-    if (currentScreen === 'details') setCurrentScreen('calendar');
+    if (selectedEventId === id) setEventDetailOpen(false);
     triggerFeedback('L3', {
       msg: '已从日历中移除',
       icon: <Trash size={16} />,
@@ -10029,7 +10035,8 @@ function MainApp() {
 
     setSelectedEventId(nextId);
     setFocusDate(stripTime(normalizedDraft.date));
-    setCurrentScreen(mode === 'send' ? 'details' : 'calendar');
+    setCurrentScreen('calendar');
+    setEventDetailOpen(mode === 'send');
     resetDraftState();
     if (typeof afterSave === 'function') {
       setTimeout(() => afterSave(nextId), 0);
@@ -10240,6 +10247,10 @@ function MainApp() {
           closeSharedCalendarDialog();
           return;
         }
+        if (eventDetailOpen) {
+          closeEventDetails();
+          return;
+        }
         if (reminderDialogOpen) {
           setReminderDialogOpen(false);
           return;
@@ -10334,7 +10345,7 @@ function MainApp() {
         default:
           if (
             (event.key === 'Delete' || event.key === 'Backspace') &&
-            (currentScreen === 'details' || currentScreen === 'calendar') &&
+            (eventDetailOpen || currentScreen === 'calendar') &&
             selectedEventId
           ) {
             event.preventDefault();
@@ -10361,6 +10372,7 @@ function MainApp() {
     currentScreen,
     feedback.type,
     selectedEventId,
+    eventDetailOpen,
     calendarLayout,
     createDraft.isDirty,
     mailComposer.open,
@@ -10898,10 +10910,13 @@ function MainApp() {
                   </Suspense>
                 )}
 
-                {currentScreen === 'details' && selectedEvent && createPortal(
+                {eventDetailOpen && selectedEvent && createPortal(
                   (
-	                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/10 p-0">
-	                    <div className="h-[70vh] max-h-[calc(100vh-32px)] w-[70vw] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]">
+		                  <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/10 p-0">
+		                    <div
+                          data-calendar-detail-modal="true"
+                          className="h-[70vh] max-h-[calc(100vh-32px)] w-[70vw] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_18px_56px_rgba(15,23,42,0.18)]"
+                        >
 	                      <div className="flex h-full w-full flex-col overflow-hidden bg-white">
 	                        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 text-sm sm:px-6">
 	                          <div className="min-w-0">
@@ -10914,10 +10929,10 @@ function MainApp() {
 	                            <button className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-600" aria-label="窗口化">
 	                              <Square size={14} />
 	                            </button>
-	                            <button
-	                              onClick={() => navTo(calendarReturnScreen || 'calendar')}
-	                              className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-700"
-	                              aria-label="关闭"
+		                            <button
+		                              onClick={closeEventDetails}
+		                              className="rounded-md p-1.5 transition hover:bg-slate-100 hover:text-slate-700"
+		                              aria-label="关闭"
 	                            >
 	                              <X size={16} />
 	                            </button>
@@ -11496,7 +11511,7 @@ function MainApp() {
                                 </div>
                               )}
 		                              {draftForm.repeat !== 'does_not_repeat' && (
-		                                <div className="text-xs text-slate-400">{REPEAT_LABELS[draftForm.repeat] || '每周'}</div>
+		                                <div className="text-xs text-slate-400">{formatRepeatRuleLabel(draftForm)}</div>
 		                              )}
                               <div className="relative">
                                 <Bell size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -11688,7 +11703,10 @@ function MainApp() {
         reminderEvents={reminderEvents.active}
         accountMap={accountMap}
         calendarMap={calendarMap}
-        onOpenEvent={(id) => navTo('details', id)}
+        onOpenEvent={(id) => {
+          setReminderDialogOpen(false);
+          navTo('details', id);
+        }}
         onJoinEvent={handleJoinReminderEvent}
         onSnoozeEvent={handleSnoozeReminderEvent}
         onDismissEvent={handleDismissReminderEvent}

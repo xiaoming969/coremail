@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { CELL_HEIGHT, MOCK_MAILS, WORK_START_HOUR } from '../src/domain/appModel.js';
+import { CELL_HEIGHT, formatRepeatRuleLabel, MOCK_MAILS, WORK_START_HOUR } from '../src/domain/appModel.js';
 
 const DISALLOWED_MAIL_SENDER_NAME_RE = /(老师|经理|总监|主管|工程师|代表|顾问|助理|团队|部门|人力资源|负责人|开发|博士|总|工|同学|CFO)$/;
 const PERSONAL_MAIL_SENDER_NAME_RE = /^[\u4e00-\u9fa5]{2,4}$/;
@@ -44,6 +44,10 @@ test('mail mock data uses personal sender names and explicit sender scope', () =
     (mail) => `${mail.id}:${mail.fromName}<${mail.fromEmail}>:${mail.fromScope}`,
   );
   expect(mismatchedScopes).toEqual([]);
+});
+
+test('calendar weekly repeat labels include the weekday when date is known', () => {
+  expect(formatRepeatRuleLabel({ repeat: 'every_week', weekOffset: 0, day: 3 })).toBe('每周四');
 });
 
 test('mail list distinguishes external senders before opening detail', async ({ page }) => {
@@ -179,6 +183,27 @@ test('calendar timeline opens at work hours and greys China rest days', async ({
     .first();
   await expect(restDaySlot).toBeVisible();
   await expect.poll(() => restDaySlot.evaluate((node) => node.className.includes('bg-slate-100'))).toBe(true);
+});
+
+test('calendar event details open over the current calendar view with specific repeat text', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+  await page.getByRole('button', { name: '日历', exact: true }).click();
+
+  const weekScroller = page.locator('[data-timeline-scroll="week"]');
+  await expect(weekScroller).toBeVisible();
+
+  const weeklyEvent = page.locator('[data-event-card-id="q4-budget-sync"]');
+  await expect(weeklyEvent).toBeVisible();
+  await weeklyEvent.hover();
+  await expect(page.locator('[data-calendar-event-preview="true"]')).toBeVisible();
+  await expect(page.locator('[data-calendar-preview-recurrence-label="true"]')).toContainText('循环：每周五');
+
+  await weeklyEvent.dblclick();
+  const detailModal = page.locator('[data-calendar-detail-modal="true"]');
+  await expect(detailModal).toBeVisible();
+  await expect(weekScroller).toBeVisible();
+  await expect(detailModal).toContainText('循环：每周五');
 });
 
 test('workspace splitters resize calendar and mail panes', async ({ page }) => {
@@ -1380,10 +1405,16 @@ test('calendar reminder modal clears events after joining', async ({ page }) => 
   await expect(dialog.getByText('双击日程查看详情')).toHaveCount(0);
 
   await q4Reminder.getByText('Q4 预算评审会').dblclick();
-  await expect(dialog).toHaveCount(1);
-  await expect(page.getByText('日历详情')).toBeVisible();
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const detailModal = page.locator('[data-calendar-detail-modal="true"]');
+  await expect(detailModal).toBeVisible();
+  await expect(page.locator('[data-timeline-scroll="week"]')).toBeVisible();
+  await detailModal.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(detailModal).toHaveCount(0);
+  await expect(page.locator('[data-timeline-scroll="week"]')).toBeVisible();
+  await page.getByRole('button', { name: '提醒' }).click();
   await expect(dialog).toBeVisible();
+  await q4Reminder.getByText('Q4 预算评审会').click();
 
   await q4Reminder.getByRole('button', { name: '加入会议' }).click();
   await expect.poll(() => page.evaluate(() => window.__lastOpenedUrl)).toContain('teams.microsoft.com');
