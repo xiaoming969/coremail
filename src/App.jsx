@@ -190,6 +190,7 @@ const Eye = createLucideIcon('eye');
 const FileText = createLucideIcon('file-text');
 const Flag = createLucideIcon('flag');
 const FlagFilled = createIconifyIcon('ph:flag-fill');
+const FolderPlus = createLucideIcon('folder-plus');
 const Forward = createLucideIcon('forward');
 const Funnel = createLucideIcon('funnel');
 const HelpCircle = createLucideIcon('circle-help');
@@ -217,6 +218,7 @@ const Sparkles = createLucideIcon('sparkles');
 const Square = createLucideIcon('square');
 const SquareCheck = createLucideIcon('square-check');
 const SquarePen = createLucideIcon('square-pen');
+const Star = createLucideIcon('star');
 const Trash = createLucideIcon('trash');
 const UserPlus = createLucideIcon('user-plus');
 const Users = createLucideIcon('users');
@@ -1237,21 +1239,39 @@ function MailSidebar({
   };
 
   const isFavoriteTargetSaved = (target) => mailFavorites.some((favorite) => favorite.id === target.id);
-  const buildContextMenuItems = () => {
+  const buildContextMenuGroups = () => {
     if (!sidebarContextMenu) return [];
     const { type, item } = sidebarContextMenu;
 
     if (type === 'account') {
       return [
         {
-          label: '创建子文件夹',
-          icon: Plus,
-          onClick: () => onCreateMailSubfolder(item.accountId),
+          id: 'primary',
+          items: [
+            {
+              label: '打开',
+              icon: Mail,
+              iconName: 'mail',
+              onClick: () => onSelectFolder('inbox', item.accountId),
+            },
+          ],
         },
         {
-          label: '导入归档',
-          icon: Archive,
-          onClick: () => onImportMailArchive(item.accountId),
+          id: 'organize',
+          items: [
+            {
+              label: '创建子文件夹',
+              icon: FolderPlus,
+              iconName: 'folder-plus',
+              onClick: () => onCreateMailSubfolder(item.accountId),
+            },
+            {
+              label: '导入归档',
+              icon: Archive,
+              iconName: 'archive',
+              onClick: () => onImportMailArchive(item.accountId),
+            },
+          ],
         },
       ];
     }
@@ -1259,14 +1279,26 @@ function MailSidebar({
     if (type === 'favorite') {
       return [
         {
-          label: '打开',
-          icon: Mail,
-          onClick: () => onSelectFolder(item.folderId, item.accountId),
+          id: 'primary',
+          items: [
+            {
+              label: '打开',
+              icon: Mail,
+              iconName: 'mail',
+              onClick: () => onSelectFolder(item.folderId, item.accountId),
+            },
+          ],
         },
         {
-          label: '从收藏夹移除',
-          icon: X,
-          onClick: () => onRemoveMailFavorite(item.id),
+          id: 'organize',
+          items: [
+            {
+              label: '从收藏夹移除',
+              icon: X,
+              iconName: 'x',
+              onClick: () => onRemoveMailFavorite(item.id),
+            },
+          ],
         },
       ];
     }
@@ -1274,55 +1306,97 @@ function MailSidebar({
     if (MAIL_DERIVED_FOLDER_IDS.has(item.folderId)) {
       return [
         {
-          label: '全部标记为已读',
-          icon: MailOpen,
-          onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
+          id: 'primary',
+          items: [
+            {
+              label: '打开',
+              icon: Mail,
+              iconName: 'mail',
+              onClick: () => onSelectFolder(item.folderId, item.accountId),
+            },
+          ],
+        },
+        {
+          id: 'state',
+          items: [
+            {
+              label: '全部标记为已读',
+              icon: MailOpen,
+              iconName: 'mail-open',
+              onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
+            },
+          ],
         },
       ];
     }
 
-    const items = [
-      {
-        label: '打开',
-        icon: Mail,
-        onClick: () => onSelectFolder(item.folderId, item.accountId),
-      },
-      {
-        label: '全部标记为已读',
-        icon: MailOpen,
-        onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
-      },
+    const organizeItems = [
       {
         label: '创建子文件夹',
-        icon: Plus,
+        icon: FolderPlus,
+        iconName: 'folder-plus',
         onClick: () => onCreateMailSubfolder(item.accountId, item.folderId),
       },
     ];
 
     if (!item.isCustom) {
-      items.push(
+      organizeItems.push(
         isFavoriteTargetSaved(item.favoriteTarget)
           ? {
               label: '从收藏夹移除',
               icon: X,
+              iconName: 'x',
               onClick: () => onRemoveMailFavorite(item.favoriteTarget.id),
             }
           : {
               label: '添加到收藏夹',
-              icon: Plus,
+              icon: Star,
+              iconName: 'star',
               onClick: () => onAddMailFavorite(item.favoriteTarget),
             },
       );
     }
 
-    items.push({
-      label: '清空文件夹',
-      icon: Trash,
-      danger: true,
-      onClick: () => onClearMailFolder(item.accountId, item.folderId),
-    });
-
-    return items;
+    return [
+      {
+        id: 'primary',
+        items: [
+          {
+            label: '打开',
+            icon: Mail,
+            iconName: 'mail',
+            onClick: () => onSelectFolder(item.folderId, item.accountId),
+          },
+        ],
+      },
+      {
+        id: 'state',
+        items: [
+          {
+            label: '全部标记为已读',
+            icon: MailOpen,
+            iconName: 'mail-open',
+            onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
+          },
+        ],
+      },
+      {
+        id: 'organize',
+        items: organizeItems,
+      },
+      {
+        id: 'danger',
+        items: [
+          {
+            label: '清空文件夹',
+            icon: Trash,
+            iconName: 'trash',
+            danger: true,
+            onClick: () => onClearMailFolder(item.accountId, item.folderId),
+          },
+        ],
+      },
+    ];
   };
 
   if (collapsed) {
@@ -1522,19 +1596,30 @@ function MailSidebar({
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
-          {buildContextMenuItems().map(({ label, icon: Icon, danger, onClick }) => (
-            <button
-              key={label}
-              type="button"
-              role="menuitem"
-              onClick={() => runSidebarContextAction(onClick)}
-              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-50 ${
-                danger ? 'text-red-600 hover:text-red-700' : 'text-slate-700 hover:text-slate-950'
-              }`}
-            >
-              <Icon size={15} className={danger ? 'text-red-500' : 'text-slate-400'} />
-              {label}
-            </button>
+          {buildContextMenuGroups().map((group, groupIndex) => (
+            <div key={group.id} data-mail-context-menu-section={group.id}>
+              {groupIndex > 0 && <div data-mail-context-menu-separator="true" className="my-1 h-px bg-slate-100" />}
+              <div data-mail-context-menu-group={group.id}>
+                {group.items.map(({ label, icon: Icon, iconName, danger, onClick }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => runSidebarContextAction(onClick)}
+                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-50 ${
+                      danger ? 'text-red-600 hover:text-red-700' : 'text-slate-700 hover:text-slate-950'
+                    }`}
+                  >
+                    <Icon
+                      data-mail-context-menu-icon={iconName}
+                      size={15}
+                      className={danger ? 'text-red-500' : 'text-slate-400'}
+                    />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

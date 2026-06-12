@@ -349,9 +349,13 @@ test('mail sidebar context menus expose account and folder operations without ac
 
   await mailSidebar.locator('[data-mailbox-account="acc1"]').click({ button: 'right' });
   await expect(contextMenu).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
   await expect(contextMenu).toContainText('创建子文件夹');
   await expect(contextMenu).toContainText('导入归档');
   await expect(contextMenu).not.toContainText('me@calendarpro.io');
+  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="organize"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(1);
   await contextMenu.getByRole('menuitem', { name: '创建子文件夹' }).click();
   await expect(mailSidebar.locator('[data-mailbox-custom-folder="custom-acc1-1"]')).toContainText('新建文件夹 1');
   await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已创建子文件夹');
@@ -365,7 +369,8 @@ test('mail sidebar context menus expose account and folder operations without ac
   await expect(mailSidebar.locator('[data-mailbox-custom-folder="import-acc1-1"]')).toContainText('导入归档');
 
   await mailSidebar.locator('[data-mailbox-folder="unread"]').first().click({ button: 'right' });
-  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(2);
+  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
   await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
   await expect(contextMenu).not.toContainText('创建子文件夹');
   await expect(contextMenu).not.toContainText('清空文件夹');
@@ -374,7 +379,8 @@ test('mail sidebar context menus expose account and folder operations without ac
 
   await page.keyboard.press('Escape');
   await mailSidebar.locator('[data-mailbox-folder="flagged"]').first().click({ button: 'right' });
-  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(2);
+  await expect(contextMenu.getByRole('menuitem', { name: '打开' })).toBeVisible();
   await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
   await expect(contextMenu).not.toContainText('创建子文件夹');
   await expect(contextMenu).not.toContainText('清空文件夹');
@@ -386,6 +392,13 @@ test('mail sidebar context menus expose account and folder operations without ac
   await expect(contextMenu).toContainText('创建子文件夹');
   await expect(contextMenu).toContainText('清空文件夹');
   await expect(contextMenu).not.toContainText('me@calendarpro.io');
+  await expect(contextMenu.locator('[data-mail-context-menu-group="primary"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="state"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="organize"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-group="danger"]')).toBeVisible();
+  await expect(contextMenu.locator('[data-mail-context-menu-separator="true"]')).toHaveCount(3);
+  await expect(contextMenu.getByRole('menuitem', { name: '创建子文件夹' }).locator('[data-mail-context-menu-icon="folder-plus"]')).toBeVisible();
+  await expect(contextMenu.getByRole('menuitem', { name: '添加到收藏夹' }).locator('[data-mail-context-menu-icon="star"]')).toBeVisible();
 
   await page.keyboard.press('Escape');
   await mailSidebar.locator('[data-mailbox-folder="inbox"]').first().click({ button: 'right' });
