@@ -237,6 +237,7 @@ const MAIL_READER_MIN_WIDTH = 720;
 const MAIL_LAYOUT_ABC_RESTORE_RATIO = 0.64;
 const MAIL_LAYOUT_STORAGE_KEY = 'coremail.mailLayout';
 const MAIL_FAVORITES_STORAGE_KEY = 'coremail.mailFavorites';
+const MAIL_CUSTOM_FOLDERS_STORAGE_KEY = 'coremail.mailCustomFolders';
 const MAIL_LAYOUT_MODE_ABC = 'ABC';
 const MAIL_LAYOUT_MODE_AB = 'AB';
 const APP_COLLAPSED_SIDEBAR_WIDTH = 64;
@@ -542,6 +543,7 @@ const MAIL_SIDEBAR_FOLDERS = [
   ...MAIL_FOLDERS.filter((folder) => folder.id !== 'inbox').map((folder) => ({ ...folder, icon: resolveIconComponent(folder.icon) })),
 ];
 const MAIL_ALL_ACCOUNTS_ID = 'all';
+const MAIL_DERIVED_FOLDER_IDS = new Set(['unread', 'flagged']);
 const MAIL_FAVORITE_GLOBAL_FOLDERS = ['sent', 'drafts', 'deleted'];
 const MAIL_FAVORITE_LABEL_OVERRIDES = {
   deleted: '已删除',
@@ -549,14 +551,11 @@ const MAIL_FAVORITE_LABEL_OVERRIDES = {
 
 const buildMailFavoriteId = (folderId, accountId = MAIL_ALL_ACCOUNTS_ID) => `${folderId}-${accountId || MAIL_ALL_ACCOUNTS_ID}`;
 
-const getMailFavoriteTarget = (folderId, accountId = MAIL_ALL_ACCOUNTS_ID) => {
-  const scopedAccountId = folderId === 'inbox' ? accountId : MAIL_ALL_ACCOUNTS_ID;
-  return {
-    id: buildMailFavoriteId(folderId, scopedAccountId),
-    folderId,
-    accountId: scopedAccountId,
-  };
-};
+const getMailFavoriteTarget = (folderId, accountId = MAIL_ALL_ACCOUNTS_ID) => ({
+  id: buildMailFavoriteId(folderId, accountId || MAIL_ALL_ACCOUNTS_ID),
+  folderId,
+  accountId: accountId || MAIL_ALL_ACCOUNTS_ID,
+});
 
 const getDefaultMailFavorites = (accounts, mails) => {
   const mailboxAccountIds = new Set(mails.map((mail) => mail.accountId));
@@ -606,6 +605,53 @@ const persistMailFavorites = (favorites) => {
     window.localStorage.setItem(MAIL_FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
   } catch {
     // Ignore private browsing or storage quota failures; current session state still works.
+  }
+};
+
+const normalizeMailCustomFolders = (items, accounts) => {
+  if (!Array.isArray(items)) return [];
+
+  const accountIds = new Set(accounts.map((account) => account.id));
+  const seen = new Set();
+  const normalized = [];
+
+  items.forEach((item) => {
+    if (!item || typeof item.id !== 'string' || typeof item.label !== 'string') return;
+    if (!accountIds.has(item.accountId)) return;
+    const label = item.label.trim();
+    if (!label || seen.has(item.id)) return;
+    seen.add(item.id);
+    normalized.push({
+      id: item.id,
+      accountId: item.accountId,
+      parentFolderId: typeof item.parentFolderId === 'string' ? item.parentFolderId : null,
+      label,
+      source: item.source === 'import' ? 'import' : 'manual',
+    });
+  });
+
+  return normalized;
+};
+
+const loadMailCustomFolders = (accounts) => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(MAIL_CUSTOM_FOLDERS_STORAGE_KEY);
+    if (raw === null) return [];
+    return normalizeMailCustomFolders(JSON.parse(raw), accounts);
+  } catch {
+    return [];
+  }
+};
+
+const persistMailCustomFolders = (folders) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(MAIL_CUSTOM_FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+  } catch {
+    // Ignore private browsing or storage quota failures; current session folders still work.
   }
 };
 
@@ -1114,11 +1160,16 @@ function MailSidebar({
   onToggleCollapsed,
   onSelectFolder,
   onCompose,
+  mailCustomFolders = [],
   mailFavorites,
   mailFavoritesCollapsed,
   onToggleMailFavoritesCollapsed,
   onAddMailFavorite,
   onRemoveMailFavorite,
+  onCreateMailSubfolder,
+  onImportMailArchive,
+  onMarkMailFolderRead,
+  onClearMailFolder,
   activeProduct,
   onSelectProduct,
 }) {
@@ -1126,7 +1177,11 @@ function MailSidebar({
   const mailAccountIds = new Set(mails.map((mail) => mail.accountId));
   const mailboxes = accounts.filter((account) => mailAccountIds.has(account.id));
   const accountMap = Object.fromEntries(accounts.map((account) => [account.id, account]));
-  const folderMap = Object.fromEntries(MAIL_SIDEBAR_FOLDERS.map((folder) => [folder.id, folder]));
+  const customFolderMap = Object.fromEntries(mailCustomFolders.map((folder) => [folder.id, { ...folder, icon: FileText, custom: true }]));
+  const folderMap = {
+    ...Object.fromEntries(MAIL_SIDEBAR_FOLDERS.map((folder) => [folder.id, folder])),
+    ...customFolderMap,
+  };
   const getFolderCount = (accountId, folderId) => mails.filter((mail) => mail.accountId === accountId && mailMatchesFolder(mail, folderId)).length;
   const getAggregateFolderCount = (folderId) => mails.filter((mail) => mailMatchesFolder(mail, folderId)).length;
   const favoriteRows = mailFavorites
@@ -1182,6 +1237,93 @@ function MailSidebar({
   };
 
   const isFavoriteTargetSaved = (target) => mailFavorites.some((favorite) => favorite.id === target.id);
+  const buildContextMenuItems = () => {
+    if (!sidebarContextMenu) return [];
+    const { type, item } = sidebarContextMenu;
+
+    if (type === 'account') {
+      return [
+        {
+          label: '创建子文件夹',
+          icon: Plus,
+          onClick: () => onCreateMailSubfolder(item.accountId),
+        },
+        {
+          label: '导入归档',
+          icon: Archive,
+          onClick: () => onImportMailArchive(item.accountId),
+        },
+      ];
+    }
+
+    if (type === 'favorite') {
+      return [
+        {
+          label: '打开',
+          icon: Mail,
+          onClick: () => onSelectFolder(item.folderId, item.accountId),
+        },
+        {
+          label: '从收藏夹移除',
+          icon: X,
+          onClick: () => onRemoveMailFavorite(item.id),
+        },
+      ];
+    }
+
+    if (MAIL_DERIVED_FOLDER_IDS.has(item.folderId)) {
+      return [
+        {
+          label: '全部标记为已读',
+          icon: MailOpen,
+          onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
+        },
+      ];
+    }
+
+    const items = [
+      {
+        label: '打开',
+        icon: Mail,
+        onClick: () => onSelectFolder(item.folderId, item.accountId),
+      },
+      {
+        label: '全部标记为已读',
+        icon: MailOpen,
+        onClick: () => onMarkMailFolderRead(item.accountId, item.folderId),
+      },
+      {
+        label: '创建子文件夹',
+        icon: Plus,
+        onClick: () => onCreateMailSubfolder(item.accountId, item.folderId),
+      },
+    ];
+
+    if (!item.isCustom) {
+      items.push(
+        isFavoriteTargetSaved(item.favoriteTarget)
+          ? {
+              label: '从收藏夹移除',
+              icon: X,
+              onClick: () => onRemoveMailFavorite(item.favoriteTarget.id),
+            }
+          : {
+              label: '添加到收藏夹',
+              icon: Plus,
+              onClick: () => onAddMailFavorite(item.favoriteTarget),
+            },
+      );
+    }
+
+    items.push({
+      label: '清空文件夹',
+      icon: Trash,
+      danger: true,
+      onClick: () => onClearMailFolder(item.accountId, item.folderId),
+    });
+
+    return items;
+  };
 
   if (collapsed) {
     return (
@@ -1305,6 +1447,12 @@ function MailSidebar({
                 type="button"
                 data-mailbox-account={account.id}
                 onClick={() => onSelectFolder('inbox', account.id)}
+                onContextMenu={(event) =>
+                  openSidebarContextMenu(event, {
+                    type: 'account',
+                    item: { accountId: account.id },
+                  })
+                }
                 className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200/70 hover:text-slate-900"
               >
                 <span className="truncate">{account.email}</span>
@@ -1312,7 +1460,12 @@ function MailSidebar({
               </button>
 
               <div className="mt-1 space-y-0.5">
-                {MAIL_SIDEBAR_FOLDERS.map(({ id, label, icon: Icon }) => {
+                {[
+                  ...MAIL_SIDEBAR_FOLDERS,
+                  ...mailCustomFolders
+                    .filter((folder) => folder.accountId === account.id)
+                    .map((folder) => ({ ...folder, icon: FileText, custom: true })),
+                ].map(({ id, label, icon: Icon, custom }) => {
                   const selected = selectedMailAccountId === account.id && mailFolder === id;
                   const count = getFolderCount(account.id, id);
                   const favoriteTarget = getMailFavoriteTarget(id, account.id);
@@ -1320,6 +1473,7 @@ function MailSidebar({
                     <button
                       key={id}
                       data-mailbox-folder={id}
+                      data-mailbox-custom-folder={custom ? id : undefined}
                       type="button"
                       onClick={() => onSelectFolder(id, account.id)}
                       onContextMenu={(event) =>
@@ -1332,6 +1486,7 @@ function MailSidebar({
                             accountId: account.id,
                             favoriteTarget,
                             favoriteLabel: getMailFavoriteLabel(favoriteTarget, accountMap),
+                            isCustom: Boolean(custom),
                           },
                         })
                       }
@@ -1362,59 +1517,25 @@ function MailSidebar({
         <div
           data-mail-sidebar-context-menu="true"
           role="menu"
-          className="fixed z-50 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
+          className="fixed z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_16px_40px_rgba(15,23,42,0.16)]"
           style={{ top: sidebarContextMenu.y, left: sidebarContextMenu.x }}
           onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="mb-0.5 border-b border-slate-100 px-3 py-2">
-            <div className="truncate text-xs font-bold text-slate-900">{sidebarContextMenu.item.label}</div>
-            {sidebarContextMenu.type === 'folder' && (
-              <div className="mt-0.5 truncate text-[11px] font-medium text-slate-400">{accountMap[sidebarContextMenu.item.accountId]?.email}</div>
-            )}
-          </div>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() =>
-              runSidebarContextAction(() => onSelectFolder(sidebarContextMenu.item.folderId, sidebarContextMenu.item.accountId))
-            }
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-          >
-            <Mail size={15} className="text-slate-400" />
-            打开
-          </button>
-          {sidebarContextMenu.type === 'favorite' ? (
+          {buildContextMenuItems().map(({ label, icon: Icon, danger, onClick }) => (
             <button
+              key={label}
               type="button"
               role="menuitem"
-              onClick={() => runSidebarContextAction(() => onRemoveMailFavorite(sidebarContextMenu.item.id))}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+              onClick={() => runSidebarContextAction(onClick)}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold transition hover:bg-slate-50 ${
+                danger ? 'text-red-600 hover:text-red-700' : 'text-slate-700 hover:text-slate-950'
+              }`}
             >
-              <X size={15} className="text-slate-400" />
-              从收藏夹移除
+              <Icon size={15} className={danger ? 'text-red-500' : 'text-slate-400'} />
+              {label}
             </button>
-          ) : isFavoriteTargetSaved(sidebarContextMenu.item.favoriteTarget) ? (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => runSidebarContextAction(() => onRemoveMailFavorite(sidebarContextMenu.item.favoriteTarget.id))}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-            >
-              <X size={15} className="text-slate-400" />
-              从收藏夹移除
-            </button>
-          ) : (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => runSidebarContextAction(() => onAddMailFavorite(sidebarContextMenu.item.favoriteTarget))}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-            >
-              <Plus size={15} className="text-slate-400" />
-              添加到收藏夹
-            </button>
-          )}
+          ))}
         </div>
       )}
 
@@ -6119,6 +6240,7 @@ function MainApp() {
   const [selectedMailId, setSelectedMailId] = useState(MOCK_MAILS[0]?.id || null);
   const [mailFavorites, setMailFavorites] = useState(() => loadMailFavorites(MOCK_ACCOUNTS, MOCK_MAILS));
   const [mailFavoritesCollapsed, setMailFavoritesCollapsed] = useState(false);
+  const [mailCustomFolders, setMailCustomFolders] = useState(() => loadMailCustomFolders(MOCK_ACCOUNTS));
   const [mailComposer, setMailComposer] = useState({
     open: false,
     mode: 'new',
@@ -6192,6 +6314,10 @@ function MainApp() {
   useEffect(() => {
     persistMailFavorites(mailFavorites);
   }, [mailFavorites]);
+
+  useEffect(() => {
+    persistMailCustomFolders(mailCustomFolders);
+  }, [mailCustomFolders]);
 
   const saveMailLayoutPreference = ({ layoutMode = mailLayoutMode, sidebarWidth = appSidebarWidth, listWidth = mailListWidth, readerWidth = null } = {}) => {
     persistMailLayoutPreference({ layoutMode, sidebarWidth, listWidth, readerWidth, isACollapsed: appSidebarCollapsed });
@@ -7063,6 +7189,115 @@ function MainApp() {
       msg: '已从收藏夹移除',
       icon: <X size={16} />,
       color: 'bg-slate-900',
+    });
+  };
+
+  const createMailSubfolder = (accountId, parentFolderId = null) => {
+    const nextIndex = mailCustomFolders.filter((folder) => folder.accountId === accountId && folder.source === 'manual').length + 1;
+    const parentLabel = parentFolderId ? getMailFolderLabel(parentFolderId) : '';
+    const createdFolder = {
+      id: `custom-${accountId}-${nextIndex}`,
+      accountId,
+      parentFolderId,
+      label: parentFolderId ? `${parentLabel} 子文件夹 ${nextIndex}` : `新建文件夹 ${nextIndex}`,
+      source: 'manual',
+    };
+    setMailCustomFolders((prev) => [...prev, createdFolder]);
+
+    triggerFeedback('L3', {
+      msg: createdFolder?.label ? `已创建子文件夹：${createdFolder.label}` : '已创建子文件夹',
+      icon: <Plus size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const importMailArchive = (accountId) => {
+    const nextIndex = mailCustomFolders.filter((folder) => folder.accountId === accountId && folder.source === 'import').length + 1;
+    const importedFolder = {
+      id: `import-${accountId}-${nextIndex}`,
+      accountId,
+      parentFolderId: null,
+      label: nextIndex === 1 ? '导入归档' : `导入归档 ${nextIndex}`,
+      source: 'import',
+    };
+    setMailCustomFolders((prev) => [...prev, importedFolder]);
+
+    triggerFeedback('L3', {
+      msg: importedFolder?.label ? `已导入归档：${importedFolder.label}` : '已导入归档',
+      icon: <Archive size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const getMailFolderScope = (accountId, folderId, sourceMails = mails) =>
+    sourceMails.filter((mail) => mail.accountId === accountId && mailMatchesFolder(mail, folderId));
+
+  const markMailFolderRead = (accountId, folderId) => {
+    const unreadCount = getMailFolderScope(accountId, folderId).filter((mail) => mail.unread).length;
+    if (unreadCount === 0) {
+      triggerFeedback('L3', {
+        msg: '没有未读邮件',
+        icon: <MailOpen size={16} />,
+        color: 'bg-slate-900',
+      });
+      return;
+    }
+
+    setMails((prev) =>
+      prev.map((mail) => (mail.accountId === accountId && mailMatchesFolder(mail, folderId) ? { ...mail, unread: false } : mail)),
+    );
+    triggerFeedback('L3', {
+      msg: `已标记 ${unreadCount} 封为已读`,
+      icon: <MailOpen size={16} />,
+      color: 'bg-slate-900',
+    });
+  };
+
+  const clearMailFolder = (accountId, folderId) => {
+    const scopedMails = getMailFolderScope(accountId, folderId);
+    if (scopedMails.length === 0) {
+      triggerFeedback('L3', {
+        msg: '该文件夹暂无邮件',
+        icon: <Trash size={16} />,
+        color: 'bg-slate-900',
+      });
+      return;
+    }
+
+    const folderLabel = getMailFolderLabel(folderId);
+    const shouldRemove = folderId === 'deleted' || folderId === 'junk';
+    setFeedback({
+      type: 'L4',
+      payload: {
+        title: '清空文件夹？',
+        desc: shouldRemove
+          ? `将从「${folderLabel}」永久移除 ${scopedMails.length} 封邮件。此操作只影响当前账号的该文件夹。`
+          : `将把「${folderLabel}」中的 ${scopedMails.length} 封邮件移到已删除邮件。此操作只影响当前账号的该文件夹。`,
+        cancelText: '取消',
+        confirmText: '清空文件夹',
+        onConfirm: () => {
+          setFeedback({ type: null, payload: null });
+          setMails((prev) =>
+            shouldRemove
+              ? prev.filter((mail) => !(mail.accountId === accountId && mailMatchesFolder(mail, folderId)))
+              : prev.map((mail) =>
+                  mail.accountId === accountId && mailMatchesFolder(mail, folderId)
+                    ? {
+                        ...mail,
+                        folder: 'deleted',
+                        unread: false,
+                      }
+                    : mail,
+                ),
+          );
+          setSelectedMailId(null);
+          triggerFeedback('L3', {
+            msg: '已清空文件夹',
+            icon: <Trash size={16} />,
+            color: 'bg-slate-900',
+          });
+        },
+      },
     });
   };
 
@@ -9931,11 +10166,16 @@ function MainApp() {
           onToggleCollapsed={handleToggleMailSidebarCollapsed}
           onSelectFolder={selectMailboxFolder}
           onCompose={openMailComposer}
+          mailCustomFolders={mailCustomFolders}
           mailFavorites={mailFavorites}
           mailFavoritesCollapsed={mailFavoritesCollapsed}
           onToggleMailFavoritesCollapsed={() => setMailFavoritesCollapsed((prev) => !prev)}
           onAddMailFavorite={addMailFavorite}
           onRemoveMailFavorite={removeMailFavorite}
+          onCreateMailSubfolder={createMailSubfolder}
+          onImportMailArchive={importMailArchive}
+          onMarkMailFolderRead={markMailFolderRead}
+          onClearMailFolder={clearMailFolder}
           activeProduct={activeProduct}
           onSelectProduct={handleProductSelect}
         />

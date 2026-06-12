@@ -546,6 +546,10 @@ startAt + endAt + timezone
 - `drafts`
 - `sent`
 - `archive`
+- `deleted`
+- `junk`
+- `outbox`
+- `conversation`
 
 ### 15.3 `category`
 
@@ -579,8 +583,29 @@ startAt + endAt + timezone
 规则：
 
 - `accountId = all` 表示聚合范围，展示数量和打开后的邮件列表都必须覆盖所有账号。
+- 相同 `folderId` 可以为多个账号各自创建收藏项，此时 `id` 必须保留账号维度，例如 `unread-acc1`、`unread-acc2`。
+- 账号级同名收藏项展示时必须附带账号名称或邮箱，避免用户误判作用范围。
 - `从收藏夹移除` 只删除 `MailFavorite` 入口，不改变 `Mail.folder`、邮件内容或账号权限。
 - 收藏夹添加 / 移除属于本地偏好，必须用短反馈说明结果。
+
+### 15.6 MailCustomFolder
+
+邮箱自定义文件夹表示账号下由用户创建或导入的本地文件夹节点。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 自定义文件夹 ID |
+| `accountId` | string | 是 | 所属邮箱账号 |
+| `parentFolderId` | string \| null | 否 | 父级文件夹；为空表示账号根级 |
+| `label` | string | 是 | 文件夹名称 |
+| `source` | string | 否 | 来源，例如 `manual`、`import` |
+
+规则：
+
+- `创建子文件夹` 写入 `source = manual`。
+- `导入归档` 写入 `source = import`，归档内容缺失时可以先以 Mock 文件夹表达，但不得假装已经导入真实后端数据。
+- 在无后端的原型中，自定义文件夹至少应作为本地偏好保存，刷新后不能立即丢失。
+- 自定义文件夹的右键操作应遵循普通实体文件夹规则；清空时仍需确认影响范围。
 
 ## 16. MailDraft
 

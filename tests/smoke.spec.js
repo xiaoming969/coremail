@@ -317,7 +317,7 @@ test('mail favorites context menu removes and restores favorite folders', async 
   await favoriteSent.click({ button: 'right' });
   const favoriteMenu = page.locator('[data-mail-sidebar-context-menu="true"]');
   await expect(favoriteMenu).toBeVisible();
-  await expect(favoriteMenu).toContainText('已发送');
+  await expect(favoriteMenu).not.toContainText('已发送');
   await favoriteMenu.getByRole('menuitem', { name: '从收藏夹移除' }).click();
   await expect(favoriteSent).toHaveCount(0);
   await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已从收藏夹移除');
@@ -329,15 +329,89 @@ test('mail favorites context menu removes and restores favorite folders', async 
   const folderMenu = page.locator('[data-mail-sidebar-context-menu="true"]');
   await expect(folderMenu).toBeVisible();
   await folderMenu.getByRole('menuitem', { name: '添加到收藏夹' }).click();
-  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-acc1"]')).toContainText('已发送 · me@calendarpro.io');
   await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已添加到收藏夹');
   await page.reload();
-  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-acc1"]')).toContainText('已发送 · me@calendarpro.io');
 
   await mailSidebar.getByRole('button', { name: '收起收藏夹' }).click();
   await expect(mailSidebar.locator('[data-mail-favorite]')).toHaveCount(0);
   await mailSidebar.getByRole('button', { name: '展开收藏夹' }).click();
-  await expect(mailSidebar.locator('[data-mail-favorite="sent-all"]')).toBeVisible();
+  await expect(mailSidebar.locator('[data-mail-favorite="sent-acc1"]')).toBeVisible();
+});
+
+test('mail sidebar context menus expose account and folder operations without account headers', async ({ page }) => {
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  const contextMenu = page.locator('[data-mail-sidebar-context-menu="true"]');
+
+  await mailSidebar.locator('[data-mailbox-account="acc1"]').click({ button: 'right' });
+  await expect(contextMenu).toBeVisible();
+  await expect(contextMenu).toContainText('创建子文件夹');
+  await expect(contextMenu).toContainText('导入归档');
+  await expect(contextMenu).not.toContainText('me@calendarpro.io');
+  await contextMenu.getByRole('menuitem', { name: '创建子文件夹' }).click();
+  await expect(mailSidebar.locator('[data-mailbox-custom-folder="custom-acc1-1"]')).toContainText('新建文件夹 1');
+  await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已创建子文件夹');
+
+  await mailSidebar.locator('[data-mailbox-account="acc1"]').click({ button: 'right' });
+  await contextMenu.getByRole('menuitem', { name: '导入归档' }).click();
+  await expect(mailSidebar.locator('[data-mailbox-custom-folder="import-acc1-1"]')).toContainText('导入归档');
+  await expect(page.locator('[data-feedback-toast="true"]')).toContainText('已导入归档');
+  await page.reload();
+  await expect(mailSidebar.locator('[data-mailbox-custom-folder="custom-acc1-1"]')).toContainText('新建文件夹 1');
+  await expect(mailSidebar.locator('[data-mailbox-custom-folder="import-acc1-1"]')).toContainText('导入归档');
+
+  await mailSidebar.locator('[data-mailbox-folder="unread"]').first().click({ button: 'right' });
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
+  await expect(contextMenu).not.toContainText('创建子文件夹');
+  await expect(contextMenu).not.toContainText('清空文件夹');
+  await expect(contextMenu).not.toContainText('添加到收藏夹');
+  await expect(contextMenu).not.toContainText('me@calendarpro.io');
+
+  await page.keyboard.press('Escape');
+  await mailSidebar.locator('[data-mailbox-folder="flagged"]').first().click({ button: 'right' });
+  await expect(contextMenu.getByRole('menuitem')).toHaveCount(1);
+  await expect(contextMenu.getByRole('menuitem', { name: '全部标记为已读' })).toBeVisible();
+  await expect(contextMenu).not.toContainText('创建子文件夹');
+  await expect(contextMenu).not.toContainText('清空文件夹');
+
+  await page.keyboard.press('Escape');
+  await mailSidebar.locator('[data-mailbox-folder="outbox"]').first().click({ button: 'right' });
+  await expect(contextMenu).toBeVisible();
+  await expect(contextMenu).toContainText('全部标记为已读');
+  await expect(contextMenu).toContainText('创建子文件夹');
+  await expect(contextMenu).toContainText('清空文件夹');
+  await expect(contextMenu).not.toContainText('me@calendarpro.io');
+
+  await page.keyboard.press('Escape');
+  await mailSidebar.locator('[data-mailbox-folder="inbox"]').first().click({ button: 'right' });
+  await contextMenu.getByRole('menuitem', { name: '清空文件夹' }).click();
+  await expect(page.getByRole('heading', { name: '清空文件夹？' })).toBeVisible();
+  await expect(page.getByText(/只影响当前账号的该文件夹/)).toBeVisible();
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '清空文件夹？' })).toHaveCount(0);
+});
+
+test('mail favorites distinguish same folder from multiple accounts', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'coremail.mailFavorites',
+      JSON.stringify([
+        { id: 'unread-acc1', folderId: 'unread', accountId: 'acc1' },
+        { id: 'unread-acc2', folderId: 'unread', accountId: 'acc2' },
+      ]),
+    );
+  });
+  await page.setViewportSize({ width: 1728, height: 900 });
+  await page.goto('/');
+
+  const mailSidebar = page.locator('[data-app-sidebar="mail"]');
+  await expect(mailSidebar.locator('[data-mail-favorite="unread-acc1"]')).toContainText('未读邮件 · me@calendarpro.io');
+  await expect(mailSidebar.locator('[data-mail-favorite="unread-acc2"]')).toContainText('未读邮件 · ea@calendarpro.io');
 });
 
 test('mail layout switches between ABC and AB reading modes', async ({ page }) => {
